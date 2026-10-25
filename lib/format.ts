@@ -51,3 +51,44 @@ export function formatShortDate(date: Date) {
 export function formatLongDate(date: Date) {
   return longDateFormatter.format(date)
 }
+
+export const CURRENCY = 'USD'
+
+const priceFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: CURRENCY,
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+export function formatPrice(value: number) {
+  return priceFormatter.format(value)
+}
+
+/** Up to two initials for an avatar: "Nadia Bitar" -> "NB". */
+export function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('')
+}
+
+const documentDateFormatter = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
+
+/** Dated documents always carry their year, unlike the dashboard's short dates. */
+export function formatDocumentDate(iso: string) {
+  return documentDateFormatter.format(new Date(iso))
+}
+
+/** `yyyy-MM-dd` for a date input, in local time so "today" is the user's today. */
+export function toDateInput(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+export function todayAsDateInput() {
+  return toDateInput(new Date())
+}

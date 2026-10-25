@@ -1,14 +1,22 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Poppins } from 'next/font/google'
-import { Providers } from '@/components/providers'
+import { Inter, Playfair_Display } from 'next/font/google'
+import { AppProviders } from '@/providers/app-providers'
 import './globals.css'
 
-const poppins = Poppins({
+const inter = Inter({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   display: 'swap',
-  variable: '--font-sans',
+  variable: '--font-inter',
+})
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  // 400 for figures sitting in body-weight text, 600 for titles and stat values.
+  weight: ['400', '600'],
+  display: 'swap',
+  variable: '--font-playfair',
 })
 
 export const metadata: Metadata = {
@@ -16,30 +24,21 @@ export const metadata: Metadata = {
     default: 'Bitar Fashion — Inventory',
     template: '%s · Bitar Fashion',
   },
-  description: 'Inventory and stock operations for Bitar Fashion.',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
+  description: 'Bitar Fashion is a fashion store that sells clothes and accessories.',
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'dark',
-  themeColor: '#0A0B0F',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F7F5F0' },
+    { media: '(prefers-color-scheme: dark)', color: '#121110' },
+  ],
 }
+
+/**
+ * Applies the stored theme before first paint. Without this the page would
+ * render light and then flip, and the markup would disagree with the DOM.
+ */
+const themeScript = `(function(){try{var s=localStorage.getItem('bitar-fashion:ui:v1');var t=s&&JSON.parse(s).state&&JSON.parse(s).state.theme;if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}var e=document.documentElement;e.classList.toggle('dark',t==='dark');e.style.colorScheme=t}catch(e){}})()`
 
 export default function RootLayout({
   children,
@@ -47,12 +46,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={poppins.variable}>
+    <html lang="en" className={`${inter.variable} ${playfair.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="antialiased">
-        <Providers>
+        <AppProviders>
           {children}
           {process.env.NODE_ENV === 'production' && <Analytics />}
-        </Providers>
+        </AppProviders>
       </body>
     </html>
   )

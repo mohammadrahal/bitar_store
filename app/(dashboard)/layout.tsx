@@ -1,16 +1,16 @@
 import { AppShell } from '@/components/dashboard/app-shell'
-import { DashboardUIProvider } from '@/components/dashboard/dashboard-ui-provider'
-import { ReadyGate } from '@/components/dashboard/ready-gate'
-import { InventoryProvider } from '@/components/inventory/inventory-provider'
+import { AuthGate } from '@/components/shared/auth-gate'
+import { BranchGuard } from '@/components/shared/branch-guard'
+import { HydrationGate } from '@/components/shared/hydration-gate'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <InventoryProvider>
-      <DashboardUIProvider>
+    <HydrationGate>
+      <AuthGate>
         <AppShell>
-          <ReadyGate>{children}</ReadyGate>
+          <BranchGuard>{children}</BranchGuard>
         </AppShell>
-      </DashboardUIProvider>
-    </InventoryProvider>
+      </AuthGate>
+    </HydrationGate>
   )
 }
