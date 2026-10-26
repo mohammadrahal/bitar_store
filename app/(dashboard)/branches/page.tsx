@@ -1,7 +1,6 @@
-import type { Metadata } from 'next'
-import { BranchesView } from '@/components/views/branches-view'
+import { BranchesView } from '@/components/branches/branches-view'
 
-export const metadata: Metadata = { title: 'Branches' }
+export const metadata = { title: 'Branches' }
 
 export default function BranchesPage() {
   return <BranchesView />

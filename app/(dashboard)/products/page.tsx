@@ -1,14 +1,7 @@
-import { Suspense } from 'react'
-import type { Metadata } from 'next'
-import { Skeleton } from '@/components/dashboard/primitives'
-import { ProductsView } from '@/components/views/products-view'
+import { ProductsView } from '@/components/products/products-view'
 
-export const metadata: Metadata = { title: 'Products' }
+export const metadata = { title: 'Products' }
 
 export default function ProductsPage() {
-  return (
-    <Suspense fallback={<Skeleton />}>
-      <ProductsView />
-    </Suspense>
-  )
+  return <ProductsView />
 }
