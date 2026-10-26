@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { VariantFields } from '@/components/products/variant-fields'
 import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
+import { usePermission } from '@/hooks/use-permission'
 import { useCategories, useCreateProduct, useUpdateProduct } from '@/hooks/use-products'
 import { emptyProductValues, productSchema, type ProductFormValues } from '@/schemas/product.schema'
 import type { ProductWithVariants } from '@/types'
@@ -16,7 +17,12 @@ function toFormValues(product?: ProductWithVariants): ProductFormValues {
     category: product.category,
     costPrice: product.costPrice,
     sellPrice: product.sellPrice,
-    variants: product.variants.map((variant) => ({ id: variant.id, size: variant.size, color: variant.color })),
+    variants: product.variants.map((variant) => ({
+      id: variant.id,
+      barcode: variant.barcode,
+      size: variant.size,
+      color: variant.color,
+    })),
   }
 }
 
@@ -25,6 +31,7 @@ export function ProductForm({ product, onClose }: { product?: ProductWithVariant
   const create = useCreateProduct()
   const update = useUpdateProduct()
   const { data: categories } = useCategories()
+  const showCost = usePermission().can('products:read-cost')
   const pending = create.isPending || update.isPending
 
   const {
@@ -77,10 +84,20 @@ export function ProductForm({ product, onClose }: { product?: ProductWithVariant
             <option key={category} value={category} />
           ))}
         </datalist>
-        <Field label="Cost price" error={errors.costPrice?.message}>
-          <input {...register('costPrice', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
-        </Field>
-        <Field label="Sell price" error={errors.sellPrice?.message}>
+        {showCost ? (
+          <Field label="Cost price" error={errors.costPrice?.message}>
+            <input {...register('costPrice', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
+          </Field>
+        ) : (
+          /* Registered but hidden: an employee editing a product must not
+             reset a cost price they are not allowed to see. */
+          <input {...register('costPrice', { valueAsNumber: true })} type="hidden" />
+        )}
+        <Field
+          label="Sell price"
+          error={errors.sellPrice?.message}
+          className={showCost ? undefined : 'full'}
+        >
           <input {...register('sellPrice', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
         </Field>
       </div>

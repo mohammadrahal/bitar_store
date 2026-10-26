@@ -1,31 +1,60 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { InvoiceLineFields } from '@/components/invoices/invoice-line-fields'
 import { InvoiceSummary } from '@/components/invoices/invoice-summary'
 import { Can } from '@/components/shared/can'
 import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
+import { SelectInput } from '@/components/shared/select-input'
 import { useBranches } from '@/hooks/use-branches'
 import { useCreateInvoice, useUpdateInvoice } from '@/hooks/use-invoices'
 import { usePermission } from '@/hooks/use-permission'
 import { toDateInput } from '@/lib/format'
 import { invoiceTotals } from '@/lib/invoice-totals'
-import { INVOICE_KIND_LABELS, INVOICE_KINDS, PARTY_LABELS, pricedAtCost } from '@/lib/invoices'
+import {
+  INVOICE_KIND_LABELS,
+  INVOICE_KINDS,
+  isAdjustmentKind,
+  PARTY_LABELS,
+  pricedAtCost,
+} from '@/lib/invoices'
 import { emptyInvoiceValues, invoiceSchema, type InvoiceFormValues } from '@/schemas/invoice.schema'
-import type { InvoiceWithLines, SalesChannel, VariantOption } from '@/types'
+import type { InvoiceKind, InvoiceWithLines, SalesChannel, VariantOption } from '@/types'
+
+export interface InvoicePrefill {
+  kind: InvoiceKind
+  variant: VariantOption
+}
 
 function toFormValues(
   defaultBranchId: string,
   invoice?: InvoiceWithLines,
   salesChannel?: SalesChannel,
+  prefill?: InvoicePrefill,
 ): InvoiceFormValues {
+  if (!invoice && prefill) {
+    return {
+      ...emptyInvoiceValues(defaultBranchId),
+      kind: prefill.kind,
+      lines: [
+        {
+          variantId: prefill.variant.variantId,
+          quantity: 1,
+          unitPrice: pricedAtCost(prefill.kind)
+            ? prefill.variant.costPrice
+            : prefill.variant.sellPrice,
+        },
+      ],
+    }
+  }
   if (!invoice) return emptyInvoiceValues(defaultBranchId, salesChannel)
   return {
     kind: invoice.kind,
     branchId: invoice.branchId,
     partyName: invoice.partyName,
+    reason: invoice.reason ?? '',
     issuedAt: toDateInput(new Date(invoice.issuedAt)),
     discount: invoice.discount,
     notes: invoice.notes ?? '',
@@ -45,6 +74,9 @@ function knownVariantsOf(invoice?: InvoiceWithLines): VariantOption[] {
   return invoice.lines.map((line) => ({
     variantId: line.variantId,
     sku: line.sku,
+    /* Saved lines snapshot the SKU but not the barcode, and the label does
+       not need it — only the catalog search does. */
+    barcode: '',
     productId: '',
     productName: line.productName,
     size: line.size,
@@ -67,10 +99,13 @@ export function InvoiceForm({
   onClose,
   salesChannel,
   saleOnly = false,
+  prefill,
 }: {
   invoice?: InvoiceWithLines
   defaultBranchId: string
   onClose: () => void
+  /** Opens the drawer on one variant already on a line, for a quick correction. */
+  prefill?: InvoicePrefill
   /** Tags new customer sales for the B2B or B2C ledger. */
   salesChannel?: SalesChannel
   /** Locks the form to a customer sale (no purchases or returns). */
@@ -90,7 +125,7 @@ export function InvoiceForm({
     formState: { errors },
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
-    defaultValues: toFormValues(defaultBranchId, invoice, salesChannel),
+    defaultValues: toFormValues(defaultBranchId, invoice, salesChannel, prefill),
   })
 
   const kind = saleOnly ? 'sale' : watch('kind')
@@ -102,6 +137,7 @@ export function InvoiceForm({
   // Switching kind would leave sell prices on a purchase, so it locks once lines exist.
   const kindLocked = (lines?.length ?? 0) > 0
   const kinds = INVOICE_KINDS.filter((option) => can('purchases:manage') || !pricedAtCost(option))
+  const isAdjustment = isAdjustmentKind(kind)
   const lockedChannel = salesChannel ?? invoice?.salesChannel
   const saleDrawer = saleOnly && lockedChannel ? SALE_DRAWER_COPY[lockedChannel] : null
 
@@ -152,44 +188,87 @@ export function InvoiceForm({
     >
       <div className="form-grid">
         {!saleOnly && (
-          <Field
-            label="Kind"
-            error={errors.kind?.message}
-            hint={kindLocked ? 'Remove the lines to change the kind' : undefined}
-          >
-            <select {...register('kind')} disabled={kindLocked}>
-              {kinds.map((option) => (
-                <option key={option} value={option}>
-                  {INVOICE_KIND_LABELS[option]}
-                </option>
-              ))}
-            </select>
-          </Field>
+          /* Controller wraps Field, not the other way round, so Field still
+             clones the id and aria props straight onto the trigger. */
+          <Controller
+            control={control}
+            name="kind"
+            render={({ field }) => (
+              <Field
+                label="Kind"
+                error={errors.kind?.message}
+                hint={kindLocked ? 'Remove the lines to change the kind' : undefined}
+              >
+                <SelectInput
+                  value={field.value}
+                  onValueChange={field.onChange}
+                  disabled={kindLocked}
+                  options={kinds.map((option) => ({
+                    value: option,
+                    label: INVOICE_KIND_LABELS[option],
+                  }))}
+                />
+              </Field>
+            )}
+          />
         )}
         {lockedChannel ? <input type="hidden" {...register('salesChannel')} value={lockedChannel} /> : null}
-        <Field label="Branch" error={errors.branchId?.message}>
-          <select {...register('branchId')} disabled={branches?.length === 1}>
-            {branches?.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-                {branch.isMain ? ' · Main' : ''}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label={PARTY_LABELS[kind]} error={errors.partyName?.message} className="full">
-          <input
-            {...register('partyName')}
-            autoComplete="off"
-            placeholder={lockedChannel === 'b2b' ? 'Account or business name' : 'Walk-in customer'}
-          />
-        </Field>
+        <Controller
+          control={control}
+          name="branchId"
+          render={({ field }) => (
+            <Field label="Branch" error={errors.branchId?.message}>
+              <SelectInput
+                value={field.value}
+                onValueChange={field.onChange}
+                disabled={branches?.length === 1}
+                placeholder="Select a branch"
+                options={
+                  branches?.map((branch) => ({
+                    value: branch.id,
+                    label: branch.name,
+                  })) ?? []
+                }
+              />
+            </Field>
+          )}
+        />
+        {isAdjustment ? (
+          <Field
+            label="Reason"
+            error={errors.reason?.message}
+            hint="Kept on the document, so the correction can be explained later"
+            className="full"
+          >
+            <input
+              {...register('reason')}
+              autoComplete="off"
+              placeholder="Stock count, damaged, theft, opening balance…"
+            />
+          </Field>
+        ) : (
+          <Field label={PARTY_LABELS[kind]} error={errors.partyName?.message} className="full">
+            <input
+              {...register('partyName')}
+              autoComplete="off"
+              placeholder={
+                lockedChannel === 'b2b' ? 'Account or business name' : 'Walk-in customer'
+              }
+            />
+          </Field>
+        )}
         <Field label="Date" error={errors.issuedAt?.message}>
           <input {...register('issuedAt')} type="date" />
         </Field>
-        <Field label="Discount" error={errors.discount?.message} hint="Taken off the subtotal">
-          <input {...register('discount', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
-        </Field>
+        {isAdjustment ? (
+          /* A correction has no money side, so the discount is kept at its
+             registered default rather than shown. */
+          <input {...register('discount', { valueAsNumber: true })} type="hidden" />
+        ) : (
+          <Field label="Discount" error={errors.discount?.message} hint="Taken off the subtotal">
+            <input {...register('discount', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
+          </Field>
+        )}
         <Field label="Notes" error={errors.notes?.message} hint="Optional" className="full">
           <textarea {...register('notes')} rows={2} placeholder="Anything worth remembering about this document" />
         </Field>
@@ -202,7 +281,8 @@ export function InvoiceForm({
         errors={errors}
         kind={kind}
         branchId={branchId}
-        knownVariants={knownVariantsOf(invoice)}
+        /* The prefilled variant labels its own line before any search runs. */
+        knownVariants={prefill ? [prefill.variant] : knownVariantsOf(invoice)}
       />
 
       <InvoiceSummary totals={totals} showMargin={false} />

@@ -5,9 +5,11 @@ import { SalesCharts } from '@/components/dashboard/sales-charts'
 import { PageHeader } from '@/components/shared/page-header'
 import { useBranches } from '@/hooks/use-branches'
 import { useBranchScope } from '@/hooks/use-branch-scope'
+import { useCurrentUser } from '@/store/user-store'
 import { ALL_BRANCHES } from '@/types'
 
 export function DashboardView() {
+  const user = useCurrentUser()
   const scope = useBranchScope()
   const { data: branches } = useBranches()
   const scopedBranch = scope === ALL_BRANCHES ? null : branches?.find((branch) => branch.id === scope)
@@ -16,7 +18,7 @@ export function DashboardView() {
     <>
       <PageHeader
         eyebrow="Dashboard"
-        title="Overview"
+        title={`Welcome back, ${user.name}`}
         description={
           scopedBranch
             ? `Stock health at ${scopedBranch.name}. Use the header filter to widen the scope.`

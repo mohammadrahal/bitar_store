@@ -9,11 +9,10 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
+import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useBranches } from '@/hooks/use-branches'
-import { useBranchScope } from '@/hooks/use-branch-scope'
+import { useBranchScope, useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useInvoices } from '@/hooks/use-invoices'
-import { usePermission } from '@/hooks/use-permission'
 import { INVOICE_KIND_LABELS, INVOICE_KINDS, INVOICE_STATUS_LABELS } from '@/lib/invoices'
 import { useUIStore } from '@/store/ui-store'
 import { ALL_BRANCHES, type InvoiceStatus } from '@/types'
@@ -24,8 +23,7 @@ const STATUSES: InvoiceStatus[] = ['draft', 'issued', 'paid', 'void']
 
 export function InvoicesView() {
   const scope = useBranchScope()
-  const { user } = usePermission()
-  const { data: branches } = useBranches()
+  const defaultBranchId = useDefaultBranchId()
 
   const search = useUIStore((state) => state.invoiceSearch)
   const setSearch = useUIStore((state) => state.setInvoiceSearch)
@@ -58,9 +56,6 @@ export function InvoicesView() {
   const visible = invoices?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE) ?? []
   const isFiltered = search.trim() !== '' || kind !== 'all' || status !== 'all'
 
-  const mainBranch = branches?.find((branch) => branch.isMain)
-  const defaultBranchId = user.branchId ?? mainBranch?.id ?? branches?.[0]?.id ?? ''
-
   return (
     <>
       <PageHeader
@@ -92,28 +87,32 @@ export function InvoicesView() {
               aria-label="Search invoices"
             />
           </div>
-          <label className="select-inline">
-            <span className="sr-only">Filter by kind</span>
-            <select value={kind} onChange={(event) => setKind(event.target.value)}>
-              <option value="all">All kinds</option>
-              {INVOICE_KINDS.map((option) => (
-                <option key={option} value={option}>
-                  {INVOICE_KIND_LABELS[option]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="select-inline">
-            <span className="sr-only">Filter by status</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="all">Any status</option>
-              {STATUSES.map((option) => (
-                <option key={option} value={option}>
-                  {INVOICE_STATUS_LABELS[option]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectInput
+            variant="inline"
+            aria-label="Filter by kind"
+            value={kind}
+            onValueChange={setKind}
+            options={[
+              { value: 'all', label: 'All kinds' },
+              ...INVOICE_KINDS.map((option) => ({
+                value: option,
+                label: INVOICE_KIND_LABELS[option],
+              })),
+            ]}
+          />
+          <SelectInput
+            variant="inline"
+            aria-label="Filter by status"
+            value={status}
+            onValueChange={setStatus}
+            options={[
+              { value: 'all', label: 'Any status' },
+              ...STATUSES.map((option) => ({
+                value: option,
+                label: INVOICE_STATUS_LABELS[option],
+              })),
+            ]}
+          />
           {isFiltered && (
             <button
               type="button"
@@ -151,7 +150,10 @@ export function InvoicesView() {
         )}
       </Panel>
 
-      {creating && <InvoiceForm defaultBranchId={defaultBranchId} onClose={() => setCreating(false)} />}
+      {/* No branch, no document: the form would open on an empty Branch select. */}
+      {creating && defaultBranchId && (
+        <InvoiceForm defaultBranchId={defaultBranchId} onClose={() => setCreating(false)} />
+      )}
     </>
   )
 }

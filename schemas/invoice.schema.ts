@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { INVOICE_KINDS } from '@/lib/invoices'
+import { INVOICE_KINDS, isAdjustmentKind } from '@/lib/invoices'
 import { todayAsDateInput } from '@/lib/format'
 
 export const invoiceLineSchema = z.object({
@@ -21,7 +21,8 @@ export const invoiceSchema = z
   .object({
     kind: z.enum(INVOICE_KINDS),
     branchId: z.string().min(1, 'Pick a branch'),
-    partyName: z.string().trim().min(2, 'Name must be at least 2 characters').max(80, 'Name is too long'),
+    partyName: z.string().trim().max(80, 'Name is too long'),
+    reason: z.string().trim().max(120, 'Reason is too long'),
     issuedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
     discount: z.number({ error: 'Enter an amount' }).min(0, 'Must be 0 or more'),
     notes: z.string().trim().max(400, 'Notes are too long'),
@@ -29,6 +30,15 @@ export const invoiceSchema = z
     lines: z.array(invoiceLineSchema).min(1, 'Add at least one line'),
   })
   .superRefine((values, ctx) => {
+    /* A trade document needs a counterparty; a correction needs a reason. */
+    if (isAdjustmentKind(values.kind)) {
+      if (values.reason.length < 2) {
+        ctx.addIssue({ code: 'custom', message: 'Say why stock is being corrected', path: ['reason'] })
+      }
+    } else if (values.partyName.length < 2) {
+      ctx.addIssue({ code: 'custom', message: 'Name must be at least 2 characters', path: ['partyName'] })
+    }
+
     const seen = new Map<string, number>()
     values.lines.forEach((line, index) => {
       const first = seen.get(line.variantId)
@@ -60,6 +70,7 @@ export function emptyInvoiceValues(branchId: string, salesChannel?: 'b2b' | 'b2c
     kind: 'sale',
     branchId,
     partyName: '',
+    reason: '',
     issuedAt: todayAsDateInput(),
     discount: 0,
     notes: '',

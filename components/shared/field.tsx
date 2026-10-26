@@ -5,6 +5,7 @@ export function Field({
   error,
   hint,
   className,
+  icon,
   affix,
   children,
 }: {
@@ -12,6 +13,8 @@ export function Field({
   error?: string
   hint?: string
   className?: string
+  /** Decorative icon at the start of the input. */
+  icon?: React.ReactNode
   /** Control sitting inside the input, such as a password reveal toggle. */
   affix?: React.ReactNode
   children: ReactElement<Record<string, unknown>>
@@ -29,8 +32,13 @@ export function Field({
   return (
     <div className={`field ${className ?? ''}`}>
       <label htmlFor={id}>{label}</label>
-      {affix ? (
-        <div className="field-affix">
+      {affix || icon ? (
+        <div className={`field-affix ${icon ? 'has-icon' : ''} ${affix ? 'has-affix' : ''}`}>
+          {icon && (
+            <span className="field-icon" aria-hidden="true">
+              {icon}
+            </span>
+          )}
           {control}
           {affix}
         </div>

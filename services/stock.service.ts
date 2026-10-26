@@ -1,6 +1,13 @@
-import { delay } from '@/lib/delay'
-import { readDb, type MockDb } from '@/mocks/store'
-import { ALL_BRANCHES, type BranchScope, type InventoryStats, type LowStockRow, type StockStatus } from '@/types'
+import { delay, delayedFailure } from '@/lib/delay'
+import { readDb, writeDb, type MockDb } from '@/mocks/store'
+import {
+  ALL_BRANCHES,
+  type BranchScope,
+  type BranchStockRow,
+  type InventoryStats,
+  type LowStockRow,
+  type StockStatus,
+} from '@/types'
 
 function inScope(branchId: string, scope: BranchScope) {
   return scope === ALL_BRANCHES || branchId === scope
@@ -63,7 +70,7 @@ export async function listLowStock(scope: BranchScope = ALL_BRANCHES): Promise<L
     const variant = db.variants.find((candidate) => candidate.id === level.variantId)
     const product = variant && db.products.find((candidate) => candidate.id === variant.productId)
     const branch = db.branches.find((candidate) => candidate.id === level.branchId)
-    if (!variant || !product || !branch) continue
+    if (!variant || !product) continue
 
     rows.push({
       variantId: variant.id,
@@ -73,8 +80,8 @@ export async function listLowStock(scope: BranchScope = ALL_BRANCHES): Promise<L
       productId: product.id,
       productName: product.name,
       category: product.category,
-      branchId: branch.id,
-      branchName: branch.name,
+      branchId: level.branchId,
+      branchName: branch?.name ?? 'Unknown branch',
       quantity: level.quantity,
       lowStockAt: level.lowStockAt,
       status,
@@ -88,6 +95,69 @@ export async function listLowStock(scope: BranchScope = ALL_BRANCHES): Promise<L
       a.branchName.localeCompare(b.branchName),
   )
   return delay(rows)
+}
+
+/** Everything a branch holds, emptiest first, for the branch stock list. */
+export async function listBranchStock(branchId: string): Promise<BranchStockRow[]> {
+  const db = readDb()
+  const rows: BranchStockRow[] = []
+
+  for (const level of db.stock) {
+    if (level.branchId !== branchId) continue
+    const variant = db.variants.find((candidate) => candidate.id === level.variantId)
+    const product = variant && db.products.find((candidate) => candidate.id === variant.productId)
+    if (!variant || !product) continue
+
+    rows.push({
+      variantId: variant.id,
+      sku: variant.sku,
+      barcode: variant.barcode,
+      size: variant.size,
+      color: variant.color,
+      productId: product.id,
+      productName: product.name,
+      category: product.category,
+      quantity: level.quantity,
+      lowStockAt: level.lowStockAt,
+      status: statusOf(level.quantity, level.lowStockAt),
+      costPrice: product.costPrice,
+      sellPrice: product.sellPrice,
+    })
+  }
+
+  rows.sort(
+    (a, b) =>
+      a.quantity - b.quantity || a.productName.localeCompare(b.productName) || a.sku.localeCompare(b.sku),
+  )
+  return delay(rows)
+}
+
+export interface LowStockAtInput {
+  variantId: string
+  branchId: string
+  lowStockAt: number
+}
+
+/**
+ * The threshold is a policy number, not a fact, so it is the one stock value a
+ * person sets by hand. The quantity beside it is only ever moved by a document.
+ */
+export async function setLowStockAt(input: LowStockAtInput): Promise<number> {
+  if (!Number.isInteger(input.lowStockAt) || input.lowStockAt < 0) {
+    return delayedFailure('A threshold must be a whole number of units, 0 or more.')
+  }
+
+  const saved = writeDb((db) => {
+    const level = db.stock.find(
+      (candidate) => candidate.variantId === input.variantId && candidate.branchId === input.branchId,
+    )
+    if (!level) return null
+    level.lowStockAt = input.lowStockAt
+    return level.lowStockAt
+  })
+
+  if (saved === null) return delayedFailure('That variant is not stocked at this branch.')
+  return delay(saved)
 }
 
 /** On-hand quantity per variant at one branch, keyed by variant id. */

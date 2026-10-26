@@ -3,15 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query-keys'
-import type { UpdateUserInput } from '@/lib/api'
 import {
   createUserWithBranch,
-  deactivateUser,
-  grantBranchAccess,
+  deleteUser,
   listUsers,
-  revokeBranchAccess,
   setUserActive,
-  updateUser,
   updateUserWithBranch,
   type CreateUserWithBranchInput,
   type UpdateUserWithBranchInput,
@@ -41,19 +37,11 @@ export function useCreateUser() {
       invalidate()
       toast.success(`${user.fullName} added`)
     },
-    onError: reportError,
-  })
-}
-
-export function useUpdateUser() {
-  const { invalidate, reportError } = useUsersMutationCallbacks()
-  return useMutation({
-    mutationFn: ({ id, changes }: { id: string; changes: UpdateUserInput }) => updateUser(id, changes),
-    onSuccess: (user) => {
+    onError: (error: Error) => {
+      /* Creation is several calls; refresh so a half-finished account still shows. */
       invalidate()
-      toast.success(`${user.fullName} updated`)
+      reportError(error)
     },
-    onError: reportError,
   })
 }
 
@@ -63,13 +51,14 @@ export function useUpdateUserWithBranch() {
     mutationFn: (input: UpdateUserWithBranchInput) => updateUserWithBranch(input),
     onSuccess: (user, input) => {
       invalidate()
-      if (input.password?.trim()) {
-        toast.success(`${user.fullName} updated — they can sign in with the new password`)
-      } else {
-        toast.success(`${user.fullName} updated`)
-      }
+      toast.success(
+        input.password ? `${user.fullName} updated — they can sign in with the new password` : `${user.fullName} updated`,
+      )
     },
-    onError: reportError,
+    onError: (error: Error) => {
+      invalidate()
+      reportError(error)
+    },
   })
 }
 
@@ -85,38 +74,13 @@ export function useSetUserActive() {
   })
 }
 
-/** Deactivates only — there is no hard delete on the API. */
-export function useDeactivateUser() {
+export function useDeleteUser() {
   const { invalidate, reportError } = useUsersMutationCallbacks()
   return useMutation({
-    mutationFn: ({ id }: { id: string; name: string }) => deactivateUser(id),
-    onSuccess: (_user, { name }) => {
+    mutationFn: ({ id }: { id: string; name: string }) => deleteUser(id),
+    onSuccess: (_result, { name }) => {
       invalidate()
-      toast.warning(`${name} deactivated`)
-    },
-    onError: reportError,
-  })
-}
-
-export function useGrantBranchAccess() {
-  const { invalidate, reportError } = useUsersMutationCallbacks()
-  return useMutation({
-    mutationFn: ({ userId, branchId }: { userId: string; branchId: string }) => grantBranchAccess(userId, branchId),
-    onSuccess: () => {
-      invalidate()
-      toast.success('Branch access granted')
-    },
-    onError: reportError,
-  })
-}
-
-export function useRevokeBranchAccess() {
-  const { invalidate, reportError } = useUsersMutationCallbacks()
-  return useMutation({
-    mutationFn: ({ userId, branchId }: { userId: string; branchId: string }) => revokeBranchAccess(userId, branchId),
-    onSuccess: () => {
-      invalidate()
-      toast.success('Branch access removed')
+      toast.success(`${name} deleted`)
     },
     onError: reportError,
   })

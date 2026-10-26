@@ -52,7 +52,7 @@ export function useVariantSearch(search: string) {
 /** On-hand quantities at the document's branch, so the form can warn early. */
 export function useBranchStock(branchId: string) {
   return useQuery({
-    queryKey: queryKeys.stock.byBranch(branchId),
+    queryKey: queryKeys.stock.onHand(branchId),
     queryFn: () => getBranchStockMap(branchId),
     enabled: Boolean(branchId),
   })

@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
+import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useCategories, useDeleteProduct, useProducts } from '@/hooks/use-products'
 import { useUIStore } from '@/store/ui-store'
@@ -77,21 +78,20 @@ export function ProductsView() {
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search name, category or SKU"
+              placeholder="Search name, category, SKU or barcode"
               aria-label="Search products"
             />
           </div>
-          <label className="select-inline">
-            <span className="sr-only">Filter by category</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="">All categories</option>
-              {categories?.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectInput
+            variant="inline"
+            aria-label="Filter by category"
+            value={category}
+            onValueChange={setCategory}
+            options={[
+              { value: '', label: 'All categories' },
+              ...(categories?.map((option) => ({ value: option, label: option })) ?? []),
+            ]}
+          />
           {isFiltered && (
             <button
               type="button"

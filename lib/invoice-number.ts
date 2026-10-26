@@ -5,6 +5,9 @@ const SERIES: Record<InvoiceKind, string> = {
   purchase: 'PUR',
   sale_return: 'SRT',
   purchase_return: 'PRT',
+  /* Both directions share one series: an adjustment is one kind of event. */
+  adjustment_in: 'ADJ',
+  adjustment_out: 'ADJ',
 }
 
 /** Transfer legs share one series, so a move reads as a single operation. */

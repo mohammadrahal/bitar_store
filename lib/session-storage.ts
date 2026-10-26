@@ -1,9 +1,8 @@
-/** Session-scoped browser storage (cleared when the tab closes). Used for sign-in and dev credentials. */
-
-export function readSessionJson<T>(key: string, fallback: T): T {
+/** Browser storage that survives closing the tab. Used for branch assignments. */
+export function readPersistentJson<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback
   try {
-    const raw = sessionStorage.getItem(key)
+    const raw = localStorage.getItem(key)
     if (!raw) return fallback
     return JSON.parse(raw) as T
   } catch {
@@ -11,16 +10,6 @@ export function readSessionJson<T>(key: string, fallback: T): T {
   }
 }
 
-export function writeSessionJson(key: string, value: unknown) {
-  sessionStorage.setItem(key, JSON.stringify(value))
-}
-
-/** One-time move from localStorage after we switched session data to sessionStorage. */
-export function migrateSessionKey(key: string) {
-  if (typeof window === 'undefined') return
-  if (sessionStorage.getItem(key) !== null) return
-  const legacy = localStorage.getItem(key)
-  if (!legacy) return
-  sessionStorage.setItem(key, legacy)
-  localStorage.removeItem(key)
+export function writePersistentJson(key: string, value: unknown) {
+  localStorage.setItem(key, JSON.stringify(value))
 }

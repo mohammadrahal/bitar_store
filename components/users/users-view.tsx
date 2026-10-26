@@ -9,7 +9,7 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useSetUserActive, useUsers } from '@/hooks/use-users'
+import { useDeleteUser, useSetUserActive, useUsers } from '@/hooks/use-users'
 import type { ApiUser } from '@/lib/api'
 import { useCurrentUser } from '@/store/user-store'
 
@@ -17,11 +17,13 @@ type Dialog =
   | { kind: 'create' }
   | { kind: 'edit'; user: ApiUser }
   | { kind: 'deactivate'; user: ApiUser }
+  | { kind: 'delete'; user: ApiUser }
 
 export function UsersView() {
   const currentUser = useCurrentUser()
   const { data: users, isPending, isError, error, refetch } = useUsers()
   const setActive = useSetUserActive()
+  const remove = useDeleteUser()
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const close = () => setDialog(null)
 
@@ -33,12 +35,18 @@ export function UsersView() {
     setDialog({ kind: 'deactivate', user })
   }
 
+  const pendingUserId = setActive.isPending
+    ? setActive.variables?.id
+    : remove.isPending
+      ? remove.variables?.id
+      : null
+
   return (
     <>
       <PageHeader
         eyebrow="Administration"
         title="Users"
-        description="Users are never deleted from the server. Turn Active off to remove sign-in access, or use Edit for more fields."
+        description="Turn Active off to pause sign-in access, or delete an account to remove it for good."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
             <Plus size={16} aria-hidden="true" />
@@ -60,10 +68,11 @@ export function UsersView() {
           <UserTable
             users={users}
             currentUserId={currentUser.id}
-            pendingUserId={setActive.isPending ? setActive.variables?.id : null}
+            pendingUserId={pendingUserId}
             onCreate={() => setDialog({ kind: 'create' })}
             onEdit={(user) => setDialog({ kind: 'edit', user })}
             onActiveChange={handleActiveChange}
+            onDelete={(user) => setDialog({ kind: 'delete', user })}
           />
         </Panel>
       )}
@@ -81,6 +90,20 @@ export function UsersView() {
             const target = dialog.user
             close()
             if (confirmed) setActive.mutate({ id: target.id, name: target.fullName, isActive: false })
+          }}
+        />
+      )}
+
+      {dialog?.kind === 'delete' && (
+        <ConfirmDialog
+          title={`Delete ${dialog.user.fullName}?`}
+          description="This permanently removes the account and its branch access. To pause access instead, turn Active off."
+          confirmLabel="Delete user"
+          tone="danger"
+          onResolve={(confirmed) => {
+            const target = dialog.user
+            close()
+            if (confirmed) remove.mutate({ id: target.id, name: target.fullName })
           }}
         />
       )}

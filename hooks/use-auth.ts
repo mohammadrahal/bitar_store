@@ -17,9 +17,9 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: (input: LoginInput) => login(input),
-    onSuccess: (user) => {
+    onSuccess: ({ token, user }) => {
       queryClient.clear()
-      signIn(user)
+      signIn(token, user)
       toast.success(`Welcome back, ${user.name.split(' ')[0]}`)
     },
   })

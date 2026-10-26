@@ -2,13 +2,9 @@ import { ApiError } from '@/lib/api/api-error'
 import { createApi, type BitarApi } from '@/lib/api/create-api'
 import { useUserStore } from '@/store/user-store'
 
-export function createApiForUser(userId: string): BitarApi {
-  return createApi(userId)
-}
-
-/** Resolves the sessionStorage user id and returns a client, or throws `ApiError` 401. */
+/** Client for the signed-in session, or throws `ApiError` 401 when there is none. */
 export function getApiClient(): BitarApi {
-  const userId = useUserStore.getState().userId
-  if (!userId) throw new ApiError(401, 'Not signed in')
-  return createApi(userId)
+  const token = useUserStore.getState().token
+  if (!token) throw new ApiError(401, 'Not signed in')
+  return createApi(token)
 }

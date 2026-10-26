@@ -7,6 +7,7 @@ import { Can } from '@/components/shared/can'
 import type { Action } from '@/lib/permissions'
 import { EmptyState } from '@/components/shared/empty-state'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
+import { documentSubject } from '@/lib/invoices'
 import type { InvoiceRow } from '@/types'
 
 export function InvoiceTable({
@@ -90,7 +91,7 @@ export function InvoiceTable({
               </td>
               {showBranch && <td>{invoice.branchName}</td>}
               <td>
-                <strong>{invoice.partyName}</strong>
+                <strong>{documentSubject(invoice)}</strong>
                 <small>
                   {invoice.lineCount} {invoice.lineCount === 1 ? 'line' : 'lines'}
                 </small>

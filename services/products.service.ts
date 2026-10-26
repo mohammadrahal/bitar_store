@@ -1,11 +1,11 @@
 import { delay, delayedFailure } from '@/lib/delay'
 import { createId } from '@/lib/ids'
 import type { ProductFilters } from '@/lib/query-keys'
+import { buildEan13 } from '@/lib/barcode'
 import { buildSku } from '@/lib/sku'
-import { readDb, writeDb, type MockDb } from '@/mocks/store'
+import { DEFAULT_LOW_STOCK_AT, readDb, writeDb, type MockDb } from '@/mocks/store'
 import type { Product, ProductWithVariants, Variant, VariantOption } from '@/types'
 
-const DEFAULT_LOW_STOCK_AT = 5
 
 export interface VariantInput {
   id?: string
@@ -37,7 +37,9 @@ export async function listProducts(filters: ProductFilters): Promise<ProductWith
         !search ||
         product.name.toLowerCase().includes(search) ||
         product.category.toLowerCase().includes(search) ||
-        product.variants.some((variant) => variant.sku.toLowerCase().includes(search)),
+        product.variants.some(
+          (variant) => variant.sku.toLowerCase().includes(search) || variant.barcode.includes(search),
+        ),
     )
     .sort((a, b) => a.name.localeCompare(b.name))
 
@@ -98,6 +100,15 @@ function claimSku(base: string, taken: Set<string>) {
   return sku
 }
 
+/** Minted once per variant and never reissued, so labels stay truthful. */
+function claimBarcode(db: MockDb): string {
+  const used = new Set(db.variants.map((variant) => variant.barcode))
+  while (used.has(buildEan13(db.barcodeSeq))) db.barcodeSeq += 1
+  const barcode = buildEan13(db.barcodeSeq)
+  db.barcodeSeq += 1
+  return barcode
+}
+
 function addVariant(
   db: MockDb,
   productId: string,
@@ -111,6 +122,7 @@ function addVariant(
     id: createId('vr'),
     productId,
     sku: claimSku(buildSku(productName, size, color), taken),
+    barcode: claimBarcode(db),
     size,
     color,
   }
@@ -169,6 +181,8 @@ export async function updateProduct(productId: string, input: ProductInput): Pro
       if (!current) return addVariant(db, productId, product.name, incoming, taken)
       const size = incoming.size.trim()
       const color = incoming.color.trim()
+      /* The SKU is re-derived when the name, size or colour changes; the
+         barcode is not, because it is already printed on stock. */
       Object.assign(current, { size, color, sku: claimSku(buildSku(product.name, size, color), taken) })
       return current
     })
@@ -201,12 +215,13 @@ export async function searchVariants(search: string, limit = 10): Promise<Varian
   const options = variants.flatMap<VariantOption>((variant) => {
     const product = products.find((candidate) => candidate.id === variant.productId)
     if (!product) return []
-    const haystack = `${variant.sku} ${product.name} ${product.category} ${variant.size} ${variant.color}`.toLowerCase()
+    const haystack = `${variant.sku} ${variant.barcode} ${product.name} ${product.category} ${variant.size} ${variant.color}`.toLowerCase()
     if (term && !haystack.includes(term)) return []
     return [
       {
         variantId: variant.id,
         sku: variant.sku,
+        barcode: variant.barcode,
         productId: product.id,
         productName: product.name,
         size: variant.size,

@@ -9,11 +9,10 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
+import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useBranches } from '@/hooks/use-branches'
-import { useBranchScope } from '@/hooks/use-branch-scope'
+import { useBranchScope, useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useInvoices } from '@/hooks/use-invoices'
-import { usePermission } from '@/hooks/use-permission'
 import { INVOICE_STATUS_LABELS } from '@/lib/invoices'
 import { ALL_BRANCHES, type InvoiceStatus, type SalesChannel } from '@/types'
 
@@ -58,8 +57,7 @@ const COPY: Record<
 export function SalesChannelView({ channel }: { channel: SalesChannel }) {
   const copy = COPY[channel]
   const scope = useBranchScope()
-  const { user } = usePermission()
-  const { data: branches } = useBranches()
+  const defaultBranchId = useDefaultBranchId()
 
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -88,9 +86,6 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
   const currentPage = Math.min(page, pageCount)
   const visible = invoices?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE) ?? []
   const isFiltered = search.trim() !== '' || status !== 'all'
-
-  const mainBranch = branches?.find((branch) => branch.isMain)
-  const defaultBranchId = user.branchId ?? mainBranch?.id ?? branches?.[0]?.id ?? ''
 
   return (
     <>
@@ -123,17 +118,19 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
               aria-label="Search sales"
             />
           </div>
-          <label className="select-inline">
-            <span className="sr-only">Filter by status</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value as InvoiceStatus | 'all')}>
-              <option value="all">Any status</option>
-              {STATUSES.map((option) => (
-                <option key={option} value={option}>
-                  {INVOICE_STATUS_LABELS[option]}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectInput
+            variant="inline"
+            aria-label="Filter by status"
+            value={status}
+            onValueChange={(next) => setStatus(next as InvoiceStatus | 'all')}
+            options={[
+              { value: 'all', label: 'Any status' },
+              ...STATUSES.map((option) => ({
+                value: option,
+                label: INVOICE_STATUS_LABELS[option],
+              })),
+            ]}
+          />
           {isFiltered && (
             <button
               type="button"

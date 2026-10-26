@@ -3,9 +3,15 @@ export type Role = 'admin' | 'manager' | 'employee'
 export interface User {
   id: string
   name: string
+  email: string
   role: Role
   /** null for admins, who are not scoped to a single branch. */
   branchId: string | null
+  /** Every branch `GET /auth/me` says this user may see. */
+  branchIds: string[]
+  /** Permission keys from `GET /auth/me`, kept for backend-driven checks. */
+  permissions: string[]
+  canViewCosts: boolean
 }
 
 export interface Branch {
@@ -15,8 +21,6 @@ export interface Branch {
   code?: string
   location: string
   phone?: string
-  /** The hub branch. Transfers between branches pass through it. Exactly one. */
-  isMain: boolean
   isActive: boolean
   createdAt: string
 }
@@ -34,6 +38,8 @@ export interface Variant {
   id: string
   productId: string
   sku: string
+  /** In-store EAN-13, minted once and never changed: it goes on printed labels. */
+  barcode: string
   size: string
   color: string
 }
@@ -55,6 +61,25 @@ export type StockStatus = 'healthy' | 'low' | 'out'
 /** Product as the table and form consume it: variants always loaded together. */
 export interface ProductWithVariants extends Product {
   variants: Variant[]
+}
+
+/** One variant's position at one branch, for the branch stock list. */
+export interface BranchStockRow {
+  variantId: string
+  sku: string
+  barcode: string
+  size: string
+  color: string
+  productId: string
+  productName: string
+  category: string
+  quantity: number
+  lowStockAt: number
+  status: StockStatus
+  /* Carried so a row can raise an adjustment priced at cost, the same way the
+     document line picker already receives them. */
+  costPrice: number
+  sellPrice: number
 }
 
 export interface InventoryStats {
@@ -86,7 +111,14 @@ export interface LowStockRow {
 }
 
 /** Sales and supplier purchases, plus the returns that reverse each of them. */
-export type InvoiceKind = 'sale' | 'purchase' | 'sale_return' | 'purchase_return'
+export type InvoiceKind =
+  | 'sale'
+  | 'purchase'
+  | 'sale_return'
+  | 'purchase_return'
+  /** Stock correction in or out: a count, damage, theft or an opening balance. */
+  | 'adjustment_in'
+  | 'adjustment_out'
 
 /** How a sale reached the customer: wholesale (B2B) or retail (B2C). */
 export type SalesChannel = 'b2b' | 'b2c'
@@ -101,8 +133,14 @@ export interface Invoice {
   kind: InvoiceKind
   /** The branch whose books this document belongs to. */
   branchId: string
-  /** Customer on a sale, supplier on a purchase, the main branch on a transfer leg. */
+  /**
+   * Customer on a sale, supplier on a purchase, the main branch on a transfer
+   * leg. Empty on an adjustment, which has no counterparty and carries
+   * `reason` instead.
+   */
   partyName: string
+  /** Why stock was corrected. Set on adjustments only. */
+  reason?: string
   status: InvoiceStatus
   issuedAt: string
   /** Invoice-level discount in currency units, taken off the line subtotal. */
@@ -160,6 +198,7 @@ export interface InvoiceRow extends Invoice {
 export interface VariantOption {
   variantId: string
   sku: string
+  barcode: string
   productId: string
   productName: string
   size: string

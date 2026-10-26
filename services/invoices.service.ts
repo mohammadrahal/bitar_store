@@ -2,7 +2,7 @@ import { delay, delayedFailure } from '@/lib/delay'
 import { createId } from '@/lib/ids'
 import { nextInvoiceNumber, seriesFor } from '@/lib/invoice-number'
 import { invoiceTotals } from '@/lib/invoice-totals'
-import { isCustomerSaleKind, isPosted, salesChannelOf } from '@/lib/invoices'
+import { isAdjustmentKind, isCustomerSaleKind, isPosted, salesChannelOf } from '@/lib/invoices'
 import type { InvoiceFilters } from '@/lib/query-keys'
 import { readDb, writeDb, type MockDb } from '@/mocks/store'
 import { findDuplicateLine, linesOf, normalizeLines, type InvoiceLineInput } from '@/services/invoice-lines'
@@ -23,6 +23,8 @@ export interface InvoiceInput {
   kind: InvoiceKind
   branchId: string
   partyName: string
+  /** Required on an adjustment, unused elsewhere. */
+  reason?: string
   /** `yyyy-MM-dd` from the form; stored as an ISO timestamp. */
   issuedAt: string
   discount: number
@@ -65,6 +67,7 @@ export async function listInvoices(filters: InvoiceFilters): Promise<InvoiceRow[
       return (
         invoice.number.toLowerCase().includes(search) ||
         invoice.partyName.toLowerCase().includes(search) ||
+        (invoice.reason ?? '').toLowerCase().includes(search) ||
         linesOf(db, invoice.id).some(
           (line) => line.sku.toLowerCase().includes(search) || line.productName.toLowerCase().includes(search),
         )
@@ -136,7 +139,9 @@ export async function createInvoice(input: InvoiceInput, issue = false): Promise
     ),
     kind: input.kind,
     branchId: input.branchId,
-    partyName: input.partyName.trim(),
+    /* A correction has no counterparty, so it stores why instead of who. */
+    partyName: isAdjustmentKind(input.kind) ? '' : input.partyName.trim(),
+    reason: isAdjustmentKind(input.kind) ? input.reason?.trim() : undefined,
     status: issue ? 'issued' : 'draft',
     issuedAt,
     discount: invoiceTotals(lines, input.discount).discount,
@@ -181,7 +186,8 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
     Object.assign(invoice, {
       kind: input.kind,
       branchId: input.branchId,
-      partyName: input.partyName.trim(),
+      partyName: isAdjustmentKind(input.kind) ? '' : input.partyName.trim(),
+      reason: isAdjustmentKind(input.kind) ? input.reason?.trim() : undefined,
       issuedAt: toIsoDate(input.issuedAt),
       discount: invoiceTotals(lines, input.discount).discount,
       notes: input.notes?.trim() || undefined,

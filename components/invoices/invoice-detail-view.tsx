@@ -25,7 +25,13 @@ import {
 import { usePermission } from '@/hooks/use-permission'
 import { formatDocumentDate } from '@/lib/format'
 import { invoiceTotals } from '@/lib/invoice-totals'
-import { INVOICE_KIND_LABELS, isEditable, PARTY_LABELS, pricedAtCost } from '@/lib/invoices'
+import {
+  documentSubject,
+  INVOICE_KIND_LABELS,
+  isEditable,
+  PARTY_LABELS,
+  pricedAtCost,
+} from '@/lib/invoices'
 
 type Dialog = 'edit' | 'void' | 'delete'
 
@@ -67,7 +73,7 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
       <PageHeader
         eyebrow={invoice.isInternal ? 'Transfer leg' : INVOICE_KIND_LABELS[invoice.kind]}
         title={invoice.number}
-        description={`${PARTY_LABELS[invoice.kind]}: ${invoice.partyName} · ${formatDocumentDate(invoice.issuedAt)}`}
+        description={`${PARTY_LABELS[invoice.kind]}: ${documentSubject(invoice)} · ${formatDocumentDate(invoice.issuedAt)}`}
         actions={
           <>
             {isEditable(invoice) && (
@@ -149,7 +155,7 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
       {dialog === 'void' && (
         <ConfirmDialog
           title={`Void ${invoice.number}?`}
-          description={`This reverses ${totals.units} units against ${invoice.partyName} and cannot be undone. The document stays on file.`}
+          description={`This reverses ${totals.units} units against ${documentSubject(invoice)} and cannot be undone. The document stays on file.`}
           confirmLabel="Void invoice"
           tone="danger"
           onResolve={(confirmed) => {

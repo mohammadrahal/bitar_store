@@ -16,6 +16,8 @@ export const ACTIONS = [
   'products:create',
   'products:edit',
   'products:delete',
+  /** Set a variant's low-stock threshold at a branch. */
+  'stock:manage',
   /** See cost price and margin. */
   'products:read-cost',
   'invoices:read',
@@ -53,6 +55,7 @@ const PERMISSIONS: Record<Role, readonly Action[]> = {
     'products:edit',
     'products:delete',
     'products:read-cost',
+    'stock:manage',
     'invoices:read',
     'invoices:create',
     'invoices:edit',
@@ -64,10 +67,16 @@ const PERMISSIONS: Record<Role, readonly Action[]> = {
     'sales:b2b:create',
     'sales:b2c:create',
   ],
-  // An employee works the till: they raise and issue sales, and nothing else.
+  /*
+   * An employee works the till: they raise and issue sales, and they may add
+   * and correct catalog entries for stock arriving in the shop. They cannot
+   * delete a product or see what it cost.
+   */
   employee: [
     'branches:read',
     'products:read',
+    'products:create',
+    'products:edit',
     'invoices:read',
     'invoices:create',
     'invoices:issue',
@@ -80,6 +89,14 @@ export function can(role: Role, action: Action) {
   return PERMISSIONS[role].includes(action)
 }
 
+const COST_ACTIONS: readonly Action[] = ['products:read-cost', 'invoices:read-cost']
+
+/** Like `can`, but cost visibility follows the backend's `canViewCosts` flag. */
+export function canUser(user: User, action: Action) {
+  if (COST_ACTIONS.includes(action)) return user.canViewCosts
+  return can(user.role, action)
+}
+
 /** True when the user may only ever see their own branch (managers and employees). */
 export function isBranchScoped(user: User) {
   return !can(user.role, 'branches:view-all')
@@ -87,13 +104,12 @@ export function isBranchScoped(user: User) {
 
 export function canAccessBranch(user: User, branchId: string) {
   if (can(user.role, 'branches:view-all')) return true
-  if (!user.branchId) return false
-  return user.branchId === branchId
+  return user.branchIds.includes(branchId)
 }
 
 /** The landing page a user is allowed to see: the overview, their own branch, or the catalog. */
 export function homePathFor(user: User) {
-  if (isBranchScoped(user)) return `/branches/${user.branchId}`
+  if (isBranchScoped(user)) return user.branchId ? `/branches/${user.branchId}` : '/products'
   return can(user.role, 'branches:view-all') ? '/dashboard' : '/products'
 }
 

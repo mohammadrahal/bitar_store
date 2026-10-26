@@ -13,7 +13,8 @@ export const branchCreateSchema = z.object({
     .trim()
     .min(1, 'Code is required')
     .max(20, 'Code is too long')
-    .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, - and _ only'),
+    .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, - and _ only')
+    .transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
 })
 

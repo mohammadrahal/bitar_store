@@ -4,26 +4,32 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { InventoryOverview } from '@/components/dashboard/inventory-overview'
 import { SalesCharts } from '@/components/dashboard/sales-charts'
+import { BranchStockPanel } from '@/components/stock/branch-stock-panel'
 import { Can } from '@/components/shared/can'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useBranch } from '@/hooks/use-branches'
-import { ALL_BRANCHES } from '@/types'
+import { useCurrentUser } from '@/store/user-store'
 
 export function BranchDetailView({ branchId }: { branchId: string }) {
+  const user = useCurrentUser()
   const { data: branch, isPending, isError, error, refetch } = useBranch(branchId)
 
   if (isPending) return <Skeleton rows={1} />
   if (isError) return <ErrorState title="Branch unavailable" error={error} onRetry={() => void refetch()} />
 
+  const isOwnBranch = user.branchId === branch.id
+
   return (
     <>
       <PageHeader
-        eyebrow="Branch"
-        title={branch.name}
-        description={[branch.code ?? branch.location, branch.phone].filter(Boolean).join(' · ')}
+        eyebrow={isOwnBranch ? `Branch · ${branch.name}` : 'Branch'}
+        title={isOwnBranch ? `Welcome back, ${user.name}` : branch.name}
+        description={
+          isOwnBranch ? undefined : [branch.code ?? branch.location, branch.phone].filter(Boolean).join(' · ')
+        }
         actions={
           <>
             <ActiveStatusPill isActive={branch.isActive} />
@@ -37,15 +43,9 @@ export function BranchDetailView({ branchId }: { branchId: string }) {
         }
       />
       <InventoryOverview scope={branch.id} mode="branch">
-        <SalesCharts scope={branch.id} heading={`Best sellers at ${branch.name}`} />
+        <BranchStockPanel branchId={branch.id} />
 
-        {/* The hub answers for the whole chain, so its page also carries the
-            network figures — for viewers allowed to see every branch. */}
-        {branch.isMain && (
-          <Can action="branches:view-all">
-            <SalesCharts scope={ALL_BRANCHES} heading="Best sellers across every branch" />
-          </Can>
-        )}
+        <SalesCharts scope={branch.id} heading={`Best sellers at ${branch.name}`} />
       </InventoryOverview>
     </>
   )

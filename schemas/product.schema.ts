@@ -8,6 +8,8 @@ const priceField = z
 export const variantSchema = z.object({
   /** Present for variants that already exist; absent for rows just added. */
   id: z.string().optional(),
+  /** Minted by the service, read-only in the form, absent on a new row. */
+  barcode: z.string().optional(),
   size: z.string().trim().min(1, 'Required').max(12, 'Too long'),
   color: z.string().trim().min(1, 'Required').max(24, 'Too long'),
 })

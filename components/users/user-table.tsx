@@ -20,8 +20,7 @@ export function UserTable({
   onCreate: () => void
   onEdit: (user: ApiUser) => void
   onActiveChange: (user: ApiUser, isActive: boolean) => void
-  /** Wire this when DELETE /users exists; until then the control stays disabled. */
-  onDelete?: (user: ApiUser) => void
+  onDelete: (user: ApiUser) => void
   pendingUserId?: string | null
 }) {
   if (users.length === 0) {
@@ -90,22 +89,10 @@ export function UserTable({
                     <button
                       type="button"
                       className="icon-btn danger"
-                      disabled={!onDelete || isSelf}
-                      onClick={() => onDelete?.(user)}
-                      aria-label={
-                        !onDelete
-                          ? `Delete ${user.fullName} (not available yet)`
-                          : isSelf
-                            ? 'You cannot delete your own account'
-                            : `Delete ${user.fullName}`
-                      }
-                      title={
-                        !onDelete
-                          ? 'Delete — coming soon (use Active to deactivate)'
-                          : isSelf
-                            ? 'Cannot delete yourself'
-                            : 'Delete'
-                      }
+                      disabled={isSelf || pendingUserId === user.id}
+                      onClick={() => onDelete(user)}
+                      aria-label={isSelf ? 'You cannot delete your own account' : `Delete ${user.fullName}`}
+                      title={isSelf ? 'Cannot delete yourself' : 'Delete'}
                     >
                       <Trash2 size={16} />
                     </button>

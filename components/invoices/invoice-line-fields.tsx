@@ -79,7 +79,7 @@ export function InvoiceLineFields({
           type="search"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search a SKU, product or color"
+          placeholder="Scan a barcode, or search a SKU or product"
           aria-label="Search the catalog for a line to add"
         />
       </div>

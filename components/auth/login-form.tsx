@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { Field } from '@/components/shared/field'
 import { useLogin } from '@/hooks/use-auth'
 import { emptyLoginValues, loginSchema, type LoginFormValues } from '@/schemas/auth.schema'
@@ -32,13 +32,14 @@ export function LoginForm() {
         </p>
       )}
 
-      <Field label="Email" error={errors.email?.message}>
+      <Field label="Email address" error={errors.email?.message} icon={<Mail size={16} />}>
         <input {...register('email')} type="email" autoComplete="email" placeholder="you@bitar.store" autoFocus />
       </Field>
 
       <Field
         label="Password"
         error={errors.password?.message}
+        icon={<Lock size={16} />}
         affix={
           <button
             type="button"
@@ -55,7 +56,7 @@ export function LoginForm() {
           {...register('password')}
           type={revealed ? 'text' : 'password'}
           autoComplete="current-password"
-          placeholder="••••••••"
+          placeholder="Enter your password"
         />
       </Field>
 

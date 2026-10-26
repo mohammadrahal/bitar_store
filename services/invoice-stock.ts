@@ -1,8 +1,7 @@
 import { stockSign } from '@/lib/invoices'
-import type { MockDb } from '@/mocks/store'
+import { DEFAULT_LOW_STOCK_AT, type MockDb } from '@/mocks/store'
 import type { Invoice, InvoiceLine } from '@/types'
 
-const DEFAULT_LOW_STOCK_AT = 5
 
 function branchName(db: MockDb, branchId: string) {
   return db.branches.find((candidate) => candidate.id === branchId)?.name ?? 'Unknown branch'

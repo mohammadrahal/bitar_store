@@ -6,90 +6,55 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 export type RequestFn = <T>(path: string, method?: HttpMethod, body?: unknown) => Promise<T>
 
-async function parseJsonBody(response: Response): Promise<unknown> {
-  return response.json().catch(() => null)
+interface SendOptions {
+  method?: HttpMethod
+  body?: unknown
+  token?: string | null
 }
 
-/**
- * Low-level fetch for the Bitar API. Adds dev identity (`X-User-Id`); when login
- * ships, only this module should switch to `Authorization: Bearer`.
- */
-export async function request<T>(
-  path: string,
-  userId: string,
-  method: HttpMethod = 'GET',
-  body?: unknown,
-): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': userId,
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+let unauthorizedHandler: (() => void) | null = null
+
+/** Called when a protected request answers 401, so the app can drop the session. */
+export function onUnauthorized(handler: (() => void) | null) {
+  unauthorizedHandler = handler
+}
+
+function messageFrom(data: unknown, fallback: string): string {
+  return data !== null && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
+    ? data.message
+    : fallback
+}
+
+/** Low-level fetch for the Bitar API. Never put the token in the URL or logs. */
+export async function send<T>(path: string, { method = 'GET', body, token }: SendOptions = {}): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
+  } catch {
+    throw new ApiError(0, 'Could not reach the server. Check your connection and try again.')
+  }
 
   if (response.status === 204) return undefined as T
 
-  const data = await parseJsonBody(response)
+  const data: unknown = await response.json().catch(() => null)
   if (!response.ok) {
-    const message =
-      data !== null && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
-        ? data.message
-        : 'Request failed'
-    throw new ApiError(response.status, message)
+    if (response.status === 401 && token) unauthorizedHandler?.()
+    throw new ApiError(response.status, messageFrom(data, 'Request failed'))
   }
 
   return data as T
 }
 
-export interface LoginApiResponse {
-  user: {
-    id: string
-    email: string
-    fullName: string
-    role: 'admin' | 'manager' | 'employee'
-    isActive: boolean
-  }
-}
-
-/** `POST /auth/login` — checks email/password against the API (no X-User-Id). */
-export async function loginWithApi(email: string, password: string): Promise<LoginApiResponse['user']> {
-  const response = await fetch(`${BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-
-  const data = await parseJsonBody(response)
-  if (!response.ok) {
-    const message =
-      data !== null && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
-        ? data.message
-        : 'Request failed'
-    throw new ApiError(response.status, message)
-  }
-
-  const payload = data as LoginApiResponse
-  return payload.user
-}
-
-/** `GET /health` — no identity header required. */
-export async function fetchHealth(): Promise<{ status: string }> {
-  const response = await fetch(`${BASE_URL}/health`)
-  const data = await parseJsonBody(response)
-  if (!response.ok) {
-    const message =
-      data !== null && typeof data === 'object' && 'message' in data && typeof data.message === 'string'
-        ? data.message
-        : 'Health check failed'
-    throw new ApiError(response.status, message)
-  }
-  return data as { status: string }
-}
-
-export function createRequest(userId: string): RequestFn {
-  return (path, method = 'GET', body) => request(path, userId, method, body)
+export function createRequest(token: string): RequestFn {
+  return (path, method = 'GET', body) => send(path, { method, body, token })
 }
 
 export function getApiBaseUrl(): string {

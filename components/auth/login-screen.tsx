@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { LoginAside } from '@/components/auth/login-aside'
 import { LoginForm } from '@/components/auth/login-form'
 import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { postLoginPathFor } from '@/lib/permissions'
@@ -22,21 +23,26 @@ export function LoginScreen() {
 
   return (
     <div className="auth-screen">
-      <div className="auth-corner">
-        <ThemeToggle />
-      </div>
+      <LoginAside />
 
-      <main className="auth-card">
-        <div className="auth-head">
-          {/* Not the shell's BrandLogo: that links to a page only a signed-in user has. */}
-          <span className="logo-full" role="img" aria-label="Bitar" />
-          <p className="eyebrow">Inventory</p>
-          <h1>Sign in</h1>
-          <p className="subtitle">Multi-branch stock and catalog for the Bitar boutiques.</p>
+      <div className="auth-main">
+        <div className="auth-corner">
+          <ThemeToggle />
         </div>
 
-        <LoginForm />
-      </main>
+        <main className="auth-card">
+          <div className="auth-head">
+            {/* Not the shell's BrandLogo: that links to a page only a signed-in user has. */}
+            <span className="logo-full" role="img" aria-label="Bitar" />
+            <h1>Welcome back</h1>
+            <p className="subtitle">Sign in to continue to your dashboard.</p>
+          </div>
+
+          <LoginForm />
+        </main>
+
+        <p className="auth-foot">© {new Date().getFullYear()} Bitar. All rights reserved.</p>
+      </div>
     </div>
   )
 }

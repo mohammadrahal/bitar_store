@@ -3,6 +3,7 @@
 import { Plus, Trash2 } from 'lucide-react'
 import { useFieldArray, type Control, type FieldErrors, type UseFormRegister, type UseFormWatch } from 'react-hook-form'
 import { Field } from '@/components/shared/field'
+import { formatBarcode } from '@/lib/barcode'
 import { buildSku } from '@/lib/sku'
 import type { ProductFormValues } from '@/schemas/product.schema'
 
@@ -26,7 +27,7 @@ export function VariantFields({
       <div className="variant-heading">
         <div>
           <p className="section-label">Variants</p>
-          <p className="field-hint">SKUs are generated from the product name, size and color.</p>
+          <p className="field-hint">SKUs come from the product name, size and color. Barcodes are in-store EAN-13, assigned on save.</p>
         </div>
         <button type="button" className="btn btn-secondary btn-sm" onClick={() => append({ size: '', color: '' })}>
           <Plus size={14} aria-hidden="true" />
@@ -42,6 +43,7 @@ export function VariantFields({
           const size = variants?.[index]?.size ?? ''
           const color = variants?.[index]?.color ?? ''
           const sku = size && color && productName ? buildSku(productName, size, color) : null
+          const barcode = variants?.[index]?.barcode ?? ''
 
           return (
             <li key={field.id} className="variant-row">
@@ -64,6 +66,10 @@ export function VariantFields({
               <p className="variant-sku">
                 SKU
                 <strong>{sku ?? '—'}</strong>
+                <span aria-hidden="true">·</span>
+                Barcode
+                {/* Minted by the service on save, so a new row has none yet. */}
+                <strong>{barcode ? formatBarcode(barcode) : 'on save'}</strong>
               </p>
             </li>
           )

@@ -184,9 +184,16 @@ p { margin: 0; }
 .nav-item.active { color: hsl(var(--foreground)); background: hsl(var(--muted)); box-shadow: inset 2px 0 hsl(var(--accent)); font-weight: 500; }
 .sidebar.collapsed .nav-item { justify-content: center; padding: 0; }
 .nav-group { display: flex; flex-direction: column; gap: 2px; }
-.nav-group-label { min-height: var(--control-h); padding: 0 12px; display: flex; align-items: center; gap: 12px; color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
-.nav-group.active .nav-group-label { color: hsl(var(--foreground)); }
-.nav-sublist { display: flex; flex-direction: column; gap: 2px; padding-left: 8px; border-left: 1px solid hsl(var(--border)); margin-left: 20px; }
+/* The group header is a disclosure button: same row metrics as a nav item,
+   with the chevron pushed to the end. */
+.nav-group-toggle { width: 100%; text-align: left; }
+.nav-group-chevron { margin-left: auto; transition: transform .15s ease; }
+.nav-group.open > .nav-group-toggle .nav-group-chevron { transform: rotate(180deg); }
+/* Closed but holding the current page: the header carries the active mark. */
+.nav-group.active:not(.open) > .nav-group-toggle { color: hsl(var(--foreground)); background: hsl(var(--muted)); box-shadow: inset 2px 0 hsl(var(--accent)); font-weight: 500; }
+.nav-group.active.open > .nav-group-toggle { color: hsl(var(--foreground)); }
+.nav-sublist { display: flex; flex-direction: column; gap: 2px; padding-left: 8px; border-left: 1px solid hsl(var(--border)); margin-left: 20px; animation: nav-sublist-in .15s ease-out; }
+@keyframes nav-sublist-in { from { opacity: 0; transform: translateY(-4px); } }
 .nav-subitem { min-height: calc(var(--control-h) - 4px); font-size: var(--fs-sm); }
 .sidebar-bottom { margin-top: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
 .user-row { border-top: 1px solid hsl(var(--border)); padding: 20px 4px 4px; display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -199,11 +206,8 @@ p { margin: 0; }
 .topbar { position: sticky; top: 0; z-index: 5; height: var(--topbar-h); padding: 0 40px; display: flex; justify-content: flex-end; align-items: center; gap: 12px; border-bottom: 1px solid hsl(var(--border)); background: hsl(var(--background) / .85); backdrop-filter: blur(8px); }
 .top-actions { display: flex; align-items: center; gap: 12px; }
 .mobile-brand { display: none; align-items: center; gap: 8px; margin-right: auto; }
-.branch-switcher, .select-inline { position: relative; display: inline-flex; align-items: center; gap: 8px; height: var(--control-h); padding: 0 12px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--r-sm); font-size: var(--fs-sm); color: hsl(var(--foreground)); }
-.branch-switcher:hover, .select-inline:hover { border-color: hsl(var(--accent) / .5); }
-.branch-switcher:focus-within, .select-inline:focus-within { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / .18); }
-.branch-switcher select, .select-inline select { appearance: none; border: 0; background: transparent; outline: none; padding-right: 20px; cursor: pointer; max-width: 200px; text-overflow: ellipsis; }
-.branch-switcher option, .select-inline option { background: hsl(var(--card)); color: hsl(var(--foreground)); }
+/* Read-only scope label. Dropdowns are the shadcn Select in components/ui. */
+.branch-switcher { position: relative; display: inline-flex; align-items: center; gap: 8px; max-width: 240px; height: var(--control-h); padding: 0 12px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--r-sm); font-size: var(--fs-sm); color: hsl(var(--foreground)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .switcher-dot { width: 8px; height: 8px; border-radius: 50%; background: hsl(var(--accent)); flex: none; }
 .icon-btn { position: relative; width: var(--control-h); height: var(--control-h); flex: none; border-radius: var(--r-sm); display: inline-grid; place-items: center; background: transparent; color: hsl(var(--muted-foreground)); transition: background-color .15s, color .15s; }
 .icon-btn:hover:not(:disabled) { color: hsl(var(--foreground)); background: hsl(var(--muted)); }
@@ -320,16 +324,17 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; border: 0; margin: 0; padding: 0; }
 .field label, .field legend { font-size: var(--fs-sm); color: hsl(var(--foreground)); padding: 0; margin-bottom: 0; }
 .field legend { margin-bottom: 6px; }
-.field input, .field select, .field textarea { width: 100%; min-height: var(--control-h); padding: 8px 12px; background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--r-sm); color: hsl(var(--foreground)); font-size: var(--fs-md); outline: none; transition: border-color .15s, box-shadow .15s; }
+.field input, .field textarea { width: 100%; min-height: var(--control-h); padding: 8px 12px; background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--r-sm); color: hsl(var(--foreground)); font-size: var(--fs-md); outline: none; transition: border-color .15s, box-shadow .15s; }
 .field textarea { resize: vertical; line-height: 1.5; }
-.field select option { background: hsl(var(--card)); }
-.field input:hover, .field select:hover, .field textarea:hover { border-color: hsl(var(--accent) / .5); }
-.field input:focus, .field select:focus, .field textarea:focus { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / .18); }
+.field input:hover, .field textarea:hover { border-color: hsl(var(--accent) / .5); }
+.field input:focus, .field textarea:focus { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / .18); }
 .field [aria-invalid='true'] { border-color: hsl(var(--destructive)); }
 .field [aria-invalid='true']:focus { box-shadow: 0 0 0 3px hsl(var(--destructive) / .18); }
 /* Holds a control inside the input, such as the password reveal toggle. */
 .field-affix { position: relative; display: flex; min-width: 0; }
-.field-affix input { padding-right: 44px; }
+.field-affix.has-affix input { padding-right: 44px; }
+.field-affix.has-icon input { padding-left: 40px; }
+.field-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); display: flex; color: hsl(var(--muted-foreground)); pointer-events: none; }
 .field-affix .icon-btn { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; }
 .field-error { color: hsl(var(--destructive)); font-size: var(--fs-xs); }
 .field-hint { color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); }
@@ -409,18 +414,47 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
 .line-warning { grid-column: 1 / -1; color: hsl(var(--warning)); font-size: var(--fs-xs); }
 
 /* ---------- Auth ---------- */
-.auth-screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 48px 16px; }
-.auth-corner { position: fixed; top: 12px; right: 12px; }
-.auth-card { width: min(420px, 100%); background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--r-lg); padding: 32px; display: flex; flex-direction: column; gap: 24px; animation: pop-in .15s ease-out; }
-.auth-head .logo-full { margin-bottom: 24px; }
+/* The brand panel stays ink in both themes; in dark mode it lifts to the card
+   tone so it still reads as a separate surface. */
+.auth-screen {
+  --aside-bg: 30 5% 8%;
+  --aside-fg: 43 28% 95%;
+  --aside-muted: 37 7% 64%;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+}
+.dark .auth-screen { --aside-bg: 40 6% 10%; }
+.auth-aside { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 48px; padding: 48px; background: hsl(var(--aside-bg)); color: hsl(var(--aside-fg)); border-right: 1px solid hsl(var(--border)); }
+.auth-brand, .auth-pitch { position: relative; display: flex; flex-direction: column; gap: 12px; }
+.auth-brand .logo-full { width: 148px; height: 32px; background-color: hsl(var(--accent)); }
+.auth-brand p { color: hsl(var(--aside-muted)); font-size: var(--fs-sm); letter-spacing: .1em; text-transform: uppercase; }
+.auth-pitch { gap: 16px; max-width: 40ch; }
+.auth-pitch h2 { font-family: var(--font-playfair), ui-serif, Georgia, serif; font-size: 40px; line-height: 1.15; letter-spacing: -.02em; }
+.auth-pitch p { color: hsl(var(--aside-muted)); font-size: var(--fs-md); line-height: 1.6; }
+.auth-rule { width: 40px; height: 1px; margin-top: 8px; background: hsl(var(--accent)); }
+.auth-watermark.logo-mark { position: absolute; right: -48px; bottom: -32px; width: 320px; height: 348px; background-color: hsl(var(--aside-fg)); opacity: .04; }
+
+.auth-main { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 48px 24px; }
+.auth-corner { position: absolute; top: 16px; right: 16px; }
+.auth-card { width: min(440px, 100%); background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--r-lg); padding: 40px; display: flex; flex-direction: column; gap: 32px; animation: pop-in .15s ease-out; }
+.auth-head .logo-full { display: none; margin-bottom: 24px; }
 .auth-head .subtitle { max-width: 36ch; }
 .auth-form { display: flex; flex-direction: column; gap: 20px; }
+.auth-form .btn-primary { height: 44px; margin-top: 8px; font-size: var(--fs-md); }
 .auth-alert { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: var(--r-sm); background: hsl(var(--destructive) / .12); color: hsl(var(--destructive)); font-size: var(--fs-sm); }
 .auth-alert svg { flex: none; margin-top: 2px; }
 .demo-text { min-width: 0; margin-right: auto; display: flex; flex-direction: column; }
 .demo-text strong { font-size: var(--fs-sm); font-weight: 500; }
 .demo-text small { color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; }
 .auth-foot { max-width: 44ch; color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); text-align: center; }
+.auth-note { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: var(--r-sm); background: hsl(var(--muted) / .6); border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); line-height: 1.5; }
+.auth-note svg { flex: none; margin-top: 1px; }
+.auth-note strong { color: hsl(var(--foreground)); font-weight: 500; }
+/* Cross-link between the sign-in and the temporary sign-up card. */
+.auth-switch { margin-top: -8px; color: hsl(var(--muted-foreground)); font-size: var(--fs-sm); text-align: center; }
+.auth-switch a { color: hsl(var(--foreground)); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: hsl(var(--border)); }
+.auth-switch a:hover { text-decoration-color: hsl(var(--accent)); }
 
 /* ---------- Loading / misc ---------- */
 .skeleton-wrap { display: flex; flex-direction: column; gap: 16px; }
@@ -468,6 +502,11 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
   .sidebar .nav-item { justify-content: center; padding: 0; }
   .page-content, .topbar { padding-inline: 24px; }
 }
+@media (max-width: 900px) {
+  .auth-screen { grid-template-columns: 1fr; }
+  .auth-aside { display: none; }
+  .auth-head .logo-full { display: block; }
+}
 @media (max-width: 1024px) {
   .chart-grid { grid-template-columns: 1fr; }
   .line-row { grid-template-columns: minmax(0, 1fr) 72px 96px auto; }
@@ -478,7 +517,7 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
   .mobile-brand { display: flex; min-width: 0; white-space: nowrap; }
   .topbar { padding-inline: 8px 12px; justify-content: space-between; }
   .top-actions { gap: 4px; flex: none; }
-  .branch-switcher select { max-width: 130px; }
+  .branch-switcher { max-width: 150px; }
   .page-content { padding: 24px 16px 48px; }
   h1 { font-size: 24px; }
   .heading-actions { width: 100%; }
@@ -507,3 +546,13 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---------- Stock threshold ---------- */
+/* The one stock number a person edits, so the input sits in the cell rather
+   than behind a dialog. */
+.threshold-edit { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.threshold-edit input { width: 72px; min-height: var(--control-h-sm); padding: 4px 8px; text-align: right; background: hsl(var(--background)); border: 1px solid hsl(var(--border)); border-radius: var(--r-sm); color: hsl(var(--foreground)); font-size: var(--fs-sm); outline: none; transition: border-color .15s, box-shadow .15s; }
+.threshold-edit input:hover:not(:disabled) { border-color: hsl(var(--accent) / .5); }
+.threshold-edit input:focus { border-color: hsl(var(--ring)); box-shadow: 0 0 0 3px hsl(var(--ring) / .18); }
+.threshold-edit input:disabled { opacity: .55; }
+.threshold-saved { color: hsl(var(--success)); flex: none; }

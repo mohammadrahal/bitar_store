@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { CheckCircle2 } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { StockStatusPill } from '@/components/shared/status-pill'
+import { ThresholdCell } from '@/components/stock/threshold-cell'
 import type { LowStockRow } from '@/types'
 
 export function LowStockTable({ rows, showBranch }: { rows: LowStockRow[]; showBranch: boolean }) {
@@ -55,7 +56,9 @@ export function LowStockTable({ rows, showBranch }: { rows: LowStockRow[]; showB
                 </td>
               )}
               <td className="num tabular">{row.quantity}</td>
-              <td className="num tabular muted">{row.lowStockAt}</td>
+              <td className="num">
+                <ThresholdCell variantId={row.variantId} branchId={row.branchId} value={row.lowStockAt} />
+              </td>
               <td>
                 <StockStatusPill status={row.status} />
               </td>

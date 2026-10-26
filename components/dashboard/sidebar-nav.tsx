@@ -1,9 +1,11 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Building2,
+  ChevronDown,
   LayoutDashboard,
   Package,
   ReceiptText,
@@ -133,33 +135,77 @@ export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavi
         }
 
         return (
-          <div key={entry.label} className={`nav-group ${groupActive ? 'active' : ''}`}>
-            <div className="nav-group-label" aria-hidden="true">
-              <entry.icon size={18} />
-              <span>{entry.label}</span>
-            </div>
-            <div className="nav-sublist" role="list">
-              {entry.children.map(({ href, label, icon: Icon }) => {
-                const active = href === current
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className={`nav-item nav-subitem ${active ? 'active' : ''}`}
-                    aria-current={active ? 'page' : undefined}
-                    role="listitem"
-                    onClick={onNavigate}
-                  >
-                    <Icon size={16} aria-hidden="true" />
-                    <span>{label}</span>
-                  </Link>
-                )
-              })}
-            </div>
-          </div>
+          <NavGroup
+            key={entry.label}
+            entry={entry}
+            current={current}
+            groupActive={groupActive}
+            onNavigate={onNavigate}
+          />
         )
       })}
     </nav>
+  )
+}
+
+/**
+ * A nav section that opens and closes, so Sales keeps its children out of the
+ * way until they are wanted. Collapsed sidebars never get here — they flatten
+ * the children into plain icons above.
+ */
+function NavGroup({
+  entry,
+  current,
+  groupActive,
+  onNavigate,
+}: {
+  entry: NavGroupItem
+  current: string | null
+  groupActive: boolean
+  onNavigate?: () => void
+}) {
+  const [open, setOpen] = useState(groupActive)
+  const panelId = `nav-group-${entry.label.toLowerCase()}`
+
+  /* Navigating into the group opens it, so the active child is never hidden. */
+  useEffect(() => {
+    if (groupActive) setOpen(true)
+  }, [groupActive])
+
+  return (
+    <div className={`nav-group ${groupActive ? 'active' : ''} ${open ? 'open' : ''}`}>
+      <button
+        type="button"
+        className="nav-item nav-group-toggle"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <entry.icon size={18} aria-hidden="true" />
+        <span>{entry.label}</span>
+        <ChevronDown size={16} className="nav-group-chevron" aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="nav-sublist" id={panelId} role="list">
+          {entry.children.map(({ href, label, icon: Icon }) => {
+            const active = href === current
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`nav-item nav-subitem ${active ? 'active' : ''}`}
+                aria-current={active ? 'page' : undefined}
+                role="listitem"
+                onClick={onNavigate}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 

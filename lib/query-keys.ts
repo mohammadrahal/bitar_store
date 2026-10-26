@@ -44,8 +44,17 @@ export const queryKeys = {
   },
   stock: {
     all: ['stock'] as const,
-    stats: (scope: BranchScope) => ['stock', 'stats', scope] as const,
-    lowStock: (scope: BranchScope) => ['stock', 'low-stock', scope] as const,
+    /* `branches` is the mirrored branch set these figures were computed from,
+       so adding or renaming a branch re-reads them instead of serving a
+       figure that predates it. */
+    stats: (scope: BranchScope, branches: string) => ['stock', 'stats', scope, branches] as const,
+    lowStock: (scope: BranchScope, branches: string) =>
+      ['stock', 'low-stock', scope, branches] as const,
     byBranch: (branchId: string) => ['stock', 'by-branch', branchId] as const,
+    /* On-hand per variant at one branch. Its own key, not `byBranch`: that one
+       answers with a single total, and two queries of different shapes under
+       one key serve each other's data to whichever mounted second. */
+    onHand: (branchId: string) => ['stock', 'on-hand', branchId] as const,
+    branchList: (branchId: string) => ['stock', 'branch-list', branchId] as const,
   },
 } as const

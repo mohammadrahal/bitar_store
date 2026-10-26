@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/shared/skeleton'
+import { ApiError } from '@/lib/api'
 import { bootstrapSession } from '@/services/session.service'
 import { useUIStore } from '@/store/ui-store'
-import { migrateUserSessionStorage, useUserStore } from '@/store/user-store'
+import { clearLegacySessionStorage, useUserStore } from '@/store/user-store'
 
 /**
- * The user session uses sessionStorage; UI preferences use localStorage. Both
- * rehydrate after mount so markup matches what the client will show.
+ * The session uses sessionStorage; UI preferences use localStorage. Both
+ * rehydrate after mount so markup matches what the client will show. A saved
+ * token is re-checked with `GET /auth/me` so role and branch access are fresh.
  */
 export function HydrationGate({
   children,
@@ -21,15 +23,15 @@ export function HydrationGate({
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    migrateUserSessionStorage()
+    clearLegacySessionStorage()
     void Promise.all([useUserStore.persist.rehydrate(), useUIStore.persist.rehydrate()]).then(async () => {
-      const { userId, user, signIn, signOut } = useUserStore.getState()
-      if (userId && !user) {
+      const { token, user, setUser, signOut } = useUserStore.getState()
+      if (token) {
         try {
-          const session = await bootstrapSession(userId)
-          signIn(session)
-        } catch {
-          signOut()
+          setUser(await bootstrapSession(token))
+        } catch (error) {
+          /* A network blip keeps the cached session; a rejected token does not. */
+          if (!user || (error instanceof ApiError && error.status === 401)) signOut()
         }
       }
       setHydrated(true)

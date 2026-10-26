@@ -1,5 +1,9 @@
 # Bitar Fashion API: guide for the frontend developer
 
+> **Outdated.** This guide describes the old `X-User-Id` development header,
+> which the app no longer uses. See [`AGENTS.md`](./AGENTS.md) for the current
+> API and [`README.md`](./README.md) for how the frontend uses it.
+
 Version 0.1: **users** and **branches**. Everything below was run against the real server; the JSON examples are real responses.
 
 | Area | Status |
