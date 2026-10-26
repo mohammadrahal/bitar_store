@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { Package, Pencil, Trash2 } from 'lucide-react'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
+import { formatBarcode } from '@/lib/barcode'
 import { formatPrice } from '@/lib/format'
 import type { ProductWithVariants } from '@/types'
 
@@ -10,6 +12,12 @@ function variantSummary(product: ProductWithVariants) {
   const sizes = [...new Set(product.variants.map((variant) => variant.size))]
   const colors = [...new Set(product.variants.map((variant) => variant.color))]
   return `${sizes.length} ${sizes.length === 1 ? 'size' : 'sizes'} · ${colors.length} ${colors.length === 1 ? 'color' : 'colors'}`
+}
+
+function barcodeSummary(product: ProductWithVariants) {
+  const barcodes = product.variants.map((variant) => variant.barcode).filter(Boolean)
+  if (barcodes.length === 0) return null
+  return { primary: formatBarcode(barcodes[0]), extra: barcodes.length - 1 }
 }
 
 export function ProductTable({
@@ -60,6 +68,7 @@ export function ProductTable({
         <thead>
           <tr>
             <th scope="col">Product</th>
+            <th scope="col">Barcode</th>
             <th scope="col">Category</th>
             <th scope="col" className="num">
               Variants
@@ -78,11 +87,25 @@ export function ProductTable({
           </tr>
         </thead>
         <tbody>
-          {products.map((product) => (
+          {products.map((product) => {
+            const barcode = barcodeSummary(product)
+            return (
             <tr key={product.id}>
               <td>
-                <strong>{product.name}</strong>
+                <Link href={`/products/${product.id}`} className="link-cell">
+                  {product.name}
+                </Link>
                 <small>{variantSummary(product)}</small>
+              </td>
+              <td className="tabular">
+                {barcode ? (
+                  <>
+                    <span>{barcode.primary}</span>
+                    {barcode.extra > 0 && <small>+ {barcode.extra} more</small>}
+                  </>
+                ) : (
+                  '—'
+                )}
               </td>
               <td>{product.category}</td>
               <td className="num tabular">{product.variants.length}</td>
@@ -117,7 +140,7 @@ export function ProductTable({
                 </div>
               </td>
             </tr>
-          ))}
+          )})}
         </tbody>
       </table>
     </div>
