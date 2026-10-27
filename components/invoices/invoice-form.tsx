@@ -9,6 +9,7 @@ import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
 import { SelectInput } from '@/components/shared/select-input'
 import { useBranches } from '@/hooks/use-branches'
+import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { useCreateInvoice, useUpdateInvoice } from '@/hooks/use-invoices'
 import { usePermission } from '@/hooks/use-permission'
 import { toDateInput } from '@/lib/format'
@@ -99,6 +100,7 @@ export function InvoiceForm({
   onClose,
   salesChannel,
   saleOnly = false,
+  lockBranch = false,
   prefill,
 }: {
   invoice?: InvoiceWithLines
@@ -110,8 +112,11 @@ export function InvoiceForm({
   salesChannel?: SalesChannel
   /** Locks the form to a customer sale (no purchases or returns). */
   saleOnly?: boolean
+  /** Keeps the document on `defaultBranchId`, e.g. B2B sales from the warehouse only. */
+  lockBranch?: boolean
 }) {
   const create = useCreateInvoice()
+  const idempotency = useIdempotencyKey()
   const update = useUpdateInvoice()
   const { can } = usePermission()
   const { data: branches } = useBranches()
@@ -152,7 +157,16 @@ export function InvoiceForm({
         salesChannel: kind === 'sale' || kind === 'sale_return' ? (channel ?? 'b2c') : undefined,
       }
       if (invoice) update.mutate({ invoiceId: invoice.id, input }, { onSuccess: onClose })
-      else create.mutate({ input, issue }, { onSuccess: onClose })
+      else
+        create.mutate(
+          { input, issue, key: idempotency.current() },
+          {
+            onSuccess: () => {
+              idempotency.reset()
+              onClose()
+            },
+          },
+        )
     })
 
   return (
@@ -217,11 +231,15 @@ export function InvoiceForm({
           control={control}
           name="branchId"
           render={({ field }) => (
-            <Field label="Branch" error={errors.branchId?.message}>
+            <Field
+              label="Branch"
+              error={errors.branchId?.message}
+              hint={lockBranch ? 'Wholesale orders ship from the main warehouse only' : undefined}
+            >
               <SelectInput
                 value={field.value}
                 onValueChange={field.onChange}
-                disabled={branches?.length === 1}
+                disabled={lockBranch || branches?.length === 1}
                 placeholder="Select a branch"
                 options={
                   branches?.map((branch) => ({

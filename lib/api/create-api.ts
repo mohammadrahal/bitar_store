@@ -1,5 +1,6 @@
 import { fetchHealth } from '@/lib/api/auth.api'
 import { createBranchesApi } from '@/lib/api/branches.api'
+import { createCatalogApi } from '@/lib/api/catalog.api'
 import { createRequest } from '@/lib/api/client'
 import { createSalesApi } from '@/lib/api/sales.api'
 import { createUsersApi } from '@/lib/api/users.api'
@@ -11,6 +12,7 @@ export function createApi(token: string) {
   return {
     ...createUsersApi(request),
     ...createBranchesApi(request),
+    ...createCatalogApi(request),
     ...createSalesApi(request),
     health: fetchHealth,
   }

@@ -1,6 +1,6 @@
 import { mapApiBranch } from '@/lib/api/map-branch'
 import { can } from '@/lib/permissions'
-import { mirrorBranches } from '@/mocks/store'
+import { mirrorBranches } from '@/mocks/mirror'
 import { useUserStore } from '@/store/user-store'
 import { getApiClient } from '@/lib/api'
 import type { CreateBranchInput, UpdateBranchInput } from '@/lib/api/types'

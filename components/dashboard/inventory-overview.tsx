@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { LowStockTable } from '@/components/dashboard/low-stock-table'
+import { OperationsCards } from '@/components/dashboard/operations-cards'
 import { BranchStatCards, NetworkStatCards } from '@/components/dashboard/stat-cards'
 import { ErrorState } from '@/components/shared/error-state'
 import { Pagination } from '@/components/shared/pagination'
@@ -58,6 +59,7 @@ export function InventoryOverview({
   return (
     <>
       {mode === 'network' ? <NetworkStatCards stats={stats.data} /> : <BranchStatCards stats={stats.data} />}
+      <OperationsCards scope={scope} />
 
       {children}
 

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import { AppProviders } from '@/providers/app-providers'
 import './globals.css'
+import './operations.css'
 
 const inter = Inter({
   subsets: ['latin'],

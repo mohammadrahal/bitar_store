@@ -1,5 +1,10 @@
-import { redirect } from 'next/navigation'
+import { HydrationGate } from '@/components/shared/hydration-gate'
+import { RootRedirect } from '@/components/shared/root-redirect'
 
 export default function HomePage() {
-  redirect('/dashboard')
+  return (
+    <HydrationGate fallback={null}>
+      <RootRedirect />
+    </HydrationGate>
+  )
 }

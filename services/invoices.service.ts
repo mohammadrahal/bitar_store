@@ -7,6 +7,7 @@ import type { InvoiceFilters } from '@/lib/query-keys'
 import { readDb, writeDb, type MockDb } from '@/mocks/store'
 import { findDuplicateLine, linesOf, normalizeLines, type InvoiceLineInput } from '@/services/invoice-lines'
 import { applyStock, findShortage, shortageMessage } from '@/services/invoice-stock'
+import { remember, replayOf } from '@/services/mock-ledger'
 import {
   ALL_BRANCHES,
   type Invoice,
@@ -58,7 +59,7 @@ export async function listInvoices(filters: InvoiceFilters): Promise<InvoiceRow[
     .filter((invoice) => filters.kind === 'all' || invoice.kind === filters.kind)
     .filter((invoice) => {
       if (!filters.salesChannel) return true
-      if (!isCustomerSaleKind(invoice.kind)) return false
+      if (invoice.isInternal || !isCustomerSaleKind(invoice.kind)) return false
       return salesChannelOf(invoice) === filters.salesChannel
     })
     .filter((invoice) => filters.status === 'all' || invoice.status === filters.status)
@@ -116,10 +117,23 @@ function toIsoDate(value: string) {
   return new Date(`${value}T09:00:00.000Z`).toISOString()
 }
 
-export async function createInvoice(input: InvoiceInput, issue = false): Promise<InvoiceWithLines> {
+/**
+ * `idempotencyKey` makes a retried confirm safe: the second call answers with
+ * the first call's document instead of selling the units twice.
+ */
+export async function createInvoice(
+  input: InvoiceInput,
+  issue = false,
+  idempotencyKey?: string,
+): Promise<InvoiceWithLines> {
   const db = readDb()
+  const replay = replayOf<InvoiceWithLines>(db, idempotencyKey)
+  if (replay) return delay(replay)
   if (!db.branches.some((candidate) => candidate.id === input.branchId)) {
     return delayedFailure(`Branch "${input.branchId}" no longer exists.`)
+  }
+  if (input.salesChannel === 'b2b' && isCustomerSaleKind(input.kind) && input.branchId !== db.warehouseId) {
+    return delayedFailure('Wholesale (B2B) sales are only made from the main warehouse.')
   }
 
   const id = createId('inv')
@@ -160,7 +174,7 @@ export async function createInvoice(input: InvoiceInput, issue = false): Promise
     current.invoices.push(invoice)
     current.invoiceLines.push(...lines)
     if (issue) applyStock(current, invoice, lines, 1)
-    return { ...invoice, lines: lines.map((line) => ({ ...line })) }
+    return remember(current, idempotencyKey, { ...invoice, lines: lines.map((line) => ({ ...line })) })
   })
 
   return delay(result)
@@ -247,6 +261,9 @@ export async function voidInvoice(id: string): Promise<Invoice> {
   const db = readDb()
   const invoice = db.invoices.find((candidate) => candidate.id === id)
   if (!invoice) return delayedFailure(`Document "${id}" no longer exists.`)
+  if (invoice.transferId) {
+    return delayedFailure(`${invoice.number} belongs to a transfer. Its stock follows the transfer, so it cannot be voided here.`)
+  }
   if (invoice.status === 'void') return delayedFailure(`${invoice.number} is already void.`)
   if (invoice.status === 'draft') return delayedFailure(`${invoice.number} is a draft. Delete it instead.`)
 

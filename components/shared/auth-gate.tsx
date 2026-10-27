@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { Skeleton } from '@/components/shared/skeleton'
 import { useSession } from '@/store/user-store'
 
 /**
@@ -15,16 +14,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    if (!user) router.replace(`/login?next=${encodeURIComponent(pathname)}`)
+    if (user) return
+    // The overview is where sign-in lands anyway, so it is not worth carrying as `next`.
+    router.replace(pathname === '/dashboard' ? '/login' : `/login?next=${encodeURIComponent(pathname)}`)
   }, [user, pathname, router])
 
-  if (!user) {
-    return (
-      <main className="page-content">
-        <Skeleton />
-      </main>
-    )
-  }
+  // Nothing of the app is drawn for a signed-out visitor, not even its skeleton.
+  if (!user) return null
 
   return <>{children}</>
 }

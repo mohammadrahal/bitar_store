@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, Search } from 'lucide-react'
 import { InvoiceForm } from '@/components/invoices/invoice-form'
 import { InvoiceTable } from '@/components/invoices/invoice-table'
@@ -12,6 +13,7 @@ import { Panel } from '@/components/shared/panel'
 import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useBranchScope, useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useWarehouseId } from '@/hooks/use-inventory'
 import { useInvoices } from '@/hooks/use-invoices'
 import { INVOICE_STATUS_LABELS } from '@/lib/invoices'
 import { ALL_BRANCHES, type InvoiceStatus, type SalesChannel } from '@/types'
@@ -56,8 +58,12 @@ const COPY: Record<
 
 export function SalesChannelView({ channel }: { channel: SalesChannel }) {
   const copy = COPY[channel]
+  const router = useRouter()
   const scope = useBranchScope()
   const defaultBranchId = useDefaultBranchId()
+  const { data: warehouseId } = useWarehouseId()
+  const formBranchId = channel === 'b2b' ? (warehouseId ?? '') : defaultBranchId
+  const startSale = () => (channel === 'b2c' ? router.push('/sales/new') : setCreating(true))
 
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -95,7 +101,7 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
         description={copy.description}
         actions={
           <Can action={CREATE_ACTION[channel]}>
-            <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
+            <button type="button" className="btn btn-primary" onClick={startSale} disabled={channel === 'b2b' && !warehouseId}>
               <Plus size={16} aria-hidden="true" />
               {copy.newLabel}
             </button>
@@ -160,7 +166,7 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
               invoices={visible}
               filtered={isFiltered}
               showBranch={scope === ALL_BRANCHES}
-              onCreate={() => setCreating(true)}
+              onCreate={startSale}
               createAction={CREATE_ACTION[channel]}
               emptyTitle={copy.emptyTitle}
               emptyDescription={copy.emptyDescription}
@@ -171,11 +177,19 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
         )}
       </Panel>
 
-      {creating && defaultBranchId && (
+      {channel === 'b2b' && warehouseId === null && (
+        <p className="notice notice-warning" role="status">
+          No location is marked as the main warehouse, so wholesale sales cannot be recorded. An admin can set one on the
+          Branches page.
+        </p>
+      )}
+
+      {creating && formBranchId && (
         <InvoiceForm
-          defaultBranchId={defaultBranchId}
+          defaultBranchId={formBranchId}
           salesChannel={channel}
           saleOnly
+          lockBranch={channel === 'b2b'}
           onClose={() => setCreating(false)}
         />
       )}

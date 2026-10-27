@@ -122,6 +122,11 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
         <InvoiceKindBadge kind={invoice.kind} isInternal={invoice.isInternal} />
         <InvoiceStatusPill status={invoice.status} />
         {invoice.status === 'draft' && <span className="muted">Nothing has moved yet.</span>}
+        {invoice.transferId && (
+          <Link href={`/transfers/${invoice.transferId}`} className="link-row">
+            Raised by a transfer. View transfer
+          </Link>
+        )}
       </div>
 
       <Panel
@@ -142,12 +147,14 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
         </Panel>
       )}
 
-      <InvoiceDangerZone
-        invoice={invoice}
-        busy={busy}
-        onVoid={() => setDialog('void')}
-        onDelete={() => setDialog('delete')}
-      />
+      {!invoice.transferId && (
+        <InvoiceDangerZone
+          invoice={invoice}
+          busy={busy}
+          onVoid={() => setDialog('void')}
+          onDelete={() => setDialog('delete')}
+        />
+      )}
 
       {dialog === 'edit' && (
         <InvoiceForm invoice={invoice} defaultBranchId={invoice.branchId} onClose={() => setDialog(null)} />

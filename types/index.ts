@@ -25,29 +25,75 @@ export interface Branch {
   createdAt: string
 }
 
+export interface ProductDetails {
+  season?: string
+  brand?: string
+  material?: string
+  description?: string
+}
+
 export interface Product {
   id: string
+  /** Style code, fixed once saved: MD000123. */
+  code: string
   name: string
   category: string
+  /** Kept on this device only: the API does not carry cost yet. */
   costPrice: number
+  /** Lowest price among the active SKUs; each SKU carries its own. */
   sellPrice: number
+  /** Archived models leave sale and transfer pickers but stay in history. */
+  archived: boolean
+  details?: ProductDetails
   createdAt: string
 }
 
 export interface Variant {
   id: string
   productId: string
+  /** Model code plus the variant code: MD000123-BLK-S. */
   sku: string
-  /** In-store EAN-13, minted once and never changed: it goes on printed labels. */
+  /** Color and size part of the SKU: BLK-S. */
+  code: string
+  /** First barcode registered for the SKU, or empty until one is known. */
   barcode: string
   size: string
   color: string
+  /** Standard price of this SKU. */
+  sellPrice: number
+  currency: string
+  /** Inactive SKUs leave sale and transfer pickers but stay in history. */
+  archived: boolean
+}
+
+export interface Barcode {
+  id: string
+  code: string
+  createdAt: string
+}
+
+export interface PriceChange {
+  id: string
+  oldPrice: number | null
+  newPrice: number
+  effectiveAt: string
+  changedBy: string | null
+}
+
+/** A model with every SKU's barcodes, for the product page. */
+export interface ProductDetail extends ProductWithVariants {
+  barcodes: Record<string, Barcode[]>
 }
 
 export interface StockLevel {
   variantId: string
   branchId: string
+  /** Units physically at the location. */
   quantity: number
+  /** Units promised to an approved transfer that has not left yet. */
+  reserved: number
+  /** Units kept out of sale: damaged, disputed or set aside. */
+  onHold: number
   /** Quantity at or below which the variant counts as low stock. */
   lowStockAt: number
 }
@@ -73,7 +119,10 @@ export interface BranchStockRow {
   productId: string
   productName: string
   category: string
+  /** On hand. */
   quantity: number
+  /** On hand less reserved and on hold. */
+  available: number
   lowStockAt: number
   status: StockStatus
   /* Carried so a row can raise an adjustment priced at cost, the same way the
@@ -83,8 +132,9 @@ export interface BranchStockRow {
 }
 
 export interface InventoryStats {
-  /** Branches inside the current scope. */
+  /** Locations inside the current scope, warehouse included. */
   branchCount: number
+  warehouseCount: number
   /** Catalog size, which is the same whatever branch is in scope. */
   productCount: number
   variantCount: number
@@ -205,6 +255,8 @@ export interface VariantOption {
   color: string
   costPrice: number
   sellPrice: number
+  /** Available at the branch the picker was opened for, when it was given one. */
+  available?: number
 }
 
 /** One coloured series in a sales chart: a branch, or the folded "Other". */
@@ -238,3 +290,5 @@ export interface SalesAnalytics {
   totalUnits: number
   totalRevenue: number
 }
+
+export * from './operations'

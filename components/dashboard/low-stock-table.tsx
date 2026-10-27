@@ -29,7 +29,7 @@ export function LowStockTable({ rows, showBranch }: { rows: LowStockRow[]; showB
             <th scope="col">Variant</th>
             {showBranch && <th scope="col">Branch</th>}
             <th scope="col" className="num">
-              On hand
+              Available
             </th>
             <th scope="col" className="num">
               Threshold

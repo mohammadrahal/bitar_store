@@ -12,14 +12,34 @@ export const ACTIONS = [
   'branches:delete',
   /** See data across every branch rather than just one. */
   'branches:view-all',
+  /** Mark which location is the main warehouse. */
+  'locations:set-warehouse',
   'products:read',
   'products:create',
   'products:edit',
-  'products:delete',
+  /** Archive a model so it leaves sale and transfer pickers, or bring it back. */
+  'products:archive',
   /** Set a variant's low-stock threshold at a branch. */
   'stock:manage',
   /** See cost price and margin. */
   'products:read-cost',
+  /** Five balances per variant and per location. */
+  'inventory:read',
+  'transfers:read',
+  'transfers:request',
+  /** Approve (reserves stock), reduce or cancel before dispatch. */
+  'transfers:approve',
+  'transfers:dispatch',
+  'transfers:receive',
+  /** Place and release holds. */
+  'stock:hold',
+  /** Apply a physical count as a correction. */
+  'stock:count',
+  /** Report a count difference for a manager to resolve. */
+  'stock:report',
+  /** Write off stock with a reason. */
+  'stock:dispose',
+  'replenishment:read',
   'invoices:read',
   'invoices:create',
   /** Rewrite or throw away a draft. */
@@ -40,12 +60,16 @@ export const ACTIONS = [
   'sales:b2b:create',
   /** Record a retail sale (same ledger as invoices, tagged B2C). */
   'sales:b2c:create',
+  /** Take money off a sale. */
+  'sales:discount',
 ] as const
 
 export type Action = (typeof ACTIONS)[number]
 
 const PERMISSIONS: Record<Role, readonly Action[]> = {
   admin: ACTIONS,
+  /* Business Managers run stock, catalog and transfers; only admins shape the
+     network itself (users, branches, the warehouse) or void documents. */
   manager: [
     'branches:manage',
     'branches:read',
@@ -53,9 +77,20 @@ const PERMISSIONS: Record<Role, readonly Action[]> = {
     'products:read',
     'products:create',
     'products:edit',
-    'products:delete',
+    'products:archive',
     'products:read-cost',
     'stock:manage',
+    'inventory:read',
+    'transfers:read',
+    'transfers:request',
+    'transfers:approve',
+    'transfers:dispatch',
+    'transfers:receive',
+    'stock:hold',
+    'stock:count',
+    'stock:report',
+    'stock:dispose',
+    'replenishment:read',
     'invoices:read',
     'invoices:create',
     'invoices:edit',
@@ -66,17 +101,20 @@ const PERMISSIONS: Record<Role, readonly Action[]> = {
     'sales:b2c:read',
     'sales:b2b:create',
     'sales:b2c:create',
+    'sales:discount',
   ],
   /*
-   * An employee works the till: they raise and issue sales, and they may add
-   * and correct catalog entries for stock arriving in the shop. They cannot
-   * delete a product or see what it cost.
+   * A branch employee works the till and the stockroom: they sell, see their
+   * own branch's balances, receive transfers and report count differences.
+   * Corrections, holds and disposal stay with managers, and costs stay hidden.
    */
   employee: [
     'branches:read',
     'products:read',
-    'products:create',
-    'products:edit',
+    'inventory:read',
+    'transfers:read',
+    'transfers:receive',
+    'stock:report',
     'invoices:read',
     'invoices:create',
     'invoices:issue',
@@ -91,9 +129,17 @@ export function can(role: Role, action: Action) {
 
 const COST_ACTIONS: readonly Action[] = ['products:read-cost', 'invoices:read-cost']
 
-/** Like `can`, but cost visibility follows the backend's `canViewCosts` flag. */
+/** Backend permission key that guards every catalog write. */
+export const CATALOG_WRITE = 'catalog.create'
+const CATALOG_ACTIONS: readonly Action[] = ['products:create', 'products:edit', 'products:archive']
+
+/**
+ * Like `can`, but cost visibility follows the backend's `canViewCosts` flag
+ * and catalog changes follow its `catalog.create` permission.
+ */
 export function canUser(user: User, action: Action) {
-  if (COST_ACTIONS.includes(action)) return user.canViewCosts
+  if (COST_ACTIONS.includes(action)) return user.canViewCosts && can(user.role, action)
+  if (CATALOG_ACTIONS.includes(action)) return user.permissions.includes(CATALOG_WRITE)
   return can(user.role, action)
 }
 
@@ -113,6 +159,23 @@ export function homePathFor(user: User) {
   return can(user.role, 'branches:view-all') ? '/dashboard' : '/products'
 }
 
+/** Path prefixes and the action each one needs. Longest prefix is checked first. */
+const ROUTE_ACTIONS: [prefix: string, action: Action][] = [
+  ['/products/new', 'products:create'],
+  ['/sales/new', 'sales:b2c:create'],
+  ['/sales/b2b', 'sales:b2b:read'],
+  ['/sales/b2c', 'sales:b2c:read'],
+  ['/transfers/new', 'transfers:request'],
+  ['/transfers', 'transfers:read'],
+  ['/inventory', 'inventory:read'],
+  ['/stock-control', 'stock:report'],
+  ['/replenishment', 'replenishment:read'],
+  ['/users', 'users:manage'],
+  // A document's own branch is only known once it loads, so /invoices/:id is
+  // checked by the detail view rather than here.
+  ['/invoices', 'invoices:read'],
+]
+
 /**
  * Where a user must be sent instead of `pathname`, or null when the path is allowed.
  * Scoped users never see the cross-branch overview or another branch's page.
@@ -123,12 +186,9 @@ export function redirectPathFor(user: User, pathname: string): string | null {
 
   if (pathname === '/dashboard' && !can(user.role, 'branches:view-all')) return home
   if (pathname === '/branches' && !can(user.role, 'branches:manage')) return home
-  if (pathname.startsWith('/users') && !can(user.role, 'users:manage')) return home
-  // A document's own branch is only known once it loads, so /invoices/:id is
-  // checked by the detail view rather than here.
-  if (pathname.startsWith('/invoices') && !can(user.role, 'invoices:read')) return home
-  if (pathname.startsWith('/sales/b2b') && !can(user.role, 'sales:b2b:read')) return home
-  if (pathname.startsWith('/sales/b2c') && !can(user.role, 'sales:b2c:read')) return home
+
+  const rule = ROUTE_ACTIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  if (rule && !canUser(user, rule[1])) return home
 
   const branchMatch = /^\/branches\/([^/]+)/.exec(pathname)
   if (branchMatch && !canAccessBranch(user, branchMatch[1])) return home

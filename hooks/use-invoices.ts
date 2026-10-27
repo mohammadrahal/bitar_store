@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { useMirroredBranches } from '@/hooks/use-stock'
 import { queryKeys, type InvoiceFilters } from '@/lib/query-keys'
 import {
   createInvoice,
@@ -19,9 +20,11 @@ import { searchVariants } from '@/services/products.service'
 import { getBranchStockMap } from '@/services/stock.service'
 
 export function useInvoices(filters: InvoiceFilters) {
+  const mirrored = useMirroredBranches()
   return useQuery({
     queryKey: queryKeys.invoices.list(filters),
     queryFn: () => listInvoices(filters),
+    enabled: mirrored !== null,
   })
 }
 
@@ -74,10 +77,13 @@ function useInvoiceMutationCallbacks() {
 export function useCreateInvoice() {
   const { invalidate, reportError } = useInvoiceMutationCallbacks()
   return useMutation({
-    mutationFn: ({ input, issue }: { input: InvoiceInput; issue: boolean }) => createInvoice(input, issue),
+    mutationFn: ({ input, issue, key }: { input: InvoiceInput; issue: boolean; key?: string }) =>
+      createInvoice(input, issue, key),
     onSuccess: (invoice) => {
       invalidate()
-      toast.success(invoice.status === 'draft' ? `${invoice.number} saved as a draft` : `${invoice.number} issued`)
+      if (invoice.status === 'draft') toast.success(`${invoice.number} saved as a draft`)
+      else if (invoice.kind === 'sale') toast.success(`Sale confirmed: ${invoice.number}`)
+      else toast.success(`${invoice.number} issued`)
     },
     onError: reportError,
   })

@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { Pencil, Store, Trash2 } from 'lucide-react'
+import { Pencil, Store, Trash2, Warehouse } from 'lucide-react'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
+import { useSetWarehouse, useWarehouseId } from '@/hooks/use-inventory'
 import { BRANCH_WRITES } from '@/services/branches.service'
 import type { Branch } from '@/types'
 
@@ -23,6 +24,9 @@ export function BranchTable({
   onEdit: (branch: Branch) => void
   onDelete: (branch: Branch) => void
 }) {
+  const { data: warehouseId } = useWarehouseId()
+  const setWarehouse = useSetWarehouse()
+
   if (branches.length === 0) {
     return (
       <div className="panel-body">
@@ -66,10 +70,27 @@ export function BranchTable({
               </td>
               <td className="tabular-nums">{branch.code ?? branch.location}</td>
               <td>
-                <ActiveStatusPill isActive={branch.isActive} />
+                <span className="row-actions">
+                  <ActiveStatusPill isActive={branch.isActive} />
+                  {branch.id === warehouseId && <span className="pill pill-accent">Warehouse</span>}
+                </span>
               </td>
               <td>
                 <div className="row-actions">
+                  {branch.id !== warehouseId && (
+                    <Can action="locations:set-warehouse">
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => setWarehouse.mutate(branch.id)}
+                        disabled={setWarehouse.isPending}
+                        aria-label={`Make ${branch.name} the main warehouse`}
+                        title="Set as warehouse"
+                      >
+                        <Warehouse size={16} />
+                      </button>
+                    </Can>
+                  )}
                   <Can action="branches:edit">
                     <button
                       type="button"

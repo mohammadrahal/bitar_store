@@ -1,8 +1,10 @@
-import type { BranchScope, InvoiceKind, InvoiceStatus, SalesChannel } from '@/types'
+import type { BranchScope, InventoryFilter, InvoiceKind, InvoiceStatus, SalesChannel, TransferStatus } from '@/types'
 
 export interface ProductFilters {
   search: string
   category: string
+  /** Active models by default; archived ones stay findable for history. */
+  show?: 'active' | 'archived' | 'all'
 }
 
 export interface InvoiceFilters {
@@ -30,6 +32,9 @@ export const queryKeys = {
     list: (filters: ProductFilters) => ['products', 'list', filters] as const,
     detail: (productId: string) => ['products', 'detail', productId] as const,
     categories: () => ['products', 'categories'] as const,
+    /** The whole API catalog, mirrored so stock can point at real SKUs. */
+    catalog: () => ['products', 'catalog'] as const,
+    priceHistory: (variantId: string) => ['products', 'price-history', variantId] as const,
     variants: (search: string) => ['products', 'variants', search] as const,
   },
   analytics: {
@@ -56,5 +61,28 @@ export const queryKeys = {
        one key serve each other's data to whichever mounted second. */
     onHand: (branchId: string) => ['stock', 'on-hand', branchId] as const,
     branchList: (branchId: string) => ['stock', 'branch-list', branchId] as const,
+    /* Everything below reads the same balances, so it lives under `stock` and
+       one invalidation after any movement refreshes all of it. */
+    inventory: (scope: BranchScope, filter: InventoryFilter, search: string) =>
+      ['stock', 'inventory', scope, filter, search] as const,
+    variant: (variantId: string) => ['stock', 'variant', variantId] as const,
+    holds: (scope: BranchScope) => ['stock', 'holds', scope] as const,
+    countSheet: (branchId: string) => ['stock', 'count-sheet', branchId] as const,
+    countReports: (scope: BranchScope) => ['stock', 'count-reports', scope] as const,
+    replenishment: (scope: BranchScope) => ['stock', 'replenishment', scope] as const,
+    operations: (scope: BranchScope) => ['stock', 'operations', scope] as const,
+    picker: (branchId: string, search: string) => ['stock', 'picker', branchId, search] as const,
+  },
+  transfers: {
+    all: ['transfers'] as const,
+    list: (scope: BranchScope, status: TransferStatus | 'open' | 'all') => ['transfers', 'list', scope, status] as const,
+    detail: (transferId: string) => ['transfers', 'detail', transferId] as const,
+  },
+  attributes: {
+    all: ['attributes'] as const,
+    colors: () => ['attributes', 'colors'] as const,
+  },
+  locations: {
+    warehouse: () => ['locations', 'warehouse'] as const,
   },
 } as const

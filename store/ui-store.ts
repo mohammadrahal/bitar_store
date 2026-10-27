@@ -27,6 +27,8 @@ interface UIState {
   setProductSearch: (search: string) => void
   productCategory: string
   setProductCategory: (category: string) => void
+  productShow: 'active' | 'archived'
+  setProductShow: (show: 'active' | 'archived') => void
   /** Header branch filter, only offered to users who can see every branch. */
   branchScope: BranchScope
   setBranchScope: (scope: BranchScope) => void
@@ -61,6 +63,8 @@ export const useUIStore = create<UIState>()(
       setProductSearch: (productSearch) => set({ productSearch }),
       productCategory: '',
       setProductCategory: (productCategory) => set({ productCategory }),
+      productShow: 'active',
+      setProductShow: (productShow) => set({ productShow }),
       branchScope: ALL_BRANCHES,
       setBranchScope: (branchScope) => set({ branchScope }),
       invoiceSearch: '',

@@ -1,52 +1,51 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
+import { ArchiveProductDialog } from '@/components/products/archive-product-dialog'
 import { ProductForm } from '@/components/products/product-form'
 import { ProductTable } from '@/components/products/product-table'
 import { Can } from '@/components/shared/can'
-import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
 import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useCategories, useDeleteProduct, useProducts } from '@/hooks/use-products'
+import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useCategories, useProducts } from '@/hooks/use-products'
 import { useUIStore } from '@/store/ui-store'
 import type { ProductWithVariants } from '@/types'
 
 const PAGE_SIZE = 8
-const SEARCH_DEBOUNCE_MS = 250
 
-type Dialog = { kind: 'create' } | { kind: 'edit'; product: ProductWithVariants } | { kind: 'delete'; product: ProductWithVariants }
+type Dialog = { kind: 'edit' | 'archive'; product: ProductWithVariants }
 
 export function ProductsView() {
   const search = useUIStore((state) => state.productSearch)
   const setSearch = useUIStore((state) => state.setProductSearch)
   const category = useUIStore((state) => state.productCategory)
   const setCategory = useUIStore((state) => state.setProductCategory)
+  const show = useUIStore((state) => state.productShow)
+  const setShow = useUIStore((state) => state.setProductShow)
 
   const [searchInput, setSearchInput] = useState(search)
+  const debounced = useDebouncedValue(searchInput)
   const [page, setPage] = useState(1)
   const [dialog, setDialog] = useState<Dialog | null>(null)
-  const close = () => setDialog(null)
 
-  // Typing updates the query a beat later, so each keystroke is not its own fetch.
   useEffect(() => {
-    if (searchInput === search) return
-    const timer = setTimeout(() => setSearch(searchInput), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
-  }, [searchInput, search, setSearch])
+    if (debounced !== search) setSearch(debounced)
+  }, [debounced, search, setSearch])
 
   useEffect(() => {
     setPage(1)
-  }, [search, category])
+  }, [search, category, show])
 
-  const filters = useMemo(() => ({ search, category }), [search, category])
+  const filters = useMemo(() => ({ search, category, show }), [search, category, show])
   const { data: products, isPending, isError, error, refetch } = useProducts(filters)
   const { data: categories } = useCategories()
-  const remove = useDeleteProduct()
 
   const total = products?.length ?? 0
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -59,18 +58,37 @@ export function ProductsView() {
       <PageHeader
         eyebrow="Catalog"
         title="Products"
-        description="Every style in the catalog with its size and color variants."
+        description="Every model with its color and size variants."
         actions={
           <Can action="products:create">
-            <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
+            <Link href="/products/new" className="btn btn-primary">
               <Plus size={16} aria-hidden="true" />
               Add product
-            </button>
+            </Link>
           </Can>
         }
       />
 
-      <Panel title="Catalog" description={isPending ? 'Loading…' : `${total} ${total === 1 ? 'product' : 'products'}`}>
+      <Panel
+        title={show === 'archived' ? 'Archived models' : 'Catalog'}
+        description={isPending ? 'Loading…' : `${total} ${total === 1 ? 'model' : 'models'}`}
+        actions={
+          <div className="segmented compact" role="radiogroup" aria-label="Show">
+            {(['active', 'archived'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={show === option}
+                className={show === option ? 'active' : ''}
+                onClick={() => setShow(option)}
+              >
+                {option === 'active' ? 'Active' : 'Archived'}
+              </button>
+            ))}
+          </div>
+        }
+      >
         <div className="toolbar">
           <div className="search-field">
             <Search size={16} aria-hidden="true" />
@@ -78,7 +96,7 @@ export function ProductsView() {
               type="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search name, category, SKU or barcode"
+              placeholder="Search name, code, category, SKU or barcode"
               aria-label="Search products"
             />
           </div>
@@ -120,32 +138,17 @@ export function ProductsView() {
             <ProductTable
               products={visible}
               filtered={isFiltered}
-              onCreate={() => setDialog({ kind: 'create' })}
+              archivedView={show === 'archived'}
               onEdit={(product) => setDialog({ kind: 'edit', product })}
-              onDelete={(product) => setDialog({ kind: 'delete', product })}
+              onArchive={(product) => setDialog({ kind: 'archive', product })}
             />
             <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
           </>
         )}
       </Panel>
 
-      {dialog?.kind === 'create' && <ProductForm onClose={close} />}
-      {dialog?.kind === 'edit' && <ProductForm key={dialog.product.id} product={dialog.product} onClose={close} />}
-      {dialog?.kind === 'delete' && (
-        <ConfirmDialog
-          title={`Delete ${dialog.product.name}?`}
-          description={`This removes ${dialog.product.variants.length} ${
-            dialog.product.variants.length === 1 ? 'variant' : 'variants'
-          } and their stock records in every branch. This cannot be undone.`}
-          confirmLabel="Delete product"
-          tone="danger"
-          onResolve={(confirmed) => {
-            const { id, name } = dialog.product
-            close()
-            if (confirmed) remove.mutate({ productId: id, name })
-          }}
-        />
-      )}
+      {dialog?.kind === 'edit' && <ProductForm key={dialog.product.id} product={dialog.product} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'archive' && <ArchiveProductDialog product={dialog.product} onClose={() => setDialog(null)} />}
     </>
   )
 }

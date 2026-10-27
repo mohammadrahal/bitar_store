@@ -57,8 +57,8 @@ export function SalesCharts({
         <div className="panel-body">
           <EmptyState
             icon={ReceiptText}
-            title="No sales yet"
-            description="Issue a sale in the ledger and the best sellers will appear here."
+            title="No sales recorded in this period."
+            description="Best sellers appear here once a sale is confirmed."
           />
         </div>
       </Panel>

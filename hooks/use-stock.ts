@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useBranches } from '@/hooks/use-branches'
 import { queryKeys } from '@/lib/query-keys'
+import { syncCatalog } from '@/services/catalog-sync.service'
 import {
   getBranchStockUnits,
   getInventoryStats,
@@ -22,20 +23,31 @@ export function useBranchStockUnits(branchId: string) {
   })
 }
 
+/** Fetches the API catalog into the mock store. Resolves to the SKU count. */
+export function useCatalogSync() {
+  return useQuery({
+    queryKey: queryKeys.products.catalog(),
+    queryFn: syncCatalog,
+    staleTime: 60_000,
+  })
+}
+
 /**
- * Stock lives in the mock catalog while branches come from the API, and
- * fetching the branch list is what mirrors them into the catalog — which is
- * what gives each variant its per-branch rows. So both stock reads wait for
- * the branch list and are keyed by it: they never run against an empty mirror,
- * and a new branch re-reads them rather than serving figures that predate it.
+ * Stock lives in the mock store while branches and the catalog come from the
+ * API, and fetching them is what mirrors them in — which is what gives each
+ * SKU its per-branch rows. So stock reads wait for both and are keyed by
+ * them: they never run against an empty mirror, and a new branch or SKU
+ * re-reads them rather than serving figures that predate it.
  */
-function useMirroredBranches(): string | null {
+export function useMirroredBranches(): string | null {
   const { data: branches } = useBranches()
-  if (!branches) return null
-  return branches
+  const { data: skuCount } = useCatalogSync()
+  if (!branches || skuCount === undefined) return null
+  const ids = branches
     .map((branch) => branch.id)
     .sort()
     .join(',')
+  return `${ids}#${skuCount}`
 }
 
 /* Rows, not the quantity map: hooks/use-invoices.ts owns useBranchStock. */

@@ -1,21 +1,53 @@
-import { buildEan13 } from '@/lib/barcode'
-import type { Branch, Invoice, InvoiceLine, Product, StockLevel, Variant } from '@/types'
+import { DEFAULT_COLORS } from '@/mocks/default-colors'
+import type {
+  Branch,
+  ColorOption,
+  CountReport,
+  Hold,
+  Invoice,
+  InvoiceLine,
+  Product,
+  StockEvent,
+  StockLevel,
+  Transfer,
+  Variant,
+} from '@/types'
 
-const STORAGE_KEY = 'bitar-fashion:catalog-db:v1'
-/** Bump to discard any previously persisted catalog payload. */
-const VERSION = 3
+const STORAGE_KEY = 'bitar-fashion:catalog-db:v6'
+const LEGACY_KEYS = [
+  'bitar-fashion:mock-db:v1',
+  'bitar-fashion:catalog-db:v1',
+  'bitar-fashion:catalog-db:v4',
+  'bitar-fashion:catalog-db:v5',
+]
+/** Bump, together with STORAGE_KEY, to discard any previously persisted payload. */
+const VERSION = 7
+/** Version 6 gave every SKU an empty row at every branch; those are dropped on load. */
+const UNCARRIED_ROWS_VERSION = 6
 
 export interface MockDb {
   version: number
   branches: Branch[]
+  /** The main warehouse among the branches, or null until one is known. */
+  warehouseId: string | null
+  /** Mirror of the API catalog: styles as products, SKUs as variants. */
   products: Product[]
   variants: Variant[]
   stock: StockLevel[]
   invoices: Invoice[]
   invoiceLines: InvoiceLine[]
-  /** Next in-store barcode sequence. Only ever counts up, so a deleted
-      variant's barcode is never handed to a different item. */
-  barcodeSeq: number
+  transfers: Transfer[]
+  holds: Hold[]
+  countReports: CountReport[]
+  /** Transfer, reservation and hold changes; document lines are read from the invoices. */
+  movements: StockEvent[]
+  colors: ColorOption[]
+  /** Results of stock-changing requests by Idempotency-Key, so a retry replays instead of repeating. */
+  idempotency: Record<string, unknown>
+  /** Next transfer number: TR-0043. */
+  transferSeq: number
+  /** True once the whole API catalog has been mirrored at least once. */
+  catalogSynced: boolean
 }
 
 let db: MockDb | null = null
@@ -24,37 +56,35 @@ function createEmptyDb(): MockDb {
   return {
     version: VERSION,
     branches: [],
+    warehouseId: null,
     products: [],
     variants: [],
     stock: [],
     invoices: [],
     invoiceLines: [],
-    barcodeSeq: 1,
+    transfers: [],
+    holds: [],
+    countReports: [],
+    movements: [],
+    colors: DEFAULT_COLORS.map((color) => ({ ...color })),
+    idempotency: {},
+    transferSeq: 1,
+    catalogSynced: false,
   }
 }
 
-/**
- * Brings a payload stored before barcodes existed up to date instead of
- * discarding the catalog: every variant without one is minted a code, and the
- * sequence continues past whatever was handed out.
- */
-function migrate(stored: MockDb): MockDb {
-  let sequence = stored.barcodeSeq ?? 1
-  let changed = stored.barcodeSeq === undefined
-
-  for (const variant of stored.variants) {
-    if (variant.barcode) continue
-    variant.barcode = buildEan13(sequence)
-    sequence += 1
-    changed = true
-  }
-
-  stored.barcodeSeq = sequence
-  if (changed) persist()
-  return stored
+function migrate(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value
+  const candidate = value as Partial<MockDb>
+  if (candidate.version !== UNCARRIED_ROWS_VERSION || !Array.isArray(candidate.stock)) return value
+  const stock = candidate.stock.filter(
+    (level) =>
+      level.quantity !== 0 || level.reserved !== 0 || level.onHold !== 0 || level.lowStockAt !== DEFAULT_LOW_STOCK_AT,
+  )
+  return { ...candidate, stock, version: VERSION }
 }
 
-function isCatalogDb(value: unknown): value is MockDb {
+function isCurrentDb(value: unknown): value is MockDb {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Partial<MockDb>
   return (
@@ -64,7 +94,9 @@ function isCatalogDb(value: unknown): value is MockDb {
     Array.isArray(candidate.variants) &&
     Array.isArray(candidate.stock) &&
     Array.isArray(candidate.invoices) &&
-    Array.isArray(candidate.invoiceLines)
+    Array.isArray(candidate.transfers) &&
+    Array.isArray(candidate.holds) &&
+    Array.isArray(candidate.movements)
   )
 }
 
@@ -80,13 +112,13 @@ function persist() {
 function load(): MockDb {
   if (db) return db
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('bitar-fashion:mock-db:v1')
+    for (const key of LEGACY_KEYS) window.localStorage.removeItem(key)
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY)
-      const parsed: unknown = raw ? JSON.parse(raw) : null
-      if (isCatalogDb(parsed)) {
+      const parsed = migrate(raw ? JSON.parse(raw) : null)
+      if (isCurrentDb(parsed)) {
         db = parsed
-        return migrate(db)
+        return db
       }
     } catch {
       // Unreadable payload: start empty.
@@ -108,6 +140,12 @@ export function writeDb<T>(change: (db: MockDb) => T): T {
   return result
 }
 
+/** Replaces the store with a copy that was changed and checked as a whole, so a refused action leaves nothing half-applied. */
+export function commitDb(next: MockDb) {
+  db = next
+  persist()
+}
+
 export function resetDb() {
   db = createEmptyDb()
   persist()
@@ -116,48 +154,12 @@ export function resetDb() {
 /** Quantity at or below which a variant counts as low stock. */
 export const DEFAULT_LOW_STOCK_AT = 5
 
-/**
- * Branches live on the API while stock lives here, so the catalog keeps a
- * mirror of them. Without it `db.branches` stays empty and a new variant gets
- * no stock rows at all, which makes the product invisible to every per-branch
- * figure. Called whenever the branch list is fetched.
- *
- * Branches are upserted, never removed: a manager's API list contains only
- * their own branch, and dropping the rest would throw away other branches'
- * stock.
- */
-export function mirrorBranches(branches: Branch[], { prune = false } = {}): void {
-  if (branches.length === 0) return
+export function emptyLevel(variantId: string, branchId: string): StockLevel {
+  return { variantId, branchId, quantity: 0, reserved: 0, onHold: 0, lowStockAt: DEFAULT_LOW_STOCK_AT }
+}
 
-  writeDb((db) => {
-    for (const incoming of branches) {
-      const existing = db.branches.find((branch) => branch.id === incoming.id)
-      if (existing) Object.assign(existing, incoming)
-      else db.branches.push({ ...incoming })
-    }
-
-    /* Only a viewer of the whole network proves a branch is gone, so only
-       their fetch drops one. Otherwise a reseeded or deleted branch lingers
-       and gets counted. Its stock goes with it: the branch no longer exists. */
-    if (prune) {
-      const live = new Set(branches.map((branch) => branch.id))
-      db.branches = db.branches.filter((branch) => live.has(branch.id))
-      db.stock = db.stock.filter((level) => live.has(level.branchId))
-    }
-
-    // Every variant needs a row in every known branch, even at zero, or it
-    // cannot be counted, listed as out of stock, or sold.
-    const rows = new Set(db.stock.map((level) => `${level.variantId}|${level.branchId}`))
-    for (const variant of db.variants) {
-      for (const branch of db.branches) {
-        if (rows.has(`${variant.id}|${branch.id}`)) continue
-        db.stock.push({
-          variantId: variant.id,
-          branchId: branch.id,
-          quantity: 0,
-          lowStockAt: DEFAULT_LOW_STOCK_AT,
-        })
-      }
-    }
-  })
+/** A variant leaves pickers when its SKU or its whole model is inactive. */
+export function isRetired(db: MockDb, variant: Variant): boolean {
+  if (variant.archived) return true
+  return db.products.find((product) => product.id === variant.productId)?.archived ?? true
 }

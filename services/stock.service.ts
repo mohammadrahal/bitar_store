@@ -1,11 +1,13 @@
 import { delay, delayedFailure } from '@/lib/delay'
-import { readDb, writeDb, type MockDb } from '@/mocks/store'
+import { isRetired, readDb, writeDb, type MockDb } from '@/mocks/store'
+import { availableOf, branchNameOf } from '@/services/mock-ledger'
 import {
   ALL_BRANCHES,
   type BranchScope,
   type BranchStockRow,
   type InventoryStats,
   type LowStockRow,
+  type StockLevel,
   type StockStatus,
 } from '@/types'
 
@@ -13,13 +15,15 @@ function inScope(branchId: string, scope: BranchScope) {
   return scope === ALL_BRANCHES || branchId === scope
 }
 
-function statusOf(quantity: number, lowStockAt: number): StockStatus {
-  if (quantity === 0) return 'out'
-  return quantity <= lowStockAt ? 'low' : 'healthy'
+export function statusOf(available: number, lowStockAt: number): StockStatus {
+  if (available === 0) return 'out'
+  return available <= lowStockAt ? 'low' : 'healthy'
 }
 
-function scopedStock(db: MockDb, scope: BranchScope) {
-  return db.stock.filter((level) => inScope(level.branchId, scope))
+/** Levels in scope for SKUs that are still sold. Archived stock is history, not a gap. */
+function liveLevels(db: MockDb, scope: BranchScope): StockLevel[] {
+  const live = new Set(db.variants.filter((variant) => !isRetired(db, variant)).map((variant) => variant.id))
+  return db.stock.filter((level) => live.has(level.variantId) && inScope(level.branchId, scope))
 }
 
 /** Total units a branch currently holds, used to guard branch deletion. */
@@ -30,46 +34,58 @@ export async function getBranchStockUnits(branchId: string): Promise<number> {
   return delay(units)
 }
 
+/**
+ * Low and out of stock are counted once per variant across the scope: a
+ * variant empty at two branches is one variant to restock, not two.
+ */
 export async function getInventoryStats(scope: BranchScope = ALL_BRANCHES): Promise<InventoryStats> {
   const db = readDb()
-  const levels = scopedStock(db, scope)
-
-  const inStock = new Set<string>()
+  const perVariant = new Map<string, { available: number; threshold: number }>()
   let stockUnits = 0
-  let lowStockCount = 0
-  let outOfStockCount = 0
 
-  for (const level of levels) {
+  for (const level of liveLevels(db, scope)) {
     stockUnits += level.quantity
-    if (level.quantity > 0) inStock.add(level.variantId)
-    const status = statusOf(level.quantity, level.lowStockAt)
-    if (status === 'out') outOfStockCount += 1
-    else if (status === 'low') lowStockCount += 1
+    const entry = perVariant.get(level.variantId) ?? { available: 0, threshold: 0 }
+    entry.available += availableOf(level)
+    entry.threshold = Math.max(entry.threshold, level.lowStockAt)
+    perVariant.set(level.variantId, entry)
   }
 
+  let lowStockCount = 0
+  let outOfStockCount = 0
+  let inStockVariantCount = 0
+  for (const { available, threshold } of perVariant.values()) {
+    const status = statusOf(available, threshold)
+    if (status === 'out') outOfStockCount += 1
+    else if (status === 'low') lowStockCount += 1
+    if (available > 0) inStockVariantCount += 1
+  }
+
+  const branches = db.branches.filter((branch) => inScope(branch.id, scope))
   return delay({
-    branchCount: db.branches.filter((branch) => inScope(branch.id, scope)).length,
-    productCount: db.products.length,
-    variantCount: db.variants.length,
-    inStockVariantCount: inStock.size,
+    branchCount: branches.length,
+    warehouseCount: branches.filter((branch) => branch.id === db.warehouseId).length,
+    productCount: db.products.filter((product) => !product.archived).length,
+    variantCount: perVariant.size,
+    inStockVariantCount,
     stockUnits,
     lowStockCount,
     outOfStockCount,
   })
 }
 
-/** Variants at or below their low-stock threshold, emptiest first. */
+/** Variant-location pairs at or below their threshold, emptiest first. */
 export async function listLowStock(scope: BranchScope = ALL_BRANCHES): Promise<LowStockRow[]> {
   const db = readDb()
   const rows: LowStockRow[] = []
 
-  for (const level of scopedStock(db, scope)) {
-    const status = statusOf(level.quantity, level.lowStockAt)
+  for (const level of liveLevels(db, scope)) {
+    const available = availableOf(level)
+    const status = statusOf(available, level.lowStockAt)
     if (status === 'healthy') continue
 
     const variant = db.variants.find((candidate) => candidate.id === level.variantId)
     const product = variant && db.products.find((candidate) => candidate.id === variant.productId)
-    const branch = db.branches.find((candidate) => candidate.id === level.branchId)
     if (!variant || !product) continue
 
     rows.push({
@@ -81,8 +97,8 @@ export async function listLowStock(scope: BranchScope = ALL_BRANCHES): Promise<L
       productName: product.name,
       category: product.category,
       branchId: level.branchId,
-      branchName: branch?.name ?? 'Unknown branch',
-      quantity: level.quantity,
+      branchName: branchNameOf(db, level.branchId),
+      quantity: available,
       lowStockAt: level.lowStockAt,
       status,
     })
@@ -102,12 +118,12 @@ export async function listBranchStock(branchId: string): Promise<BranchStockRow[
   const db = readDb()
   const rows: BranchStockRow[] = []
 
-  for (const level of db.stock) {
-    if (level.branchId !== branchId) continue
+  for (const level of liveLevels(db, branchId)) {
     const variant = db.variants.find((candidate) => candidate.id === level.variantId)
     const product = variant && db.products.find((candidate) => candidate.id === variant.productId)
     if (!variant || !product) continue
 
+    const available = availableOf(level)
     rows.push({
       variantId: variant.id,
       sku: variant.sku,
@@ -118,16 +134,17 @@ export async function listBranchStock(branchId: string): Promise<BranchStockRow[
       productName: product.name,
       category: product.category,
       quantity: level.quantity,
+      available,
       lowStockAt: level.lowStockAt,
-      status: statusOf(level.quantity, level.lowStockAt),
+      status: statusOf(available, level.lowStockAt),
       costPrice: product.costPrice,
-      sellPrice: product.sellPrice,
+      sellPrice: variant.sellPrice,
     })
   }
 
   rows.sort(
     (a, b) =>
-      a.quantity - b.quantity || a.productName.localeCompare(b.productName) || a.sku.localeCompare(b.sku),
+      a.available - b.available || a.productName.localeCompare(b.productName) || a.sku.localeCompare(b.sku),
   )
   return delay(rows)
 }
@@ -160,11 +177,11 @@ export async function setLowStockAt(input: LowStockAtInput): Promise<number> {
   return delay(saved)
 }
 
-/** On-hand quantity per variant at one branch, keyed by variant id. */
+/** Available quantity per variant at one branch, keyed by variant id. */
 export async function getBranchStockMap(branchId: string): Promise<Record<string, number>> {
   const map: Record<string, number> = {}
   for (const level of readDb().stock) {
-    if (level.branchId === branchId) map[level.variantId] = level.quantity
+    if (level.branchId === branchId) map[level.variantId] = availableOf(level)
   }
   return delay(map)
 }

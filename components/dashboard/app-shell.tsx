@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { BrandLogo, NavLinks, SidebarFooter } from '@/components/dashboard/sidebar-nav'
 import { Topbar } from '@/components/dashboard/topbar'
 import { NoBranchBanner } from '@/components/shared/no-branch-banner'
+import { OfflineBanner } from '@/components/shared/offline-banner'
 import { useUIStore } from '@/store/ui-store'
 
 function MobileNav() {
@@ -78,6 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Topbar />
         <main id="main" className="page-content" tabIndex={-1}>
           <NoBranchBanner />
+          <OfflineBanner />
           {children}
         </main>
       </div>

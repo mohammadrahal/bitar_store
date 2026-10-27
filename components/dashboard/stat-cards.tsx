@@ -5,21 +5,23 @@ import { AlertTriangle, Boxes, Layers, Package, Store } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
 import type { InventoryStats } from '@/types'
 
-function StatCard({
+export function StatCard({
   label,
   value,
   detail,
   alert,
+  highlight,
   icon: Icon,
 }: {
   label: string
   value: string
   detail: string
   alert?: boolean
+  highlight?: boolean
   icon: LucideIcon
 }) {
   return (
-    <article className="stat-card">
+    <article className={`stat-card ${highlight ? 'highlight' : ''}`}>
       <div className="stat-top">
         <span>{label}</span>
         <Icon size={16} aria-hidden="true" />
@@ -30,26 +32,32 @@ function StatCard({
   )
 }
 
-/** Network-wide figures: every branch the viewer can see. */
+/** "1 warehouse", "2 branches", "0 variants". */
+export function countOf(value: number, singular: string, plural = `${singular}s`) {
+  return `${formatNumber(value)} ${value === 1 ? singular : plural}`
+}
+
+/** Network-wide figures: every location the viewer can see. */
 export function NetworkStatCards({ stats }: { stats: InventoryStats }) {
+  const branches = stats.branchCount - stats.warehouseCount
   return (
     <div className="stats-grid">
       <StatCard
-        label="Branches"
+        label="Locations"
         value={formatNumber(stats.branchCount)}
-        detail={`${formatNumber(stats.variantCount)} variants tracked`}
+        detail={`${countOf(stats.warehouseCount, 'warehouse')} · ${countOf(branches, 'branch', 'branches')}`}
         icon={Store}
       />
       <StatCard
         label="Products"
         value={formatNumber(stats.productCount)}
-        detail={`${formatNumber(stats.inStockVariantCount)} variants in stock`}
+        detail={`${countOf(stats.inStockVariantCount, 'variant')} in stock`}
         icon={Package}
       />
       <StatCard
         label="Stock units"
         value={formatNumber(stats.stockUnits)}
-        detail="On hand across the scope"
+        detail="On hand across all locations"
         icon={Boxes}
       />
       <StatCard
@@ -57,7 +65,7 @@ export function NetworkStatCards({ stats }: { stats: InventoryStats }) {
         value={formatNumber(stats.lowStockCount)}
         detail={
           stats.outOfStockCount > 0
-            ? `${formatNumber(stats.outOfStockCount)} out of stock`
+            ? `${countOf(stats.outOfStockCount, 'variant')} out of stock`
             : 'Nothing out of stock'
         }
         alert={stats.lowStockCount > 0 || stats.outOfStockCount > 0}
@@ -80,7 +88,7 @@ export function BranchStatCards({ stats }: { stats: InventoryStats }) {
       <StatCard
         label="Variants carried"
         value={formatNumber(stats.inStockVariantCount)}
-        detail={`of ${formatNumber(stats.variantCount)} in the catalog`}
+        detail={`of ${countOf(stats.variantCount, 'variant')} in the catalog`}
         icon={Layers}
       />
       <StatCard

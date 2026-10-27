@@ -30,6 +30,9 @@
   --ring: 36 35% 49%;              /* [52%] 2.82:1 -> 3.07:1, non-text minimum */
   --success: 115 14% 38%;          /* [42%] 3.95:1 -> 4.58:1 on its own tint */
   --warning: 36 71% 32%;           /* [42%] 3.06:1 -> 4.63:1 on its own tint */
+  /* Two more stock states from BL-02, in the same muted register. */
+  --info: 215 21% 40%;             /* in transit */
+  --hold: 270 14% 42%;             /* on hold */
 
   --fs-xs: 12px;
   --fs-sm: 13px;
@@ -80,6 +83,8 @@
   /* Same hues as light, lifted for legible text on the dark card. */
   --success: 115 20% 62%;
   --warning: 36 71% 62%;
+  --info: 215 40% 72%;
+  --hold: 270 32% 74%;
   --destructive: 7 60% 64%;
   --destructive-foreground: 30 6% 7%;
 

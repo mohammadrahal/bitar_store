@@ -101,7 +101,7 @@ export function InvoiceLineFields({
                     </strong>
                     <small>
                       {option.sku}
-                      {onHand ? ` · ${onHand[option.variantId] ?? 0} on hand` : ''}
+                      {onHand ? ` · ${onHand[option.variantId] ?? 0} available` : ''}
                     </small>
                   </span>
                   {already ? <span className="pill pill-neutral">Added</span> : <Plus size={16} aria-hidden="true" />}
@@ -128,7 +128,7 @@ export function InvoiceLineFields({
                 <strong>{option ? `${option.productName} · ${option.size} / ${option.color}` : 'Unknown variant'}</strong>
                 <small>
                   {option?.sku ?? line?.variantId}
-                  {available !== null ? ` · ${available} on hand` : ''}
+                  {available !== null ? ` · ${available} available` : ''}
                 </small>
               </div>
               <Field label="Qty" error={errors.lines?.[index]?.quantity?.message}>
@@ -161,7 +161,7 @@ export function InvoiceLineFields({
               </button>
               {short && (
                 <p className="line-warning" role="status">
-                  Only {available} on hand. Issuing will be refused until the quantity fits.
+                  Only {available} available here. Issuing will be refused until the quantity fits.
                 </p>
               )}
               {errors.lines?.[index]?.variantId?.message && (

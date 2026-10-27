@@ -26,7 +26,7 @@ function BranchFilter() {
       disabled={isPending}
       icon={<span className="switcher-dot" aria-hidden="true" />}
       options={[
-        { value: ALL_BRANCHES, label: 'All branches' },
+        { value: ALL_BRANCHES, label: 'All locations' },
         ...(branches?.map((branch) => ({ value: branch.id, label: branch.name })) ?? []),
       ]}
     />

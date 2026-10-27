@@ -12,6 +12,7 @@ import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { StockStatusPill } from '@/components/shared/status-pill'
 import { useBranchStockRows } from '@/hooks/use-stock'
+import { formatPrice } from '@/lib/format'
 import type { BranchStockRow, InvoiceKind } from '@/types'
 
 const PAGE_SIZE = 10
@@ -86,7 +87,13 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
                 <tr>
                   <th scope="col">Variant</th>
                   <th scope="col" className="num">
+                    Price
+                  </th>
+                  <th scope="col" className="num">
                     On hand
+                  </th>
+                  <th scope="col" className="num">
+                    Available
                   </th>
                   <th scope="col" className="num">
                     Threshold
@@ -108,7 +115,11 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
                         {row.sku} · {row.barcode || row.category}
                       </small>
                     </td>
+                    <td className="num tabular" data-label="Price">{formatPrice(row.sellPrice)}</td>
                     <td className="num tabular">{row.quantity}</td>
+                    <td className="num tabular">
+                      <strong>{row.available}</strong>
+                    </td>
                     <td className="num">
                       <ThresholdCell variantId={row.variantId} branchId={branchId} value={row.lowStockAt} />
                     </td>
