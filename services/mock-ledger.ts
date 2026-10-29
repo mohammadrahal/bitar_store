@@ -3,7 +3,7 @@ import { canViewCosts, isLocationScoped } from '@/lib/permissions'
 import { isOpenTransfer, lineInTransit } from '@/lib/transfers'
 import { DEFAULT_LOW_STOCK_AT, emptyLevel, type MockDb } from '@/mocks/store'
 import { useUserStore } from '@/store/user-store'
-import { ALL_BRANCHES, type Balances, type BranchScope, type StockEvent, type StockLevel } from '@/types'
+import { ALL_BRANCHES, type BranchScope, type StockEvent, type StockLevel } from '@/types'
 
 /*
  * Stock arithmetic over the mock store. When the API lands these figures come
@@ -41,28 +41,6 @@ export function inTransitMap(db: MockDb): Map<string, number> {
     }
   }
   return map
-}
-
-export function balancesOf(level: StockLevel | undefined, inTransit: number): Balances {
-  return {
-    onHand: level?.quantity ?? 0,
-    reserved: level?.reserved ?? 0,
-    onHold: level?.onHold ?? 0,
-    available: availableOf(level),
-    inTransit,
-  }
-}
-
-export function addBalances(target: Balances, add: Balances) {
-  target.onHand += add.onHand
-  target.reserved += add.reserved
-  target.onHold += add.onHold
-  target.available += add.available
-  target.inTransit += add.inTransit
-}
-
-export function zeroBalances(): Balances {
-  return { onHand: 0, reserved: 0, onHold: 0, available: 0, inTransit: 0 }
 }
 
 export function thresholdOf(level: StockLevel | undefined) {

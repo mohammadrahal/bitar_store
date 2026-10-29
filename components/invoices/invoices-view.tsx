@@ -8,6 +8,7 @@ import { InvoiceTable } from '@/components/invoices/invoice-table'
 import { Can } from '@/components/shared/can'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
+import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
 import { SelectInput } from '@/components/shared/select-input'
@@ -72,6 +73,8 @@ export function InvoicesView() {
           </Can>
         }
       />
+
+      <PreviewBadge feature="Purchase, return and adjustment documents" />
 
       <Panel
         title="All invoices"

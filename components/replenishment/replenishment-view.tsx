@@ -7,6 +7,7 @@ import { ReplenishmentTable } from '@/components/replenishment/replenishment-tab
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
+import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useBranchScope } from '@/hooks/use-branch-scope'
@@ -72,6 +73,8 @@ export function ReplenishmentView() {
           </button>
         }
       />
+
+      <PreviewBadge feature="Replenishment" />
       <Panel title="Suggestions" description={isPending ? 'Loading…' : `${rows?.length ?? 0} below threshold`}>
         {isPending ? (
           <div className="panel-body"><Skeleton rows={3} stats={0} /></div>

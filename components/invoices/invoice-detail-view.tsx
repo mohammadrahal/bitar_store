@@ -13,6 +13,7 @@ import { Can } from '@/components/shared/can'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
+import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import {
@@ -69,6 +70,8 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
         <ArrowLeft size={14} aria-hidden="true" />
         All invoices
       </Link>
+
+      <PreviewBadge feature="This document" />
 
       <PageHeader
         eyebrow={invoice.isInternal ? 'Transfer leg' : INVOICE_KIND_LABELS[invoice.kind]}

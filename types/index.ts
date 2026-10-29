@@ -304,6 +304,8 @@ export interface BranchSalesRow {
 }
 
 export interface SalesAnalytics {
+  /** The business date `GET /sales` answered for, which is what these cover. */
+  businessDate: string
   /** Series in fixed order; colours are assigned from this, never from rank. */
   series: SalesSeries[]
   topProducts: TopSellerRow[]

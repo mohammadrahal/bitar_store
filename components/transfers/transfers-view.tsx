@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { FilterChips, type ChipOption } from '@/components/shared/filter-chips'
 import { PageHeader } from '@/components/shared/page-header'
+import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useBranchScope } from '@/hooks/use-branch-scope'
@@ -45,6 +46,8 @@ export function TransfersView() {
           </Can>
         }
       />
+
+      <PreviewBadge feature="Transfers between locations" />
       <Panel title="Transfers" description={isPending ? 'Loading…' : `${transfers?.length ?? 0} shown`}>
         <div className="toolbar">
           <FilterChips label="Filter by status" options={FILTERS} value={status} onChange={setStatus} />

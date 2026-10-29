@@ -1,5 +1,5 @@
 import { delay, delayedFailure } from '@/lib/delay'
-import { writeDb } from '@/mocks/store'
+import { emptyLevel, writeDb } from '@/mocks/store'
 import type { StockOverview } from '@/services/stock-stats.service'
 import { ALL_BRANCHES, type BranchScope, type BranchStockRow, type StockStatus } from '@/types'
 
@@ -37,8 +37,11 @@ export interface LowStockAtInput {
 }
 
 /**
- * The threshold is a policy number, not a fact, so it is the one stock value a
- * person sets by hand. The quantity beside it is only ever moved by a document.
+ * The threshold is a manager's policy number rather than a balance (BL-05), so
+ * it is the one stock value a person sets by hand and the only reason a local
+ * stock row still exists. Quantities come from `GET /stock`, so the row is
+ * created on demand: a variant can be given a threshold at a location before
+ * the first unit ever arrives there.
  */
 export async function setLowStockAt(input: LowStockAtInput): Promise<number> {
   if (!Number.isInteger(input.lowStockAt) || input.lowStockAt < 0) {
@@ -49,12 +52,14 @@ export async function setLowStockAt(input: LowStockAtInput): Promise<number> {
     const level = db.stock.find(
       (candidate) => candidate.variantId === input.variantId && candidate.branchId === input.branchId,
     )
-    if (!level) return null
-    level.lowStockAt = input.lowStockAt
-    return level.lowStockAt
+    if (level) {
+      level.lowStockAt = input.lowStockAt
+      return level.lowStockAt
+    }
+    db.stock.push({ ...emptyLevel(input.variantId, input.branchId), lowStockAt: input.lowStockAt })
+    return input.lowStockAt
   })
 
-  if (saved === null) return delayedFailure('That variant is not stocked at this branch.')
   return delay(saved)
 }
 

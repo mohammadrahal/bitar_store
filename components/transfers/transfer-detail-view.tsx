@@ -10,6 +10,7 @@ import { TransferStatusPill } from '@/components/transfers/transfer-status-pill'
 import { TransferStepper } from '@/components/transfers/transfer-stepper'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
+import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useTransfer } from '@/hooks/use-transfers'
@@ -25,6 +26,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
         <ArrowLeft size={16} aria-hidden="true" />
         Transfers
       </Link>
+      <PreviewBadge feature="Transfers between locations" />
       {isPending ? (
         <Skeleton rows={4} stats={0} />
       ) : isError ? (

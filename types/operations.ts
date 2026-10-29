@@ -1,9 +1,19 @@
-/** The five numbers BL-02 tracks for a variant at a location. */
+/**
+ * The five numbers BL-02 tracks for a variant at a location, as far as the API
+ * can report them. `GET /stock` answers with sellable, non-sellable and in
+ * transit; reserved and on hold have no endpoint yet, so they are null and the
+ * UI says "not available yet" instead of inventing a figure.
+ */
 export interface Balances {
+  /** Sellable plus non-sellable: everything physically there. */
   onHand: number
-  reserved: number
-  onHold: number
-  /** On hand − reserved − on hold: what can be sold or sent. */
+  /** Kept out of sale by the server: damaged, disputed or set aside. */
+  nonSellable: number
+  /** Promised to an approved transfer. Null until the API returns it. */
+  reserved: number | null
+  /** Set aside by a hold. Null until the API returns it. */
+  onHold: number | null
+  /** Sellable now. */
   available: number
   /** Dispatched towards the location and not received yet. */
   inTransit: number

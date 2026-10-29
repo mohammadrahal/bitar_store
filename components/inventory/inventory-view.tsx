@@ -26,7 +26,7 @@ const PAGE_SIZE = 12
 const FILTERS: ChipOption<InventoryFilter>[] = [
   { value: 'all', label: 'All' },
   { value: 'low', label: 'Low stock' },
-  { value: 'on_hold', label: 'On hold' },
+  { value: 'on_hold', label: 'Non-sellable' },
   { value: 'in_transit', label: 'In transit' },
   { value: 'archived', label: 'Archived' },
 ]
@@ -34,7 +34,19 @@ const FILTERS: ChipOption<InventoryFilter>[] = [
 function exportRows(rows: InventoryRow[]) {
   downloadCsv(
     'inventory.csv',
-    ['Product', 'Code', 'SKU', 'Color', 'Size', 'On hand', 'Reserved', 'On hold', 'Available', 'In transit'],
+    [
+      'Product',
+      'Code',
+      'SKU',
+      'Color',
+      'Size',
+      'On hand',
+      'Non-sellable',
+      'Reserved',
+      'On hold',
+      'Available',
+      'In transit',
+    ],
     rows.map((row) => [
       row.productName,
       row.productCode,
@@ -42,8 +54,10 @@ function exportRows(rows: InventoryRow[]) {
       row.color,
       row.size,
       row.onHand,
-      row.reserved,
-      row.onHold,
+      row.nonSellable,
+      /* The API cannot report these two yet; an empty cell says so. */
+      row.reserved ?? '',
+      row.onHold ?? '',
       row.available,
       row.inTransit,
     ]),

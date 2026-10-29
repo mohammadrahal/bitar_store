@@ -3,6 +3,7 @@
 import { PackageSearch } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { StockBadge } from '@/components/shared/stock-badge'
+import { balanceText } from '@/lib/balances'
 import { formatNumber } from '@/lib/format'
 import type { Balances, InventoryRow } from '@/types'
 
@@ -13,6 +14,9 @@ const COLUMNS: { key: keyof Balances; label: string }[] = [
   { key: 'available', label: 'Available' },
   { key: 'inTransit', label: 'In transit' },
 ]
+
+/** Reserved and on hold come back null until the API can report them. */
+const cell = (value: number | null) => balanceText(value, formatNumber)
 
 export function InventoryTable({
   rows,
@@ -75,7 +79,7 @@ export function InventoryTable({
               </td>
               {COLUMNS.map((column) => (
                 <td key={column.key} className="num tabular" data-label={column.label}>
-                  {column.key === 'available' ? <strong>{formatNumber(row[column.key])}</strong> : formatNumber(row[column.key])}
+                  {column.key === 'available' ? <strong>{cell(row[column.key])}</strong> : cell(row[column.key])}
                 </td>
               ))}
               <td data-label="Status">
@@ -90,7 +94,7 @@ export function InventoryTable({
             <td />
             {COLUMNS.map((column) => (
               <td key={column.key} className="num tabular" data-label={column.label}>
-                {formatNumber(totals[column.key])}
+                {cell(totals[column.key])}
               </td>
             ))}
             <td />

@@ -9,7 +9,7 @@ const TONES: Record<InventoryStatus, string> = {
   archived: 'pill-archived',
 }
 
-function labelFor(row: Pick<InventoryRow, 'status' | 'onHold' | 'inTransit'>) {
+function labelFor(row: Pick<InventoryRow, 'status' | 'nonSellable' | 'inTransit'>) {
   switch (row.status) {
     case 'in_stock':
       return 'In stock'
@@ -18,7 +18,7 @@ function labelFor(row: Pick<InventoryRow, 'status' | 'onHold' | 'inTransit'>) {
     case 'out':
       return 'Out of stock'
     case 'on_hold':
-      return `${row.onHold} on hold`
+      return `${row.nonSellable} non-sellable`
     case 'in_transit':
       return `${row.inTransit} in transit`
     case 'archived':
@@ -27,7 +27,7 @@ function labelFor(row: Pick<InventoryRow, 'status' | 'onHold' | 'inTransit'>) {
 }
 
 /** The one status a variant row leads with; the five numbers sit beside it. */
-export function StockBadge({ row }: { row: Pick<InventoryRow, 'status' | 'onHold' | 'inTransit'> }) {
+export function StockBadge({ row }: { row: Pick<InventoryRow, 'status' | 'nonSellable' | 'inTransit'> }) {
   return (
     <span className={`pill ${TONES[row.status]}`}>
       <span className="pill-dot" aria-hidden="true" />
