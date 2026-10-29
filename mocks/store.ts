@@ -3,17 +3,22 @@ import type {
   Branch,
   ColorOption,
   CountReport,
+  DiscountRequest,
   Hold,
   Invoice,
   InvoiceLine,
+  OpeningStockPost,
   Product,
+  Receipt,
+  ReplenishmentRequest,
   StockEvent,
   StockLevel,
+  Supplier,
   Transfer,
   Variant,
 } from '@/types'
 
-const STORAGE_KEY = 'bitar-fashion:catalog-db:v9'
+const STORAGE_KEY = 'bitar-fashion:catalog-db:v10'
 const LEGACY_KEYS = [
   'bitar-fashion:mock-db:v1',
   'bitar-fashion:catalog-db:v1',
@@ -22,9 +27,10 @@ const LEGACY_KEYS = [
   'bitar-fashion:catalog-db:v6',
   'bitar-fashion:catalog-db:v7',
   'bitar-fashion:catalog-db:v8',
+  'bitar-fashion:catalog-db:v9',
 ]
 /** Bump, together with STORAGE_KEY, to discard any previously persisted payload. */
-const VERSION = 9
+const VERSION = 10
 /** Version 6 gave every SKU an empty row at every branch; those are dropped on load. */
 const UNCARRIED_ROWS_VERSION = 6
 
@@ -47,8 +53,19 @@ export interface MockDb {
   colors: ColorOption[]
   /** Results of stock-changing requests by Idempotency-Key, so a retry replays instead of repeating. */
   idempotency: Record<string, unknown>
+  /** Counted opening quantities already posted, one entry per location. */
+  openingPosts: OpeningStockPost[]
+  suppliers: Supplier[]
+  receipts: Receipt[]
+  replenishmentRequests: ReplenishmentRequest[]
+  /** Discounts an employee asked for and an owner role has to decide. */
+  discountRequests: DiscountRequest[]
   /** Next transfer number: TR-0043. */
   transferSeq: number
+  /** Next receipt number: GRN-0007. */
+  receiptSeq: number
+  /** Next replenishment request number: RR-0012. */
+  replenishmentSeq: number
   /** True once the whole API catalog has been mirrored at least once. */
   catalogSynced: boolean
 }
@@ -71,7 +88,14 @@ function createEmptyDb(): MockDb {
     movements: [],
     colors: DEFAULT_COLORS.map((color) => ({ ...color })),
     idempotency: {},
+    openingPosts: [],
+    suppliers: [],
+    receipts: [],
+    replenishmentRequests: [],
+    discountRequests: [],
     transferSeq: 1,
+    receiptSeq: 1,
+    replenishmentSeq: 1,
     catalogSynced: false,
   }
 }
@@ -99,7 +123,12 @@ function isCurrentDb(value: unknown): value is MockDb {
     Array.isArray(candidate.invoices) &&
     Array.isArray(candidate.transfers) &&
     Array.isArray(candidate.holds) &&
-    Array.isArray(candidate.movements)
+    Array.isArray(candidate.movements) &&
+    Array.isArray(candidate.openingPosts) &&
+    Array.isArray(candidate.suppliers) &&
+    Array.isArray(candidate.receipts) &&
+    Array.isArray(candidate.replenishmentRequests) &&
+    Array.isArray(candidate.discountRequests)
   )
 }
 

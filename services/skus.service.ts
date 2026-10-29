@@ -32,9 +32,14 @@ export async function listPriceHistory(variantId: string): Promise<PriceChange[]
   return (await getApiClient().getPriceHistory(variantId, 50)).map(mapApiPriceChange)
 }
 
-/** An inactive SKU leaves sale and transfer pickers; its stock and history stay. */
+/**
+ * An inactive SKU leaves sale and transfer pickers; its history stays.
+ * Archiving is refused while it still holds units anywhere, which
+ * `setVariantArchived` checks.
+ */
 export async function setVariantActive(variantId: string, isActive: boolean): Promise<void> {
-  await getApiClient().updateSku(variantId, { isActive })
+  const { setVariantArchived } = await import('@/services/product-lifecycle.service')
+  await setVariantArchived(variantId, !isActive)
 }
 
 export async function addBarcode(variantId: string, code: string): Promise<Barcode> {

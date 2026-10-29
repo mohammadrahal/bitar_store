@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { SearchInput } from '@/components/shared/search-input'
-import { ArchiveAllDialog } from '@/components/products/archive-all-dialog'
 import { ArchiveProductDialog } from '@/components/products/archive-product-dialog'
 import { ProductForm } from '@/components/products/product-form'
 import { ProductTable } from '@/components/products/product-table'
@@ -36,7 +35,6 @@ export function ProductsView() {
   const debounced = useDebouncedValue(searchInput)
   const [page, setPage] = useState(1)
   const [dialog, setDialog] = useState<Dialog | null>(null)
-  const [archiveAll, setArchiveAll] = useState(false)
 
   useEffect(() => {
     if (debounced !== search) setSearch(debounced)
@@ -63,19 +61,12 @@ export function ProductsView() {
         title="Products"
         description="Every model with its color and size variants."
         actions={
-          <>
-            <Can permission="catalog.edit">
-              <button type="button" className="btn btn-secondary" onClick={() => setArchiveAll(true)}>
-                Archive all
-              </button>
-            </Can>
-            <Can permission="catalog.create">
-              <Link href="/products/new" className="btn btn-primary">
-                <Plus size={16} aria-hidden="true" />
-                Add product
-              </Link>
-            </Can>
-          </>
+          <Can permission="catalog.create">
+            <Link href="/products/new" className="btn btn-primary">
+              <Plus size={16} aria-hidden="true" />
+              Add product
+            </Link>
+          </Can>
         }
       />
 
@@ -155,7 +146,6 @@ export function ProductsView() {
 
       {dialog?.kind === 'edit' && <ProductForm key={dialog.product.id} product={dialog.product} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'archive' && <ArchiveProductDialog product={dialog.product} onClose={() => setDialog(null)} />}
-      {archiveAll && <ArchiveAllDialog onClose={() => setArchiveAll(false)} />}
     </>
   )
 }

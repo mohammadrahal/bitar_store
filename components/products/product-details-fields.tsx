@@ -3,10 +3,13 @@
 import type { FieldErrors, UseFormRegister } from 'react-hook-form'
 import { Field } from '@/components/shared/field'
 import { useCategories } from '@/hooks/use-products'
-import { usePermission } from '@/hooks/use-permission'
 import type { ProductDetailsFormValues } from '@/schemas/product.schema'
 
-/** Name, category, prices and the optional details, shared by the new-model page and the edit drawer. */
+/**
+ * Name, category, sell price and the optional details, shared by the new-model
+ * page and the edit drawer. There is no cost field: cost is recorded on each
+ * supplier receipt line, so a model never carries one.
+ */
 export function ProductDetailsFields({
   register,
   errors,
@@ -17,7 +20,6 @@ export function ProductDetailsFields({
   priceHint?: string
 }) {
   const { data: categories } = useCategories()
-  const showCost = usePermission().can('costs.view')
 
   return (
     <>
@@ -33,19 +35,7 @@ export function ProductDetailsFields({
             <option key={category} value={category} />
           ))}
         </datalist>
-        {showCost ? (
-          <Field label="Cost price" error={errors.costPrice?.message} hint="Saved on this device only">
-            <input {...register('costPrice', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
-          </Field>
-        ) : (
-          <input {...register('costPrice', { valueAsNumber: true })} type="hidden" />
-        )}
-        <Field
-          label="Sell price"
-          error={errors.sellPrice?.message}
-          hint={priceHint}
-          className={showCost ? undefined : 'full'}
-        >
+        <Field label="Sell price" error={errors.sellPrice?.message} hint={priceHint} className="full">
           <input {...register('sellPrice', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
         </Field>
       </div>

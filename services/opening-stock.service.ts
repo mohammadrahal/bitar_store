@@ -1,6 +1,7 @@
 import { getApiClient } from '@/lib/api'
-import { readDb } from '@/mocks/store'
-import { listBranchStockFromApi } from '@/services/stock-api.service'
+import { commitDb, readDb } from '@/mocks/store'
+import { actorName } from '@/services/mock-ledger'
+import type { OpeningStockPost } from '@/types'
 
 export interface OpeningStock {
   branchId: string
@@ -21,12 +22,42 @@ export async function placeOpeningStock(plan: OpeningStock[]): Promise<void> {
   }
 }
 
-/** Branches that already hold any unit of this style, so new SKUs belong there too. */
-export async function branchesCarryingProduct(styleId: string): Promise<string[]> {
-  const branches: string[] = []
-  for (const branch of readDb().branches) {
-    const rows = await listBranchStockFromApi(branch.id)
-    if (rows.some((row) => row.productId === styleId && row.quantity > 0)) branches.push(branch.id)
+/** Every location whose opening count has already been posted. */
+export async function listOpeningPosts(): Promise<OpeningStockPost[]> {
+  return readDb().openingPosts
+}
+
+export async function openingPostFor(branchId: string): Promise<OpeningStockPost | null> {
+  return readDb().openingPosts.find((post) => post.branchId === branchId) ?? null
+}
+
+/**
+ * Posts a counted opening quantity for one location, once.
+ *
+ * The API refuses a SKU that already has movement at that branch, so a second
+ * attempt would partly succeed and partly fail. Recording the post here closes
+ * the screen instead: a location is opened one time, and anything after that is
+ * a count or a receipt. The record is local until the backend keeps it.
+ */
+export async function postOpeningStock(input: OpeningStock): Promise<OpeningStockPost> {
+  const db = readDb()
+  if (db.openingPosts.some((post) => post.branchId === input.branchId)) {
+    throw new Error('Opening stock has already been posted for this location. Use a physical count instead.')
   }
-  return branches
+
+  const lines = Object.values(input.quantities).filter((quantity) => quantity > 0).length
+  if (lines === 0) throw new Error('Enter at least one counted quantity.')
+
+  await placeOpeningStock([input])
+
+  const post: OpeningStockPost = {
+    branchId: input.branchId,
+    postedAt: new Date().toISOString(),
+    postedBy: actorName(),
+    lines,
+  }
+  const next = readDb()
+  next.openingPosts.push(post)
+  commitDb(next)
+  return post
 }

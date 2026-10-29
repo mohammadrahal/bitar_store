@@ -5,6 +5,7 @@ import {
   Boxes,
   Building2,
   ClipboardCheck,
+  ClipboardList,
   LayoutDashboard,
   Package,
   PackagePlus,
@@ -71,6 +72,8 @@ export function useNavEntries(): NavEntry[] {
   if (can('documents.manage')) items.push({ type: 'link', href: '/invoices', label: 'Invoices', icon: ReceiptText })
   if (canAny(['counts.enter', 'counts.apply', 'holds.manage', 'stock.dispose']))
     items.push({ type: 'link', href: '/stock-control', label: 'Stock control', icon: ClipboardCheck })
+  if (canAny(['counts.enter', 'opening_stock.post']))
+    items.push({ type: 'link', href: '/opening-stock', label: 'Opening stock', icon: ClipboardList })
   if (canAny(['receipts.enter', 'receipts.confirm', 'suppliers.manage']))
     items.push({ type: 'link', href: '/receiving', label: 'Receiving', icon: Truck })
   if (canAny(['movements.request', 'replenishment.review']))

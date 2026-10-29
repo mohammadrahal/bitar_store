@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm, useWatch, type UseFormRegister } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft } from 'lucide-react'
-import { BranchStockPicker } from '@/components/products/branch-stock-picker'
+import { VariantPricesTable } from '@/components/products/variant-prices-table'
 import { ColorPicker } from '@/components/products/color-picker'
 import { NewProductSummary } from '@/components/products/new-product-summary'
 import { ProductDetailsFields } from '@/components/products/product-details-fields'
@@ -20,7 +20,6 @@ import {
   detailsFrom,
   emptyNewProductValues,
   newProductSchema,
-  openingKey,
   type NewProductFormValues,
   type ProductDetailsFormValues,
 } from '@/schemas/product.schema'
@@ -62,13 +61,12 @@ export function NewProductView() {
   const revalidate = { shouldValidate: isSubmitted }
 
   const submit = handleSubmit((form) => {
-    const { code, name, category, costPrice, sellPrice, season, brand, material, description } = form
+    const { code, name, category, sellPrice, season, brand, material, description } = form
     create.mutate(
       {
         code,
         name,
         category,
-        costPrice,
         sellPrice,
         details: detailsFrom({ season, brand, material, description }),
         variants: combinationsOf(form).map(({ color, size }) => ({
@@ -76,21 +74,14 @@ export function NewProductView() {
           size,
           sellPrice: form.prices[comboKey(color, size)] ?? form.sellPrice,
         })),
-        branches: form.branchIds.map((branchId) => ({
-          branchId,
-          quantities: Object.fromEntries(
-            combinationsOf(form).map(({ color, size }) => [comboKey(color, size), form.opening[openingKey(branchId, color, size)] ?? 0]),
-          ),
-        })),
       },
       { onSuccess: ({ product }) => router.push(`/products/${product.id}`) },
     )
   })
 
-  const openingError = Object.values(errors.opening ?? {}).find((entry) => entry && 'message' in entry)?.message
   const pricesError = typeof errors.prices?.message === 'string' ? errors.prices.message : undefined
-  const firstError = [errors.code, errors.name, errors.category, errors.costPrice, errors.sellPrice, errors.colors, errors.sizes, errors.excluded, errors.branchIds]
-    .find(Boolean)?.message ?? openingError ?? pricesError
+  const firstError = [errors.code, errors.name, errors.category, errors.sellPrice, errors.colors, errors.sizes, errors.excluded]
+    .find(Boolean)?.message ?? pricesError
 
   return (
     <>
@@ -143,18 +134,14 @@ export function NewProductView() {
           </Section>
           <Section
             number={5}
-            title="Branches"
-            hint="Where this model is sold. Each variant has its own price. Other branches will not list it."
-            error={errors.branchIds?.message ?? (isSubmitted ? openingError ?? pricesError : undefined)}
+            title="Prices"
+            hint="Override any variant that does not sell for the model price. Saving a model never places stock — start it with an opening count or a supplier receipt."
+            error={isSubmitted ? pricesError : undefined}
           >
-            <BranchStockPicker
+            <VariantPricesTable
               combos={combos}
-              selected={values.branchIds ?? []}
-              opening={(values.opening ?? {}) as Record<string, number>}
               prices={(values.prices ?? {}) as Record<string, number>}
               defaultPrice={values.sellPrice ?? 0}
-              onSelectedChange={(next) => setValue('branchIds', next, revalidate)}
-              onOpeningChange={(next) => setValue('opening', next, revalidate)}
               onPriceChange={(next) => setValue('prices', next, revalidate)}
             />
           </Section>
@@ -163,7 +150,6 @@ export function NewProductView() {
           <NewProductSummary
             name={values.name ?? ''}
             combos={combos}
-            costPrice={values.costPrice ?? 0}
             sellPrice={values.sellPrice ?? 0}
             prices={(values.prices ?? {}) as Record<string, number>}
             pending={create.isPending}

@@ -80,8 +80,8 @@ export function mirrorCatalog(products: Product[], variants: Variant[], { comple
   })
 }
 
-/** Sets what only this device keeps for a model: its cost and extra details. */
-export function setLocalProductFields(productId: string, fields: Pick<Product, 'costPrice' | 'details'>): void {
+/** Sets what only this device keeps for a model: its extra details. */
+export function setLocalProductFields(productId: string, fields: Pick<Product, 'details'>): void {
   writeDb((db) => {
     const product = db.products.find((candidate) => candidate.id === productId)
     if (product) Object.assign(product, fields)

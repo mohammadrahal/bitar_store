@@ -6,15 +6,12 @@ import { setLocalProductFields } from '@/mocks/mirror'
 import { readDb } from '@/mocks/store'
 import { mintBarcode } from '@/services/barcodes.service'
 import { refreshStyle, syncCatalog } from '@/services/catalog-sync.service'
-import { placeOpeningStock } from '@/services/opening-stock.service'
 import { callerSeesCosts } from '@/services/mock-ledger'
 import type { Product, ProductDetails, ProductWithVariants, Variant } from '@/types'
 
 export interface ProductDetailsInput {
   name: string
   category: string
-  /** Ignored for callers who cannot see costs, so an edit never wipes it. */
-  costPrice: number
   /** On edit, a changed price is applied to every active SKU of the model. */
   sellPrice: number
   details?: ProductDetails
@@ -31,8 +28,6 @@ export interface ProductInput extends ProductDetailsInput {
   /** Style code; blank takes the next free MD code. */
   code: string
   variants: Combination[]
-  /** Where the model is stocked, with opening units keyed by `color|size`. */
-  branches: { branchId: string; quantities: Record<string, number> }[]
 }
 
 const comboKeyOf = (combo: Combination) => `${combo.color}|${combo.size}`
@@ -96,11 +91,10 @@ function nextStyleCode(products: Product[]): string {
   return formatModelCode(numbers.length ? Math.max(...numbers) + 1 : 1)
 }
 
-function localFields(input: ProductDetailsInput, current?: Product) {
-  return {
-    costPrice: callerSeesCosts() ? input.costPrice : (current?.costPrice ?? 0),
-    details: input.details,
-  }
+/* Cost is never written here: it comes from the latest confirmed supplier
+   receipt line (BL-06), which `costOfVariants` reads. */
+function localFields(input: ProductDetailsInput) {
+  return { details: input.details }
 }
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : 'refused')
@@ -157,19 +151,15 @@ export async function createProduct(input: ProductInput): Promise<CreatedProduct
   await syncCatalog()
   const code = input.code.trim().toUpperCase() || nextStyleCode(readDb().products)
   const style = await getApiClient().createStyle({ code, name: input.name.trim(), category: input.category.trim() })
-  const { created, ...outcome } = await createSkus(style.id, style.code, input.variants, input.sellPrice)
+  const outcome = await createSkus(style.id, style.code, input.variants, input.sellPrice)
   await refreshStyle(style.id)
   setLocalProductFields(style.id, localFields(input))
-  await placeOpeningStock(
-    input.branches.map(({ branchId, quantities }) => ({
-      branchId,
-      quantities: Object.fromEntries([...created].map(([key, skuId]) => [skuId, quantities[key] ?? 0])),
-    })),
-  )
+  /* Creating a model never places stock (BL-01). Use an opening count or a
+     supplier receipt to put the first units somewhere. */
   return { product: await getProduct(style.id), ...outcome }
 }
 
-/** Name and category go to the API; a new sell price re-prices every active SKU. Cost and details stay here. */
+/** Name and category go to the API; a new sell price re-prices every active SKU. Details stay here. */
 export async function updateProduct(productId: string, input: ProductDetailsInput): Promise<ProductWithVariants> {
   const api = getApiClient()
   const current = await getProduct(productId)
@@ -179,7 +169,7 @@ export async function updateProduct(productId: string, input: ProductDetailsInpu
     const live = current.variants.filter((variant) => !variant.archived && variant.sellPrice !== input.sellPrice)
     await Promise.all(live.map((variant) => api.setSkuPrice(variant.id, price)))
   }
-  setLocalProductFields(productId, localFields(input, readDb().products.find((product) => product.id === productId)))
+  setLocalProductFields(productId, localFields(input))
   return getProduct(productId)
 }
 

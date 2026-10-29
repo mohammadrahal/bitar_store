@@ -97,4 +97,8 @@ export const queryKeys = {
   locations: {
     warehouse: () => ['locations', 'warehouse'] as const,
   },
+  openingStock: {
+    all: ['opening-stock'] as const,
+    post: (branchId: string) => ['opening-stock', 'post', branchId] as const,
+  },
 } as const

@@ -12,7 +12,6 @@ function toFormValues(product: ProductWithVariants): ProductDetailsFormValues {
   return {
     name: product.name,
     category: product.category,
-    costPrice: product.costPrice,
     sellPrice: product.sellPrice,
     season: product.details?.season ?? '',
     brand: product.details?.brand ?? '',
