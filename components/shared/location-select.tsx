@@ -11,6 +11,7 @@ export function LocationSelect({
   onChange,
   exclude,
   onlyAccessible = false,
+  onlyFullAccess = false,
   placeholder = 'Select',
   ...aria
 }: {
@@ -18,6 +19,8 @@ export function LocationSelect({
   onChange: (value: string) => void
   exclude?: string
   onlyAccessible?: boolean
+  /** Leaves out view-only assignments, which may be looked at but not acted on. */
+  onlyFullAccess?: boolean
   placeholder?: string
   id?: string
   'aria-label'?: string
@@ -26,11 +29,12 @@ export function LocationSelect({
 }) {
   const { data: branches, isPending } = useBranches()
   const { data: warehouseId } = useWarehouseId()
-  const { canAccessLocation } = usePermission()
+  const { canAccessLocation, locationAccess } = usePermission()
 
   const options = (branches ?? [])
     .filter((branch) => branch.id !== exclude && branch.isActive)
     .filter((branch) => !onlyAccessible || canAccessLocation(branch.id))
+    .filter((branch) => !onlyFullAccess || locationAccess(branch.id) === 'full')
     .map((branch) => ({
       value: branch.id,
       label: branch.id === warehouseId ? `${branch.name} (warehouse)` : branch.name,

@@ -10,6 +10,7 @@ import { SaleItemCard } from '@/components/sales/sale-item-card'
 import { Field } from '@/components/shared/field'
 import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
+import { ViewOnlyNotice } from '@/components/shared/view-only-notice'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useOpenDiscountRequests, useRequestDiscount } from '@/hooks/use-discount-requests'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
@@ -136,9 +137,12 @@ export function NewSaleView() {
               setLines([])
             }}
             onlyAccessible
+            onlyFullAccess
           />
         </Field>
       )}
+
+      <ViewOnlyNotice locationId={branchId} action="ring up sales" />
 
       <SaleItemCard branchId={branchId} inCart={inCart} onAdd={add} />
 

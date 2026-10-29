@@ -7,6 +7,7 @@ import { HoldsTab } from '@/components/stock-control/holds-tab'
 import { Field } from '@/components/shared/field'
 import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
+import { ViewOnlyNotice } from '@/components/shared/view-only-notice'
 import { PreviewBadge } from '@/components/shared/preview-badge'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { usePermission } from '@/hooks/use-permission'
@@ -36,11 +37,13 @@ export function StockControlView() {
         actions={
           !locationScoped && (
             <Field label="Location" className="inline-field">
-              <LocationSelect value={branchId} onChange={setBranch} onlyAccessible />
+              <LocationSelect value={branchId} onChange={setBranch} onlyAccessible onlyFullAccess />
             </Field>
           )
         }
       />
+
+      <ViewOnlyNotice locationId={branchId} action="change stock" />
 
       <PreviewBadge feature="Holds, physical counts and disposal" />
       <div className="segmented" role="tablist" aria-label="Stock control">

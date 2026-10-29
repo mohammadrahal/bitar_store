@@ -68,7 +68,13 @@ export function ReplenishmentRequestForm({
       <div className="form-grid">
         {!locationScoped && (
           <Field label="For location" className="full">
-            <LocationSelect value={branchChoice} onChange={setBranchChoice} onlyAccessible placeholder="Select" />
+            <LocationSelect
+              value={branchChoice}
+              onChange={setBranchChoice}
+              onlyAccessible
+              onlyFullAccess
+              placeholder="Select"
+            />
           </Field>
         )}
 

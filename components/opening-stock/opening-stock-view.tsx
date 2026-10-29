@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/shared/error-state'
 import { Field } from '@/components/shared/field'
 import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
+import { ViewOnlyNotice } from '@/components/shared/view-only-notice'
 import { Panel } from '@/components/shared/panel'
 import { SearchInput } from '@/components/shared/search-input'
 import { Skeleton } from '@/components/shared/skeleton'
@@ -58,9 +59,17 @@ export function OpeningStockView() {
 
       {!locationScoped && (
         <Field label="Location">
-          <LocationSelect value={branchChoice} onChange={setBranchChoice} onlyAccessible placeholder="Select a location" />
+          <LocationSelect
+            value={branchChoice}
+            onChange={setBranchChoice}
+            onlyAccessible
+            onlyFullAccess
+            placeholder="Select a location"
+          />
         </Field>
       )}
+
+      <ViewOnlyNotice locationId={branchId} action="post an opening count" />
 
       {!branchId ? (
         <EmptyState

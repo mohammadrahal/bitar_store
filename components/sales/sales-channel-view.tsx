@@ -188,7 +188,7 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
 
       {channel === 'b2b' && warehouseId === null && (
         <p className="notice notice-warning" role="status">
-          No location is marked as the main warehouse, so wholesale sales cannot be recorded. An admin can set one on the
+          No location is marked as the main warehouse, so wholesale sales cannot be recorded. A super admin can set one on the
           Branches page.
         </p>
       )}
