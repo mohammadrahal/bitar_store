@@ -2,6 +2,9 @@ import { getApiClient } from '@/lib/api'
 import { priceText } from '@/lib/api/map-catalog'
 import type { ApiSale, CreateSaleInput, SalesListParams } from '@/lib/api/types'
 
+/** A completed POS sale, named for the screens so they need no API types. */
+export type { ApiSale as Sale, ApiSaleLine as SaleLine, ApiSalePayment as SalePayment } from '@/lib/api/types'
+
 export interface NewSaleLine {
   skuId: string
   quantity: number

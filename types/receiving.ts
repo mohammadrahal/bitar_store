@@ -53,8 +53,15 @@ export interface Receipt {
   confirmedBy?: string
 }
 
+/** A receipt line with the SKU and name a table needs. */
+export interface ReceiptLineRow extends ReceiptLine {
+  sku: string
+  label: string
+}
+
 /** A receipt with the names a table needs. */
-export interface ReceiptRow extends Receipt {
+export interface ReceiptRow extends Omit<Receipt, 'lines'> {
+  lines: ReceiptLineRow[]
   supplierName: string
   branchName: string
   units: number

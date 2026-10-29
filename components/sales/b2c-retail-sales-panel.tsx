@@ -16,16 +16,16 @@ import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { usePermission } from '@/hooks/use-permission'
 import { useSalesList } from '@/hooks/use-sales'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
-import type { ApiSale } from '@/lib/api/types'
+import type { Sale } from '@/services/sales.service'
 
 const PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 250
 
-function saleUnits(sale: ApiSale) {
+function saleUnits(sale: Sale) {
   return sale.lines.reduce((sum, line) => sum + line.quantity, 0)
 }
 
-function matchesSearch(sale: ApiSale, query: string) {
+function matchesSearch(sale: Sale, query: string) {
   const haystack = [
     sale.reference,
     sale.note ?? '',

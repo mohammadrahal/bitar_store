@@ -97,6 +97,15 @@ export const queryKeys = {
   locations: {
     warehouse: () => ['locations', 'warehouse'] as const,
   },
+  suppliers: {
+    all: ['suppliers'] as const,
+    list: (includeArchived: boolean) => ['suppliers', 'list', includeArchived] as const,
+  },
+  receipts: {
+    all: ['receipts'] as const,
+    list: (status: string) => ['receipts', 'list', status] as const,
+    detail: (receiptId: string) => ['receipts', 'detail', receiptId] as const,
+  },
   discountRequests: {
     all: ['discount-requests'] as const,
     list: (scope: BranchScope) => ['discount-requests', 'list', scope] as const,

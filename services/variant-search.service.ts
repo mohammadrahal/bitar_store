@@ -3,6 +3,7 @@ import { mapApiSku } from '@/lib/api/map-catalog'
 import { mirrorCatalog } from '@/mocks/mirror'
 import { isRetired, readDb, type MockDb } from '@/mocks/store'
 import { callerSeesCosts } from '@/services/mock-ledger'
+import { latestConfirmedCosts } from '@/services/receipts.service'
 import type { VariantOption } from '@/types'
 
 /** Something a scanner could have produced: one token, no spaces. */
@@ -10,6 +11,8 @@ const SCANNABLE = /^[\x21-\x7E]{4,64}$/
 
 function optionsFrom(db: MockDb, term: string): VariantOption[] {
   const seesCost = callerSeesCosts()
+  /* Cost lives on the supplier receipt line, not on the model (BL-06). */
+  const costs = seesCost ? latestConfirmedCosts() : null
   return db.variants.flatMap<VariantOption>((variant) => {
     const product = db.products.find((candidate) => candidate.id === variant.productId)
     if (!product || isRetired(db, variant)) return []
@@ -24,7 +27,7 @@ function optionsFrom(db: MockDb, term: string): VariantOption[] {
         productName: product.name,
         size: variant.size,
         color: variant.color,
-        costPrice: seesCost ? product.costPrice : 0,
+        costPrice: costs?.get(variant.id) ?? 0,
         sellPrice: variant.sellPrice,
       },
     ]

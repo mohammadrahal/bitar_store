@@ -16,7 +16,7 @@ import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { useCreateSale } from '@/hooks/use-sales'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { usePermission } from '@/hooks/use-permission'
-import { ApiError } from '@/lib/api/api-error'
+import { isConflict, messageOf } from '@/lib/errors'
 import { formatPrice } from '@/lib/format'
 import { fromCents, toCents } from '@/lib/invoice-totals'
 import { emptyPayment, paymentProblem, paymentsFor, type PaymentDraft } from '@/lib/sale-payments'
@@ -86,8 +86,8 @@ export function NewSaleView() {
 
   const approvedTotal = fromCents(effectiveLines.reduce((sum, line) => sum + lineNet(line), 0))
   const problem = paymentProblem(payment, approvedTotal)
-  const referenceError =
-    create.error instanceof ApiError && create.error.status === 409 ? create.error.message : undefined
+  /* The server refuses a Whish reference it has already recorded. */
+  const referenceError = isConflict(create.error) ? messageOf(create.error) : undefined
 
   const add = (option: VariantOption, quantity: number) =>
     setLines((current) => {

@@ -7,6 +7,7 @@ import { readDb } from '@/mocks/store'
 import { mintBarcode } from '@/services/barcodes.service'
 import { refreshStyle, syncCatalog } from '@/services/catalog-sync.service'
 import { callerSeesCosts } from '@/services/mock-ledger'
+import { latestConfirmedCosts } from '@/services/receipts.service'
 import type { Product, ProductDetails, ProductWithVariants, Variant } from '@/types'
 
 export interface ProductDetailsInput {
@@ -40,13 +41,20 @@ export interface CreatedProduct {
   unbarcoded: string[]
 }
 
-/** Cost is not on the API; this device hides it from callers who may not see it. */
-export function redactProduct(product: ProductWithVariants): ProductWithVariants {
-  return callerSeesCosts() ? product : { ...product, costPrice: 0 }
+/**
+ * A model's cost is the unit cost from the newest confirmed supplier receipt
+ * that mentions one of its variants (BL-06): the catalog itself carries no
+ * cost. Callers who may not see costs get zero.
+ */
+export function withCost(product: ProductWithVariants): ProductWithVariants {
+  if (!callerSeesCosts()) return { ...product, costPrice: 0 }
+  const costs = latestConfirmedCosts()
+  const known = product.variants.map((variant) => costs.get(variant.id)).filter((cost) => cost !== undefined)
+  return { ...product, costPrice: known.length ? known[known.length - 1]! : 0 }
 }
 
 function attachVariants(product: Product, variants: Variant[]): ProductWithVariants {
-  return redactProduct({ ...product, variants: variants.filter((variant) => variant.productId === product.id) })
+  return withCost({ ...product, variants: variants.filter((variant) => variant.productId === product.id) })
 }
 
 function matches(product: ProductWithVariants, search: string) {

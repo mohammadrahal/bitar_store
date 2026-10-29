@@ -7,7 +7,7 @@ import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
 import { Switch } from '@/components/shared/switch'
 import { useBranches, useCreateBranch, useUpdateBranch } from '@/hooks/use-branches'
-import { ApiError } from '@/lib/api'
+import { isConflict } from '@/lib/errors'
 import { buildBranchCode } from '@/lib/branch-code'
 import {
   branchCreateSchema,
@@ -85,7 +85,7 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
       onSuccess: onClose,
       /* Another admin may have taken the code since the list was fetched. */
       onError: (error) => {
-        if (error instanceof ApiError && error.status === 409) {
+        if (isConflict(error)) {
           setError('code', { message: error.message || 'That code is already used.' })
         }
       },
