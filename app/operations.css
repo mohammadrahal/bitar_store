@@ -217,3 +217,11 @@ details.optional[open] summary { margin-bottom: 16px; }
 .assignment-row .muted { color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); }
 .assignment-access { display: flex; flex-wrap: wrap; gap: 16px; margin: 8px 0 0 26px; font-size: var(--fs-xs); color: hsl(var(--muted-foreground)); }
 .assignment-access label { display: flex; align-items: center; gap: 6px; }
+
+/* ---------- Till: per-line discount and payment ---------- */
+.sale-line-block { display: block; padding: 12px 0; }
+.sale-line-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sale-line-block .form-grid { margin-top: 10px; }
+.sale-line-block .field-hint,
+.sale-line-block .muted { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font-size: var(--fs-xs); }
+.sale-card .segmented { margin-bottom: 16px; }

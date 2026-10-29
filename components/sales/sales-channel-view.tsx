@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { SearchInput } from '@/components/shared/search-input'
 import { B2cRetailSalesPanel } from '@/components/sales/b2c-retail-sales-panel'
+import { DiscountApprovalsPanel } from '@/components/sales/discount-approvals-panel'
 import { InvoiceForm } from '@/components/invoices/invoice-form'
 import { InvoiceTable } from '@/components/invoices/invoice-table'
 import { Can } from '@/components/shared/can'
@@ -114,6 +115,8 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
       />
 
       {channel === 'b2b' && <PreviewBadge feature="Wholesale documents" />}
+
+      {channel === 'b2c' && <DiscountApprovalsPanel scope={scope} />}
 
       {channel === 'b2c' ? (
         <B2cRetailSalesPanel onCreate={startSale} />
