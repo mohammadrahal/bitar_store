@@ -68,9 +68,9 @@ export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavi
 }
 
 export function SidebarFooter() {
-  const { user, branchScoped } = usePermission()
+  const { user, locationScoped } = usePermission()
   const { data: branches } = useBranches()
-  const branchName = branchScoped
+  const branchName = locationScoped
     ? (branches?.find((branch) => branch.id === user.branchId)?.name ?? (user.branchId ? 'Unknown branch' : 'No branch assigned'))
     : 'All locations'
 

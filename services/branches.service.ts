@@ -5,6 +5,7 @@ import { useUserStore } from '@/store/user-store'
 import { getApiClient } from '@/lib/api'
 import type { CreateBranchInput, UpdateBranchInput } from '@/lib/api/types'
 import { ALL_BRANCHES, type Branch, type BranchScope } from '@/types'
+import { getBranchStockUnits } from '@/services/stock.service'
 
 export interface BranchInput {
   code: string
@@ -18,7 +19,7 @@ export interface BranchInput {
  */
 function seesWholeNetwork(): boolean {
   const user = useUserStore.getState().user
-  return user ? can(user.role, 'branches:view-all') : false
+  return user ? can(user, 'locations.view_all') : false
 }
 
 async function fetchScopedBranches(scope: BranchScope): Promise<Branch[]> {
@@ -56,37 +57,30 @@ export async function createBranch(input: BranchInput): Promise<Branch> {
   return mapApiBranch(branch)
 }
 
-/**
- * What the server can actually do to a branch today. `PATCH /branches/:id` and
- * `DELETE /branches/:id` both answer 404, so the edit and delete controls read
- * these flags and explain themselves instead of failing on click.
- *
- * When the endpoints ship, flip the flag — the calls below and the whole UI
- * above them are already wired.
- */
+/** Server supports PATCH (name, isActive). Branches are deactivated, not deleted. */
 export const BRANCH_WRITES = {
-  update: false,
-  delete: false,
-  toggleActive: false,
+  update: true,
+  deactivate: true,
 } as const
 
-const NOT_SUPPORTED = {
-  update: 'Branch editing is not available on the server yet.',
-  delete: 'Branch deletion is not available on the server yet.',
-  toggleActive: 'Branch status changes are not available on the server yet.',
-}
-
 export async function updateBranch(branchId: string, input: UpdateBranchInput): Promise<Branch> {
-  if (!BRANCH_WRITES.update) throw new Error(NOT_SUPPORTED.update)
+  if (!BRANCH_WRITES.update) throw new Error('Branch editing is not available.')
   return mapApiBranch(await getApiClient().updateBranch(branchId, input))
 }
 
 export async function setBranchActive(branchId: string, isActive: boolean): Promise<Branch> {
-  if (!BRANCH_WRITES.toggleActive) throw new Error(NOT_SUPPORTED.toggleActive)
+  if (!BRANCH_WRITES.update) throw new Error('Branch status changes are not available.')
   return mapApiBranch(await getApiClient().updateBranch(branchId, { isActive }))
 }
 
-export async function deleteBranch(branchId: string): Promise<void> {
-  if (!BRANCH_WRITES.delete) throw new Error(NOT_SUPPORTED.delete)
-  return getApiClient().deleteBranch(branchId)
+/** Marks the branch inactive. Fails when stock remains on hand. */
+export async function deactivateBranch(branchId: string): Promise<Branch> {
+  if (!BRANCH_WRITES.deactivate) throw new Error('Branch deactivation is not available.')
+  const units = await getBranchStockUnits(branchId)
+  if (units > 0) {
+    throw new Error(
+      `This branch still holds ${units.toLocaleString()} units. Move or sell stock before marking it inactive.`,
+    )
+  }
+  return setBranchActive(branchId, false)
 }

@@ -13,15 +13,18 @@ import type {
   Variant,
 } from '@/types'
 
-const STORAGE_KEY = 'bitar-fashion:catalog-db:v6'
+const STORAGE_KEY = 'bitar-fashion:catalog-db:v9'
 const LEGACY_KEYS = [
   'bitar-fashion:mock-db:v1',
   'bitar-fashion:catalog-db:v1',
   'bitar-fashion:catalog-db:v4',
   'bitar-fashion:catalog-db:v5',
+  'bitar-fashion:catalog-db:v6',
+  'bitar-fashion:catalog-db:v7',
+  'bitar-fashion:catalog-db:v8',
 ]
 /** Bump, together with STORAGE_KEY, to discard any previously persisted payload. */
-const VERSION = 7
+const VERSION = 9
 /** Version 6 gave every SKU an empty row at every branch; those are dropped on load. */
 const UNCARRIED_ROWS_VERSION = 6
 

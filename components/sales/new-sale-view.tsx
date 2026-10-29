@@ -10,10 +10,10 @@ import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
-import { useCreateInvoice } from '@/hooks/use-invoices'
+import { useCreateSale } from '@/hooks/use-sales'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { usePermission } from '@/hooks/use-permission'
-import { formatPrice, todayAsDateInput } from '@/lib/format'
+import { formatPrice } from '@/lib/format'
 import { invoiceTotals } from '@/lib/invoice-totals'
 import type { VariantOption } from '@/types'
 
@@ -24,18 +24,18 @@ interface CartLine {
 
 export function NewSaleView() {
   const router = useRouter()
-  const { can, branchScoped } = usePermission()
+  const { can, locationScoped } = usePermission()
   const online = useOnlineStatus()
   const defaultBranch = useDefaultBranchId()
-  const create = useCreateInvoice()
+  const create = useCreateSale()
   const idempotency = useIdempotencyKey()
 
-  const [branchChoice, setBranch] = useState<string | null>(null)
+  const [branchChoice, setBranch] = useState('')
   const [lines, setLines] = useState<CartLine[]>([])
   const [customer, setCustomer] = useState('')
   const [discount, setDiscount] = useState(0)
-  const branchId = branchChoice ?? defaultBranch
-  const canDiscount = can('sales:discount')
+  const branchId = locationScoped ? defaultBranch : branchChoice
+  const canDiscount = can('discounts.apply')
 
   const totals = invoiceTotals(lines.map((line) => ({ quantity: line.quantity, unitPrice: line.option.sellPrice })), discount)
   const inCart = Object.fromEntries(lines.map((line) => [line.option.variantId, line.quantity]))
@@ -53,21 +53,22 @@ export function NewSaleView() {
     create.mutate(
       {
         input: {
-          kind: 'sale',
           branchId,
-          partyName: customer.trim() || 'Walk-in customer',
-          issuedAt: todayAsDateInput(),
-          discount: canDiscount ? totals.discount : 0,
-          salesChannel: 'b2c',
-          lines: lines.map((line) => ({ variantId: line.option.variantId, quantity: line.quantity, unitPrice: line.option.sellPrice })),
+          note: customer.trim() || undefined,
+          lines: lines.map((line) => ({
+            skuId: line.option.variantId,
+            quantity: line.quantity,
+            unitPrice: line.option.sellPrice,
+          })),
+          discount: totals.discount,
+          canDiscount,
         },
-        issue: true,
-        key: idempotency.current(),
+        idempotencyKey: idempotency.current(),
       },
       {
-        onSuccess: (invoice) => {
+        onSuccess: (sale) => {
           idempotency.reset()
-          router.push(`/invoices/${invoice.id}`)
+          router.push(`/sales/${sale.id}`)
         },
       },
     )
@@ -76,9 +77,9 @@ export function NewSaleView() {
   return (
     <form className="sale-layout" onSubmit={submit} noValidate>
       <PageHeader eyebrow="Sales" title="New sale" />
-      {!branchScoped && (
+      {!locationScoped && (
         <Field label="Selling from">
-          <LocationSelect value={branchId} onChange={(value) => { setBranch(value); setLines([]) }} onlyAccessible />
+          <LocationSelect value={branchChoice} onChange={(value) => { setBranch(value); setLines([]) }} onlyAccessible />
         </Field>
       )}
 

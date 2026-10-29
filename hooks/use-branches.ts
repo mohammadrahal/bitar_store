@@ -8,7 +8,7 @@ import { queryKeys } from '@/lib/query-keys'
 import type { UpdateBranchInput } from '@/lib/api'
 import {
   createBranch,
-  deleteBranch,
+  deactivateBranch,
   getBranch,
   listBranches,
   updateBranch,
@@ -18,8 +18,8 @@ import { ALL_BRANCHES, type BranchScope } from '@/types'
 
 /** The branches the current user is allowed to see at all. */
 export function useBranchAccessScope(): BranchScope {
-  const { user, branchScoped } = usePermission()
-  return branchScoped && user.branchId ? user.branchId : ALL_BRANCHES
+  const { user, locationScoped } = usePermission()
+  return locationScoped && user.branchId ? user.branchId : ALL_BRANCHES
 }
 
 export function useBranches() {
@@ -79,15 +79,18 @@ export function useUpdateBranch() {
   })
 }
 
-export function useDeleteBranch() {
+export function useDeactivateBranch() {
   const { invalidate, reportError } = useBranchMutationCallbacks()
   return useMutation({
-    mutationFn: ({ id }: { id: string; name: string }) => deleteBranch(id),
+    mutationFn: ({ id }: { id: string; name: string }) => deactivateBranch(id),
     onSuccess: (_result, { name }) => {
       invalidate()
-      toast.success(`${name} deleted`)
+      toast.success(`${name} marked inactive`)
     },
     onError: reportError,
   })
 }
+
+/** @deprecated Use useDeactivateBranch — branches are not hard-deleted. */
+export const useDeleteBranch = useDeactivateBranch
 

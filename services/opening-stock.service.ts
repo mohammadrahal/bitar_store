@@ -1,38 +1,32 @@
-import { readDb, commitDb } from '@/mocks/store'
-import { postAdjustments } from '@/services/adjustment-docs'
-import { ensureLevel, visibleBranchIds } from '@/services/mock-ledger'
+import { getApiClient } from '@/lib/api'
+import { readDb } from '@/mocks/store'
+import { listBranchStockFromApi } from '@/services/stock-api.service'
 
 export interface OpeningStock {
   branchId: string
-  /** Units per variant id. Zero still places the variant at the branch. */
+  /** Units per variant id. Only quantities above zero are sent to the API. */
   quantities: Record<string, number>
 }
 
-export const OPENING_STOCK_REASON = 'Opening stock'
-
-/**
- * Places new variants at the chosen branches. Each gets a stock row there, so
- * the branch carries it, and any opening units are posted as an adjustment
- * document so they show in the stock history like every other movement.
- */
-export function placeOpeningStock(plan: OpeningStock[]): void {
-  const db = readDb()
-  const allowed = new Set(visibleBranchIds(db))
+/** Opening stock on the server. Each branch batch gets its own idempotency key. */
+export async function placeOpeningStock(plan: OpeningStock[]): Promise<void> {
+  const api = getApiClient()
+  const known = new Set(readDb().variants.map((variant) => variant.id))
   for (const { branchId, quantities } of plan) {
-    if (!allowed.has(branchId) || !db.branches.some((branch) => branch.id === branchId)) continue
-    const entries = Object.entries(quantities).filter(([variantId]) => db.variants.some((variant) => variant.id === variantId))
-    for (const [variantId] of entries) ensureLevel(db, variantId, branchId)
-    const items = entries
-      .filter(([, quantity]) => quantity > 0)
-      .map(([variantId, quantity]) => ({ variantId, delta: Math.floor(quantity) }))
-    if (items.length) postAdjustments(db, branchId, OPENING_STOCK_REASON, items)
+    const lines = Object.entries(quantities)
+      .filter(([skuId, quantity]) => known.has(skuId) && quantity > 0)
+      .map(([skuId, quantity]) => ({ skuId, quantity: Math.floor(quantity) }))
+    if (lines.length === 0) continue
+    await api.setOpeningStock({ branchId, lines }, crypto.randomUUID())
   }
-  commitDb(db)
 }
 
-/** Branches that already carry any variant of the model, where its new variants belong too. */
-export function branchesCarrying(productId: string): string[] {
-  const db = readDb()
-  const ids = new Set(db.variants.filter((variant) => variant.productId === productId).map((variant) => variant.id))
-  return [...new Set(db.stock.filter((level) => ids.has(level.variantId)).map((level) => level.branchId))]
+/** Branches that already hold any unit of this style, so new SKUs belong there too. */
+export async function branchesCarryingProduct(styleId: string): Promise<string[]> {
+  const branches: string[] = []
+  for (const branch of readDb().branches) {
+    const rows = await listBranchStockFromApi(branch.id)
+    if (rows.some((row) => row.productId === styleId && row.quantity > 0)) branches.push(branch.id)
+  }
+  return branches
 }

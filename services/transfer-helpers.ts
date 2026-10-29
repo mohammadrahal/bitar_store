@@ -1,6 +1,6 @@
 import { delay, delayedFailure } from '@/lib/delay'
 import { createId } from '@/lib/ids'
-import { canAccessBranch, canUser, type Action } from '@/lib/permissions'
+import { can, canAccessLocation, type Permission } from '@/lib/permissions'
 import { transferTotals } from '@/lib/transfers'
 import { commitDb, readDb, type MockDb } from '@/mocks/store'
 import { actorName, branchNameOf, remember, replayOf } from '@/services/mock-ledger'
@@ -44,24 +44,24 @@ export function logEvent(transfer: Transfer, message: string, at = new Date().to
   transfer.updatedAt = at
 }
 
-/** The role must allow the action and the user must belong to that side of the transfer. */
-export function permissionError(action: Action, branchId: string, db: MockDb): string | null {
+/** The user must hold the key at that location and belong to that side of the transfer. */
+export function permissionError(permission: Permission, branchId: string, db: MockDb): string | null {
   const user = useUserStore.getState().user
-  if (!user || !canUser(user, action)) return "You don't have access to this."
-  if (!canAccessBranch(user, branchId)) return `Only staff at ${branchNameOf(db, branchId)} can do this.`
+  if (!user || !can(user, permission, branchId)) return "You don't have access to this."
+  if (!canAccessLocation(user, branchId)) return `Only staff at ${branchNameOf(db, branchId)} can do this.`
   return null
 }
 
 export function canSeeTransfer(transfer: Transfer): boolean {
   const user = useUserStore.getState().user
   if (!user) return false
-  return canAccessBranch(user, transfer.fromBranchId) || canAccessBranch(user, transfer.toBranchId)
+  return canAccessLocation(user, transfer.fromBranchId) || canAccessLocation(user, transfer.toBranchId)
 }
 
 interface ActionSpec {
   transferId: string
   idempotencyKey?: string
-  action: Action
+  permission: Permission
   side: 'from' | 'to'
   /** Changes the working copy, or returns why it cannot. */
   change: (db: MockDb, transfer: Transfer) => string | void
@@ -72,14 +72,14 @@ interface ActionSpec {
  * it only when every check passed. A repeated Idempotency-Key replays the
  * first answer instead of moving stock again.
  */
-export async function runTransferAction({ transferId, idempotencyKey, action, side, change }: ActionSpec) {
+export async function runTransferAction({ transferId, idempotencyKey, permission, side, change }: ActionSpec) {
   const db = readDb()
   const replay = replayOf<TransferWithLinks>(db, idempotencyKey)
   if (replay) return delay(replay)
 
   const transfer = db.transfers.find((candidate) => candidate.id === transferId)
   if (!transfer) return delayedFailure('This transfer no longer exists.')
-  const denied = permissionError(action, side === 'from' ? transfer.fromBranchId : transfer.toBranchId, db)
+  const denied = permissionError(permission, side === 'from' ? transfer.fromBranchId : transfer.toBranchId, db)
   if (denied) return delayedFailure(denied)
 
   const refused = change(db, transfer)

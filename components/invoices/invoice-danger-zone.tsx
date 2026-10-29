@@ -19,7 +19,7 @@ export function InvoiceDangerZone({
 }) {
   if (isPosted(invoice)) {
     return (
-      <Can action="invoices:void">
+      <Can permission="documents.void">
         <div className="doc-danger">
           <div>
             <p className="section-label">Void this document</p>
@@ -40,7 +40,7 @@ export function InvoiceDangerZone({
   if (!isEditable(invoice)) return null
 
   return (
-    <Can action="invoices:edit">
+    <Can permission="documents.manage">
       <div className="doc-danger">
         <div>
           <p className="section-label">Delete this draft</p>

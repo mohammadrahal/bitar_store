@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useMirroredBranches } from '@/hooks/use-stock'
+import { useBranchesKey, useMirroredBranches } from '@/hooks/use-stock'
 import { queryKeys } from '@/lib/query-keys'
 import { getVariantDetail, listInventory, type InventoryQuery } from '@/services/inventory.service'
 import { getOperationsSummary } from '@/services/operations.service'
@@ -29,11 +29,11 @@ export function useVariantDetail(variantId: string) {
 }
 
 export function useOperationsSummary(scope: BranchScope) {
-  const mirrored = useMirroredBranches()
+  const branches = useBranchesKey()
   return useQuery({
     queryKey: queryKeys.stock.operations(scope),
     queryFn: () => getOperationsSummary(scope),
-    enabled: mirrored !== null,
+    enabled: branches !== null,
   })
 }
 
@@ -60,10 +60,10 @@ export function useSetWarehouse() {
 }
 
 export function useWarehouseId() {
-  const mirrored = useMirroredBranches()
+  const branches = useBranchesKey()
   return useQuery({
-    queryKey: [...queryKeys.locations.warehouse(), mirrored ?? ''],
+    queryKey: [...queryKeys.locations.warehouse(), branches ?? ''],
     queryFn: getWarehouseId,
-    enabled: mirrored !== null,
+    enabled: branches !== null,
   })
 }

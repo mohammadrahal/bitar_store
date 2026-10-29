@@ -33,7 +33,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
 
   const count = product.variants.length
   const details = [product.details?.season, product.details?.brand, product.details?.material].filter(Boolean)
-  const prices = can('products:read-cost')
+  const prices = can('costs.view')
     ? `From ${formatPrice(product.sellPrice)} · Cost ${formatPrice(product.costPrice)}`
     : `From ${formatPrice(product.sellPrice)}`
   /* Looked up on every render so the dialogs show the SKU as it is after a refetch. */
@@ -52,7 +52,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
         actions={
           <>
             {!product.archived && (
-              <Can action="products:edit">
+              <Can permission="catalog.edit">
                 <button type="button" className="btn btn-secondary" onClick={() => setDialog({ kind: 'edit' })}>
                   <Pencil size={16} aria-hidden="true" />
                   Edit
@@ -63,7 +63,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
                 </button>
               </Can>
             )}
-            <Can action="products:archive">
+            <Can permission="catalog.edit">
               <button type="button" className="btn btn-secondary" onClick={() => setDialog({ kind: 'archive' })}>
                 {product.archived ? <ArchiveRestore size={16} aria-hidden="true" /> : <Archive size={16} aria-hidden="true" />}
                 {product.archived ? 'Reactivate' : 'Archive'}

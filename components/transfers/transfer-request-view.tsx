@@ -23,13 +23,13 @@ interface Line {
 
 export function TransferRequestView() {
   const router = useRouter()
-  const { user, branchScoped } = usePermission()
+  const { user, locationScoped } = usePermission()
   const { data: warehouseId } = useWarehouseId()
   const create = useCreateTransfer()
   const idempotency = useIdempotencyKey()
 
   const [fromChoice, setFrom] = useState<string | null>(null)
-  const [to, setTo] = useState(branchScoped ? (user.branchId ?? '') : '')
+  const [to, setTo] = useState(locationScoped ? (user.branchId ?? '') : '')
   const [lines, setLines] = useState<Line[]>([])
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)

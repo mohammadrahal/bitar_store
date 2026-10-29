@@ -1,80 +1,134 @@
 import { getApiClient } from '@/lib/api'
-import type { ApiUser, UpdateUserInput, UserRole } from '@/lib/api'
-import { clearUserBranchId, getUserBranchId, setUserBranchId } from '@/lib/user-branch-map'
+import type { ApiUser } from '@/lib/api'
+import { DEFAULT_EMPLOYEE_PERMISSIONS, PLATFORM_SCOPE } from '@/lib/permission-keys'
+import {
+  assignmentsFor,
+  clearUserAccess,
+  getUserAccess,
+  setGrants,
+  setUserAccess,
+  type StoredUserAccess,
+} from '@/lib/user-access'
+import { toApiRole, toRole } from '@/services/session.service'
 import { useUserStore } from '@/store/user-store'
+import type { LocationAssignment, Role } from '@/types'
 
-export interface CreateUserWithBranchInput {
+/** An account as the app talks about it: the API's `admin` reads as `super_admin`. */
+export interface StaffUser extends Omit<ApiUser, 'role'> {
+  role: Role
+  locations: LocationAssignment[]
+}
+
+export interface SaveUserInput {
   email: string
   fullName: string
-  role: UserRole
-  password: string
-  branchId?: string | null
-}
-
-export interface UpdateUserWithBranchInput extends UpdateUserInput {
-  id: string
+  role: Role
+  /** Required on create; blank on edit keeps the current one. */
   password?: string
-  branchId?: string | null
+  locations: LocationAssignment[]
 }
 
-export async function listUsers(): Promise<ApiUser[]> {
-  return getApiClient().listUsers()
+function toStaffUser(user: ApiUser): StaffUser {
+  return { ...user, role: toRole(user.role), locations: assignmentsFor(user.id, []) }
 }
 
-/*
- * The API has no endpoint that lists a user's branches, so the branch picked
- * here is remembered in this browser to prefill the edit form and to know
- * which grant to revoke when it changes.
+export async function listUsers(): Promise<StaffUser[]> {
+  const users = await getApiClient().listUsers()
+  return users.map(toStaffUser)
+}
+
+/**
+ * The API has no endpoint that lists a user's locations, so the assignments
+ * picked here are remembered in this browser: to prefill the form, to know
+ * which grant to revoke when one is removed, and to hold the access level and
+ * per-location keys the API cannot store yet.
  */
-async function syncBranchAssignment(userId: string, role: UserRole, branchId: string | null | undefined) {
-  const previous = getUserBranchId(userId)
+async function syncLocations(userId: string, role: Role, locations: LocationAssignment[]) {
+  const api = getApiClient()
+  const previous = getUserAccess(userId).locations
+  const wanted = role === 'employee' ? locations : []
 
-  if (role === 'admin') {
-    if (previous) {
-      await revokeBranchAccess(userId, previous)
-      clearUserBranchId(userId)
+  for (const entry of previous) {
+    if (!wanted.some((next) => next.locationId === entry.locationId)) {
+      await api.revokeBranchAccess(userId, entry.locationId)
     }
-    return
+  }
+  for (const entry of wanted) {
+    if (!previous.some((old) => old.locationId === entry.locationId)) {
+      await api.grantBranchAccess(userId, entry.locationId)
+    }
   }
 
-  if (!branchId || branchId === previous) return
-  if (previous) await revokeBranchAccess(userId, previous)
-  await grantBranchAccess(userId, branchId)
-  setUserBranchId(userId, branchId)
+  const kept = getUserAccess(userId).grants
+  const grants: StoredUserAccess['grants'] = { [PLATFORM_SCOPE]: kept[PLATFORM_SCOPE] ?? [] }
+  for (const entry of wanted) {
+    grants[entry.locationId] = kept[entry.locationId] ?? [...DEFAULT_EMPLOYEE_PERMISSIONS]
+  }
+  setUserAccess(userId, { locations: wanted, grants })
 }
 
-export async function createUserWithBranch(input: CreateUserWithBranchInput): Promise<ApiUser> {
-  const { branchId, password, ...payload } = input
+export async function createUser(input: SaveUserInput): Promise<StaffUser> {
   const api = getApiClient()
-  const user = await api.createUser(payload)
-  await api.setPassword(user.id, password)
-  await syncBranchAssignment(user.id, user.role, branchId ?? null)
-  return user
+  const user = await api.createUser({
+    email: input.email,
+    fullName: input.fullName,
+    role: toApiRole(input.role),
+  })
+  if (input.password) await api.setPassword(user.id, input.password)
+  await syncLocations(user.id, input.role, input.locations)
+  return toStaffUser(user)
 }
 
-export async function updateUser(id: string, changes: UpdateUserInput): Promise<ApiUser> {
-  return getApiClient().updateUser(id, changes)
-}
-
-export async function updateUserWithBranch(input: UpdateUserWithBranchInput): Promise<ApiUser> {
-  const { id, branchId, password, ...fields } = input
+export async function updateUser(id: string, input: SaveUserInput): Promise<StaffUser> {
+  const api = getApiClient()
   const isSelf = useUserStore.getState().user?.id === id
-  /* Nobody edits their own role or switches their own account off. */
-  const changes: UpdateUserInput = isSelf ? { email: fields.email, fullName: fields.fullName } : fields
-
-  const user = await updateUser(id, changes)
-  if (password) await getApiClient().setPassword(id, password)
-  if (!isSelf) await syncBranchAssignment(user.id, user.role, branchId)
-  return user
+  /* Nobody edits their own role. */
+  const user = await api.updateUser(
+    id,
+    isSelf
+      ? { email: input.email, fullName: input.fullName }
+      : { email: input.email, fullName: input.fullName, role: toApiRole(input.role) },
+  )
+  if (input.password) await api.setPassword(id, input.password)
+  if (!isSelf) await syncLocations(id, input.role, input.locations)
+  return toStaffUser(user)
 }
 
-export async function setUserActive(id: string, isActive: boolean): Promise<ApiUser> {
-  return updateUser(id, { isActive })
+/**
+ * Accounts are never removed: history has to keep pointing at whoever rang up
+ * a sale. Deactivating blocks sign-in and keeps the record, and the stored
+ * access stays put so reactivating restores the same locations.
+ */
+export async function setUserActive(id: string, isActive: boolean): Promise<StaffUser> {
+  return toStaffUser(await getApiClient().updateUser(id, { isActive }))
 }
 
-export async function deleteUser(id: string): Promise<void> {
-  await getApiClient().deleteUser(id)
-  clearUserBranchId(id)
+/** Drops the locally stored access for an account that no longer exists. */
+export function forgetUserAccess(id: string): void {
+  clearUserAccess(id)
+}
+
+export function getUserLocations(userId: string): LocationAssignment[] {
+  return getUserAccess(userId).locations
+}
+
+export function getUserGrants(userId: string): Record<string, string[]> {
+  return getUserAccess(userId).grants
+}
+
+export async function saveUserGrants(userId: string, grants: Record<string, string[]>): Promise<void> {
+  for (const [scope, keys] of Object.entries(grants)) setGrants(userId, scope, keys)
+  /* Keys live in this browser until the API can store them; nothing to call. */
+  return Promise.resolve()
+}
+
+/**
+ * The last door into the system. Blocking this in the UI is a courtesy — the
+ * check that matters is the backend's.
+ */
+export function isOnlyActiveSuperAdmin(users: StaffUser[], userId: string): boolean {
+  const actives = users.filter((user) => user.role === 'super_admin' && user.isActive)
+  return actives.length === 1 && actives[0].id === userId
 }
 
 export async function grantBranchAccess(userId: string, branchId: string): Promise<void> {

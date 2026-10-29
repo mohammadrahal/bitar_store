@@ -23,7 +23,7 @@ export function NewProductSummary({
   /** The first form error, repeated here because the button sits far from the field. */
   error?: string
 }) {
-  const showCost = usePermission().can('products:read-cost')
+  const showCost = usePermission().can('costs.view')
   const margin = sellPrice > 0 && costPrice > 0 ? Math.round(((sellPrice - costPrice) / sellPrice) * 100) : null
 
   return (

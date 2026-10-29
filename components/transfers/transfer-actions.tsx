@@ -19,7 +19,7 @@ type Dialog = 'approve' | 'dispatch' | 'cancel' | 'discrepancy'
 
 /** Only the steps the current user may take at this point, for the side of the transfer they belong to. */
 export function TransferActions({ transfer, onReceive }: { transfer: TransferRow; onReceive: () => void }) {
-  const { can, canAccessBranch } = usePermission()
+  const { can, canAccessLocation } = usePermission()
   const idempotency = useIdempotencyKey()
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const approve = useApproveTransfer()
@@ -28,18 +28,18 @@ export function TransferActions({ transfer, onReceive }: { transfer: TransferRow
   const discrepancy = useReportDiscrepancy()
   const cancel = useCancelTransfer()
 
-  const atSender = canAccessBranch(transfer.fromBranchId)
-  const atReceiver = canAccessBranch(transfer.toBranchId)
+  const atSender = canAccessLocation(transfer.fromBranchId)
+  const atReceiver = canAccessLocation(transfer.toBranchId)
   const { totals, status } = transfer
   const done = { onSuccess: () => { idempotency.reset(); setDialog(null) } }
 
   const show = {
-    approve: status === 'requested' && atSender && can('transfers:approve'),
-    dispatch: totals.stillReserved > 0 && status !== 'requested' && atSender && can('transfers:dispatch'),
-    release: totals.stillReserved > 0 && status !== 'requested' && atSender && can('transfers:approve'),
-    receive: totals.inTransit > 0 && atReceiver && can('transfers:receive'),
-    discrepancy: totals.inTransit > 0 && atReceiver && can('transfers:receive'),
-    cancel: canCancelTransfer(transfer) && atSender && can('transfers:approve'),
+    approve: status === 'requested' && atSender && can('movements.approve'),
+    dispatch: totals.stillReserved > 0 && status !== 'requested' && atSender && can('movements.confirm_dispatch'),
+    release: totals.stillReserved > 0 && status !== 'requested' && atSender && can('movements.approve'),
+    receive: totals.inTransit > 0 && atReceiver && can('movements.confirm_receipt'),
+    discrepancy: totals.inTransit > 0 && atReceiver && can('movements.confirm_receipt'),
+    cancel: canCancelTransfer(transfer) && atSender && can('movements.approve'),
   }
   if (!Object.values(show).some(Boolean)) return null
 

@@ -1,80 +1,63 @@
 'use client'
 
-import {
-  Controller,
-  useForm,
-  type Control,
-  type FieldPath,
-  type FieldValues,
-} from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
 import { SelectInput } from '@/components/shared/select-input'
-import { Switch } from '@/components/shared/switch'
+import { LocationAssignmentsField } from '@/components/users/location-assignments-field'
 import { useBranches } from '@/hooks/use-branches'
-import { useCreateUser, useUpdateUserWithBranch } from '@/hooks/use-users'
-import { getUserBranchId } from '@/lib/user-branch-map'
-import type { ApiUser } from '@/lib/api'
+import { usePermission } from '@/hooks/use-permission'
+import { useCreateUser, useUpdateUser, useUserAccess } from '@/hooks/use-users'
 import { ROLE_LABELS } from '@/lib/permissions'
-import { useCurrentUser } from '@/store/user-store'
-import {
-  createUserSchema,
-  emptyCreateUserValues,
-  toUpdateUserFormValues,
-  updateUserSchema,
-  type CreateUserFormValues,
-  type UpdateUserFormValues,
-} from '@/schemas/user.schema'
+import type { StaffUser } from '@/services/users.service'
+import { emptyUserValues, toUserFormValues, userFormSchema, type UserFormValues } from '@/schemas/user.schema'
 import type { Role } from '@/types'
 
-export function UserForm({ user, onClose }: { user?: ApiUser; onClose: () => void }) {
+/** Only a super admin may hand out the owner roles. */
+function roleOptions(mayChangeRoles: boolean) {
+  const roles: Role[] = mayChangeRoles ? ['super_admin', 'manager', 'employee'] : ['employee']
+  return roles.map((value) => ({ value, label: ROLE_LABELS[value] }))
+}
+
+export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => void }) {
   const isEdit = Boolean(user)
-  const isSelf = useCurrentUser().id === user?.id
+  const { user: currentUser, can } = usePermission()
+  const mayChangeRoles = can('users.role.change')
+  const isSelf = currentUser.id === user?.id
   const create = useCreateUser()
-  const update = useUpdateUserWithBranch()
+  const update = useUpdateUser()
   const { data: branches, isPending: branchesLoading } = useBranches()
+  const { data: access } = useUserAccess(user?.id ?? '')
 
-  const createForm = useForm<CreateUserFormValues>({
-    resolver: zodResolver(createUserSchema),
-    defaultValues: emptyCreateUserValues,
+  const form = useForm<UserFormValues>({
+    resolver: zodResolver(userFormSchema(!isEdit)),
+    values: isEdit && user ? toUserFormValues(user, access?.locations ?? []) : undefined,
+    defaultValues: emptyUserValues,
   })
 
-  const editForm = useForm<UpdateUserFormValues>({
-    resolver: zodResolver(updateUserSchema),
-    defaultValues: user ? toUpdateUserFormValues(user, getUserBranchId(user.id)) : undefined,
-  })
-
+  const {
+    register,
+    control,
+    watch,
+    formState: { errors },
+  } = form
+  const role = watch('role')
   const pending = create.isPending || update.isPending
-  const role = isEdit ? editForm.watch('role') : createForm.watch('role')
 
-  const submitCreate = createForm.handleSubmit((values) => {
-    create.mutate(
-      {
-        email: values.email,
-        password: values.password,
-        fullName: values.fullName,
-        role: values.role,
-        branchId: values.role === 'admin' ? null : values.branchId || null,
-      },
-      { onSuccess: onClose },
-    )
-  })
-
-  const submitEdit = editForm.handleSubmit((values) => {
-    if (!user) return
-    update.mutate(
-      {
-        id: user.id,
-        email: values.email,
-        fullName: values.fullName,
-        role: values.role,
-        isActive: values.isActive,
-        password: values.password || undefined,
-        branchId: values.role === 'admin' ? null : values.branchId || null,
-      },
-      { onSuccess: onClose },
-    )
+  const submit = form.handleSubmit((values) => {
+    const payload = {
+      email: values.email,
+      fullName: values.fullName,
+      role: values.role,
+      password: values.password || undefined,
+      locations: values.role === 'employee' ? values.locations : [],
+    }
+    if (isEdit && user) {
+      update.mutate({ id: user.id, ...payload }, { onSuccess: onClose })
+      return
+    }
+    create.mutate(payload, { onSuccess: onClose })
   })
 
   return (
@@ -84,10 +67,10 @@ export function UserForm({ user, onClose }: { user?: ApiUser; onClose: () => voi
       description={
         isEdit
           ? 'The password is only changed when you fill it in.'
-          : 'Managers and employees must be linked to a branch. They only see that branch after sign-in.'
+          : 'An employee works only at the locations you assign. Owners work everywhere.'
       }
       onClose={onClose}
-      onSubmit={isEdit ? submitEdit : submitCreate}
+      onSubmit={submit}
       footer={
         <>
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={pending}>
@@ -100,185 +83,62 @@ export function UserForm({ user, onClose }: { user?: ApiUser; onClose: () => voi
       }
     >
       <div className="form-grid">
-        {isEdit ? (
-          <EditFields
-            form={editForm}
-            role={role}
-            isSelf={isSelf}
-            branches={branches}
-            branchesLoading={branchesLoading}
-          />
+        <Field label="Full name" error={errors.fullName?.message} className="full">
+          <input {...register('fullName')} autoComplete="off" placeholder="Sara Khoury" />
+        </Field>
+        <Field label="Email" error={errors.email?.message} className="full">
+          <input {...register('email')} type="email" autoComplete="off" placeholder="sara@bitar.test" />
+        </Field>
+        <Field
+          label={isEdit ? 'New sign-in password' : 'Password'}
+          error={errors.password?.message}
+          hint={isEdit ? 'Leave blank to keep the current password. At least 8 characters.' : 'At least 8 characters'}
+          className="full"
+        >
+          <input {...register('password')} type="password" autoComplete="new-password" />
+        </Field>
+
+        {isSelf ? (
+          <p className="full text-sm text-muted-foreground">You cannot change your own role or locations.</p>
         ) : (
-          <CreateFields form={createForm} role={role} branches={branches} branchesLoading={branchesLoading} />
+          <>
+            <Controller
+              control={control}
+              name="role"
+              render={({ field }) => (
+                <Field
+                  label="Role"
+                  error={errors.role?.message}
+                  hint={mayChangeRoles ? undefined : 'Only a super admin can create managers or super admins.'}
+                  className="full"
+                >
+                  <SelectInput
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    options={roleOptions(mayChangeRoles)}
+                    disabled={!mayChangeRoles}
+                  />
+                </Field>
+              )}
+            />
+            {role === 'employee' && (
+              <Controller
+                control={control}
+                name="locations"
+                render={({ field }) => (
+                  <LocationAssignmentsField
+                    branches={branches}
+                    value={field.value}
+                    onChange={field.onChange}
+                    disabled={branchesLoading}
+                    error={errors.locations?.message}
+                  />
+                )}
+              />
+            )}
+          </>
         )}
       </div>
     </Drawer>
-  )
-}
-
-function CreateFields({
-  form,
-  role,
-  branches,
-  branchesLoading,
-}: {
-  form: ReturnType<typeof useForm<CreateUserFormValues>>
-  role: Role
-  branches: ReturnType<typeof useBranches>['data']
-  branchesLoading: boolean
-}) {
-  const {
-    register,
-    control,
-    formState: { errors },
-  } = form
-
-  return (
-    <>
-      <Field label="Full name" error={errors.fullName?.message} className="full">
-        <input {...register('fullName')} autoComplete="off" placeholder="Sara Khoury" />
-      </Field>
-      <Field label="Email" error={errors.email?.message} className="full">
-        <input {...register('email')} type="email" autoComplete="off" placeholder="sara@bitar.test" />
-      </Field>
-      <Field label="Password" error={errors.password?.message} hint="At least 8 characters" className="full">
-        <input {...register('password')} type="password" autoComplete="new-password" />
-      </Field>
-      <RoleAndBranchFields
-        control={control}
-        errors={errors}
-        role={role}
-        branches={branches}
-        branchesLoading={branchesLoading}
-      />
-    </>
-  )
-}
-
-function EditFields({
-  form,
-  role,
-  isSelf,
-  branches,
-  branchesLoading,
-}: {
-  form: ReturnType<typeof useForm<UpdateUserFormValues>>
-  role: Role
-  isSelf: boolean
-  branches: ReturnType<typeof useBranches>['data']
-  branchesLoading: boolean
-}) {
-  const {
-    register,
-    control,
-    formState: { errors },
-  } = form
-
-  return (
-    <>
-      <Field label="Full name" error={errors.fullName?.message} className="full">
-        <input {...register('fullName')} autoComplete="off" />
-      </Field>
-      <Field label="Email" error={errors.email?.message} className="full">
-        <input {...register('email')} type="email" autoComplete="off" />
-      </Field>
-      <Field
-        label="New sign-in password"
-        error={errors.password?.message}
-        hint="Leave blank to keep the current password. At least 8 characters."
-        className="full"
-      >
-        <input {...register('password')} type="password" autoComplete="new-password" placeholder="Change password" />
-      </Field>
-      {isSelf ? (
-        <p className="full text-sm text-muted-foreground">
-          You cannot change your own role, branch or active status.
-        </p>
-      ) : (
-        <RoleAndBranchFields
-          control={control}
-          errors={errors}
-          role={role}
-          branches={branches}
-          branchesLoading={branchesLoading}
-        />
-      )}
-      <div className="full" hidden={isSelf}>
-        <Controller
-          control={control}
-          name="isActive"
-          render={({ field }) => (
-            <Switch
-              id="user-is-active"
-              checked={field.value}
-              onCheckedChange={field.onChange}
-              label="Active account"
-              description="Inactive users cannot sign in."
-            />
-          )}
-        />
-      </div>
-    </>
-  )
-}
-
-const ROLE_OPTIONS = (Object.keys(ROLE_LABELS) as Role[]).map((value) => ({
-  value,
-  label: ROLE_LABELS[value],
-}))
-
-/* Both schemas carry the same `role` and `branchId` fields, so the create and
-   edit forms share these two dropdowns through one generic control. */
-function RoleAndBranchFields<T extends FieldValues>({
-  control,
-  errors,
-  role,
-  branches,
-  branchesLoading,
-}: {
-  control: Control<T>
-  errors: Record<string, { message?: string } | undefined>
-  role: Role
-  branches: ReturnType<typeof useBranches>['data']
-  branchesLoading: boolean
-}) {
-  return (
-    <>
-      <Controller
-        control={control}
-        name={'role' as FieldPath<T>}
-        render={({ field }) => (
-          <Field label="Role" error={errors.role?.message} className="full">
-            <SelectInput
-              value={field.value as string}
-              onValueChange={field.onChange}
-              options={ROLE_OPTIONS}
-            />
-          </Field>
-        )}
-      />
-      {role !== 'admin' && (
-        <Controller
-          control={control}
-          name={'branchId' as FieldPath<T>}
-          render={({ field }) => (
-            <Field label="Branch" error={errors.branchId?.message} className="full">
-              <SelectInput
-                value={(field.value as string) ?? ''}
-                onValueChange={field.onChange}
-                disabled={branchesLoading}
-                placeholder="Select a branch"
-                options={
-                  branches?.map((branch) => ({
-                    value: branch.id,
-                    label: `${branch.name} (${branch.code ?? branch.location})`,
-                  })) ?? []
-                }
-              />
-            </Field>
-          )}
-        />
-      )}
-    </>
   )
 }

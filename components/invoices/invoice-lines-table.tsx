@@ -18,7 +18,7 @@ export function InvoiceLinesTable({ lines }: { lines: InvoiceLine[] }) {
             <th scope="col" className="num">
               Qty
             </th>
-            <Can action="invoices:read-cost">
+            <Can permission="costs.view">
               <th scope="col" className="num">
                 Unit cost
               </th>
@@ -42,7 +42,7 @@ export function InvoiceLinesTable({ lines }: { lines: InvoiceLine[] }) {
               </td>
               <td>{line.sku}</td>
               <td className="num tabular">{line.quantity}</td>
-              <Can action="invoices:read-cost">
+              <Can permission="costs.view">
                 <td className="num tabular">{formatPrice(line.unitCost)}</td>
               </Can>
               <td className="num tabular">{formatPrice(line.unitPrice)}</td>

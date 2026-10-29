@@ -45,7 +45,7 @@ export function ProductTable({
             title="No models yet"
             description="Add your first model with its colors and sizes."
             action={
-              <Can action="products:create">
+              <Can permission="catalog.create">
                 <Link href="/products/new" className="btn btn-primary">
                   Add product
                 </Link>
@@ -67,7 +67,7 @@ export function ProductTable({
             <th scope="col">Code</th>
             <th scope="col">Category</th>
             <th scope="col" className="num">Variants</th>
-            <Can action="products:read-cost">
+            <Can permission="costs.view">
               <th scope="col" className="num">Cost</th>
             </Can>
             <th scope="col" className="num">Sell</th>
@@ -88,7 +88,7 @@ export function ProductTable({
               <td className="td-code" data-label="Code">{product.code}</td>
               <td data-label="Category">{product.category}</td>
               <td className="num tabular" data-label="Variants">{product.variants.length}</td>
-              <Can action="products:read-cost">
+              <Can permission="costs.view">
                 <td className="num tabular" data-label="Cost">{formatPrice(product.costPrice)}</td>
               </Can>
               <td className="num tabular" data-label="Sell">
@@ -98,7 +98,7 @@ export function ProductTable({
               <td>
                 <div className="row-actions">
                   {!product.archived && (
-                    <Can action="products:edit">
+                    <Can permission="catalog.edit">
                       <button
                         type="button"
                         className="icon-btn"
@@ -110,7 +110,7 @@ export function ProductTable({
                       </button>
                     </Can>
                   )}
-                  <Can action="products:archive">
+                  <Can permission="catalog.edit">
                     <button
                       type="button"
                       className="icon-btn"

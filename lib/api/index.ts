@@ -8,10 +8,12 @@ export {
   send,
   type HttpMethod,
   type RequestFn,
+  type RequestOptions,
 } from '@/lib/api/client'
 export { createBranchesApi, type BranchesApi } from '@/lib/api/branches.api'
 export { createCatalogApi, type CatalogApi } from '@/lib/api/catalog.api'
 export { createSalesApi, type SalesApi } from '@/lib/api/sales.api'
+export { createStockApi, type StockApi } from '@/lib/api/stock.api'
 export { createUsersApi, type UsersApi } from '@/lib/api/users.api'
 export { getApiClient } from '@/lib/api/get-api-client'
 export type {
@@ -23,6 +25,11 @@ export type {
   ApiSkuWithStyle,
   ApiStyle,
   ApiStyleDetail,
+  ApiSale,
+  ApiStockItem,
+  CreateSaleInput,
+  OpeningStockInput,
+  StockListParams,
   ApiUser,
   CatalogListParams,
   CreateSkuInput,

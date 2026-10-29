@@ -9,8 +9,6 @@ import { useSetWarehouse, useWarehouseId } from '@/hooks/use-inventory'
 import { BRANCH_WRITES } from '@/services/branches.service'
 import type { Branch } from '@/types'
 
-/* The server has no branch edit or delete yet, so the controls say why they
-   are off rather than failing when pressed. */
 const UNAVAILABLE = 'Not supported by the API yet'
 
 export function BranchTable({
@@ -35,7 +33,7 @@ export function BranchTable({
           title="No branches yet"
           description="Add your first branch, then assign staff to it from the Users screen."
           action={
-            <Can action="branches:create">
+            <Can permission="settings.manage">
               <button type="button" className="btn btn-primary" onClick={onCreate}>
                 Add branch
               </button>
@@ -78,7 +76,7 @@ export function BranchTable({
               <td>
                 <div className="row-actions">
                   {branch.id !== warehouseId && (
-                    <Can action="locations:set-warehouse">
+                    <Can permission="settings.manage">
                       <button
                         type="button"
                         className="icon-btn"
@@ -91,7 +89,7 @@ export function BranchTable({
                       </button>
                     </Can>
                   )}
-                  <Can action="branches:edit">
+                  <Can permission="settings.manage">
                     <button
                       type="button"
                       className="icon-btn"
@@ -103,14 +101,20 @@ export function BranchTable({
                       <Pencil size={16} />
                     </button>
                   </Can>
-                  <Can action="branches:delete">
+                  <Can permission="settings.manage">
                     <button
                       type="button"
                       className="icon-btn danger"
                       onClick={() => onDelete(branch)}
-                      disabled={!BRANCH_WRITES.delete}
-                      aria-label={`Delete ${branch.name}`}
-                      title={BRANCH_WRITES.delete ? 'Delete' : UNAVAILABLE}
+                      disabled={!BRANCH_WRITES.deactivate || !branch.isActive}
+                      aria-label={`Mark ${branch.name} inactive`}
+                      title={
+                        !branch.isActive
+                          ? 'Already inactive'
+                          : BRANCH_WRITES.deactivate
+                            ? 'Mark inactive'
+                            : UNAVAILABLE
+                      }
                     >
                       <Trash2 size={16} />
                     </button>

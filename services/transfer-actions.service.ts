@@ -13,7 +13,7 @@ export function approveTransfer(transferId: string, quantities: LineQuantities, 
   return runTransferAction({
     transferId,
     idempotencyKey,
-    action: 'transfers:approve',
+    permission: 'movements.approve',
     side: 'from',
     change: (db, transfer) => {
       if (transfer.status !== 'requested') return 'Only a requested transfer can be approved.'
@@ -44,7 +44,7 @@ export function dispatchTransfer(transferId: string, quantities: LineQuantities,
   return runTransferAction({
     transferId,
     idempotencyKey,
-    action: 'transfers:dispatch',
+    permission: 'movements.confirm_dispatch',
     side: 'from',
     change: (db, transfer) => {
       if (transfer.status === 'requested' || transfer.status === 'cancelled' || transfer.status === 'closed') {
@@ -99,7 +99,7 @@ export function receiveTransfer(
   return runTransferAction({
     transferId,
     idempotencyKey,
-    action: 'transfers:receive',
+    permission: 'movements.confirm_receipt',
     side: 'to',
     change: (db, transfer) => {
       let accepted = 0
@@ -148,7 +148,7 @@ export function releaseReserved(transferId: string, idempotencyKey?: string) {
   return runTransferAction({
     transferId,
     idempotencyKey,
-    action: 'transfers:approve',
+    permission: 'movements.approve',
     side: 'from',
     change: (db, transfer) => {
       const total = transfer.lines.reduce((sum, line) => sum + lineStillReserved(line), 0)
@@ -173,7 +173,7 @@ export function reportDiscrepancy(transferId: string, note: string, idempotencyK
   return runTransferAction({
     transferId,
     idempotencyKey,
-    action: 'transfers:receive',
+    permission: 'movements.confirm_receipt',
     side: 'to',
     change: (_db, transfer) => {
       const missing = transfer.lines.reduce((sum, line) => sum + lineInTransit(line), 0)

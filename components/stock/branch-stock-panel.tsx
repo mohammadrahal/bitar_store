@@ -127,7 +127,7 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
                       <StockStatusPill status={row.status} />
                     </td>
                     <td>
-                      <Can action="purchases:manage">
+                      <Can permission="documents.manage">
                         <div className="row-actions">
                           <button
                             type="button"

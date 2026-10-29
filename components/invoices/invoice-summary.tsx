@@ -29,7 +29,7 @@ export function InvoiceSummary({ totals, showMargin }: { totals: InvoiceTotals; 
         <dd className="tabular">{formatPrice(totals.total)}</dd>
       </div>
       {showMargin && (
-        <Can action="invoices:read-cost">
+        <Can permission="costs.view">
           <div>
             <dt>Cost</dt>
             <dd className="tabular">{formatPrice(totals.cost)}</dd>

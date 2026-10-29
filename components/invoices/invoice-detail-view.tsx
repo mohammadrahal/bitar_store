@@ -37,7 +37,7 @@ type Dialog = 'edit' | 'void' | 'delete'
 
 export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
   const router = useRouter()
-  const { canAccessBranch } = usePermission()
+  const { canAccessLocation } = usePermission()
   const { data: invoice, isPending, isError, error, refetch } = useInvoice(invoiceId)
   const [dialog, setDialog] = useState<Dialog | null>(null)
 
@@ -51,7 +51,7 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
   if (isError) return <ErrorState title="Could not load this document" error={error} onRetry={() => void refetch()} />
 
   // The document's branch is only known once it loads, so the check lands here.
-  if (!canAccessBranch(invoice.branchId)) {
+  if (!canAccessLocation(invoice.branchId)) {
     return (
       <ErrorState
         title="Not your branch"
@@ -78,13 +78,13 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
           <>
             {isEditable(invoice) && (
               <>
-                <Can action="invoices:edit">
+                <Can permission="documents.manage">
                   <button type="button" className="btn btn-secondary" onClick={() => setDialog('edit')} disabled={busy}>
                     <Pencil size={16} aria-hidden="true" />
                     Edit
                   </button>
                 </Can>
-                <Can action="invoices:issue">
+                <Can permission="documents.manage">
                   <button
                     type="button"
                     className="btn btn-primary"
@@ -98,7 +98,7 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
               </>
             )}
             {invoice.status === 'issued' && (
-              <Can action="invoices:issue">
+              <Can permission="documents.manage">
                 <button
                   type="button"
                   className="btn btn-primary"

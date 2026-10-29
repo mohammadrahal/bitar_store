@@ -17,7 +17,7 @@ export function ProductDetailsFields({
   priceHint?: string
 }) {
   const { data: categories } = useCategories()
-  const showCost = usePermission().can('products:read-cost')
+  const showCost = usePermission().can('costs.view')
 
   return (
     <>

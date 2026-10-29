@@ -21,7 +21,7 @@ export function OperationsCards({ scope }: { scope: BranchScope }) {
         <StatCard label="Open transfers" value={String(data.openTransfers)} detail="Requested, approved or on the way" icon={ArrowLeftRight} />
       </Link>
       <StatCard label="In transit" value={String(data.inTransitUnits)} detail={data.inTransitUnits === 1 ? 'Unit on the road' : 'Units on the road'} icon={Truck} />
-      {can('inventory:read') ? (
+      {can('stock.view') ? (
         <Link href="/stock-control" className="stat-link" aria-label={`${countOf(data.onHoldUnits, 'unit')} on hold. View stock control`}>
           <StatCard label="On hold" value={String(data.onHoldUnits)} detail="Kept out of sale" alert={data.onHoldUnits > 0} icon={Lock} />
         </Link>

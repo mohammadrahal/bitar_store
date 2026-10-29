@@ -12,6 +12,7 @@ import {
   ScanLine,
   ShoppingBag,
   Store,
+  Truck,
   TrendingUp,
   Users,
   type LucideIcon,
@@ -49,29 +50,33 @@ export function activeHref(pathname: string, hrefs: string[]) {
 
 /** Navigation is derived from permissions, so a role never sees a link it cannot open. */
 export function useNavEntries(): NavEntry[] {
-  const { user, can, branchScoped } = usePermission()
+  const { user, can, canAny, locationScoped, activeLocationId } = usePermission()
   const items: NavEntry[] = []
+  const ownLocation = activeLocationId ?? user.branchId
 
-  if (can('branches:view-all')) items.push({ type: 'link', href: '/dashboard', label: 'Overview', icon: LayoutDashboard })
-  if (branchScoped && user.branchId)
-    items.push({ type: 'link', href: `/branches/${user.branchId}`, label: 'Overview', icon: LayoutDashboard })
-  if (can('inventory:read')) items.push({ type: 'link', href: '/inventory', label: 'Inventory', icon: Boxes })
-  if (can('products:read')) items.push({ type: 'link', href: '/products', label: 'Products', icon: Package })
-  if (can('transfers:read')) items.push({ type: 'link', href: '/transfers', label: 'Transfers', icon: ArrowLeftRight })
+  if (can('locations.view_all')) items.push({ type: 'link', href: '/dashboard', label: 'Overview', icon: LayoutDashboard })
+  if (locationScoped && ownLocation)
+    items.push({ type: 'link', href: `/branches/${ownLocation}`, label: 'Overview', icon: LayoutDashboard })
+  if (can('stock.view')) items.push({ type: 'link', href: '/inventory', label: 'Inventory', icon: Boxes })
+  if (can('catalog.view')) items.push({ type: 'link', href: '/products', label: 'Products', icon: Package })
+  if (can('stock.view')) items.push({ type: 'link', href: '/transfers', label: 'Transfers', icon: ArrowLeftRight })
 
   const salesChildren: NavGroupItem['children'] = []
-  if (can('sales:b2c:create')) salesChildren.push({ href: '/sales/new', label: 'New sale', icon: ScanLine })
-  if (can('sales:b2c:read')) salesChildren.push({ href: '/sales/b2c', label: 'B2C', icon: ShoppingBag })
-  if (can('sales:b2b:read')) salesChildren.push({ href: '/sales/b2b', label: 'B2B', icon: Building2 })
+  if (can('sales.create')) salesChildren.push({ href: '/sales/new', label: 'New sale', icon: ScanLine })
+  if (canAny(['sales.view_own', 'sales.view_branch']))
+    salesChildren.push({ href: '/sales/b2c', label: 'B2C', icon: ShoppingBag })
+  if (can('documents.manage')) salesChildren.push({ href: '/sales/b2b', label: 'B2B', icon: Building2 })
   if (salesChildren.length) items.push({ type: 'group', label: 'Sales', icon: TrendingUp, children: salesChildren })
 
-  if (can('invoices:read')) items.push({ type: 'link', href: '/invoices', label: 'Invoices', icon: ReceiptText })
-  if (can('stock:report'))
+  if (can('documents.manage')) items.push({ type: 'link', href: '/invoices', label: 'Invoices', icon: ReceiptText })
+  if (canAny(['counts.enter', 'counts.apply', 'holds.manage', 'stock.dispose']))
     items.push({ type: 'link', href: '/stock-control', label: 'Stock control', icon: ClipboardCheck })
-  if (can('replenishment:read'))
+  if (canAny(['receipts.enter', 'receipts.confirm', 'suppliers.manage']))
+    items.push({ type: 'link', href: '/receiving', label: 'Receiving', icon: Truck })
+  if (canAny(['movements.request', 'replenishment.review']))
     items.push({ type: 'link', href: '/replenishment', label: 'Replenishment', icon: PackagePlus })
-  if (can('users:manage')) items.push({ type: 'link', href: '/users', label: 'Users', icon: Users })
-  if (can('branches:manage')) items.push({ type: 'link', href: '/branches', label: 'Branches', icon: Store })
+  if (can('users.manage')) items.push({ type: 'link', href: '/users', label: 'Users', icon: Users })
+  if (can('locations.view_all')) items.push({ type: 'link', href: '/branches', label: 'Branches', icon: Store })
 
   return items
 }

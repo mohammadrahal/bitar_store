@@ -19,8 +19,8 @@ import type { CountSheetRow } from '@/types'
  * difference instead, and a manager applies or dismisses it.
  */
 export function CountTab({ branchId }: { branchId: string }) {
-  const { can, canAccessBranch } = usePermission()
-  const applies = can('stock:count') && canAccessBranch(branchId)
+  const { can, canAccessLocation } = usePermission()
+  const applies = can('counts.apply') && canAccessLocation(branchId)
   const { data: rows, isPending, isError, error, refetch } = useCountSheet(branchId)
   const apply = useApplyCount()
   const report = useReportCount()

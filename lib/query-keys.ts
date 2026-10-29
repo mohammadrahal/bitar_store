@@ -16,11 +16,20 @@ export interface InvoiceFilters {
   salesChannel?: SalesChannel
 }
 
+/** Completed POS sales from `GET/POST /sales`. */
+export const salesQueryKeys = {
+  all: ['sales'] as const,
+  list: (branchId: string, date: string) => ['sales', 'list', branchId, date] as const,
+  detail: (saleId: string) => ['sales', 'detail', saleId] as const,
+} as const
+
 /** Every query key in the app, so invalidation never guesses at a shape. */
 export const queryKeys = {
   users: {
     all: ['users'] as const,
     list: () => ['users', 'list'] as const,
+    /** Locations and permission keys for one account. */
+    access: (userId: string) => ['users', 'access', userId] as const,
   },
   branches: {
     all: ['branches'] as const,
@@ -41,6 +50,7 @@ export const queryKeys = {
     all: ['analytics'] as const,
     sales: (scope: BranchScope) => ['analytics', 'sales', scope] as const,
   },
+  sales: salesQueryKeys,
   invoices: {
     all: ['invoices'] as const,
     list: (filters: InvoiceFilters) => ['invoices', 'list', filters] as const,
@@ -52,9 +62,9 @@ export const queryKeys = {
     /* `branches` is the mirrored branch set these figures were computed from,
        so adding or renaming a branch re-reads them instead of serving a
        figure that predates it. */
-    stats: (scope: BranchScope, branches: string) => ['stock', 'stats', scope, branches] as const,
-    lowStock: (scope: BranchScope, branches: string) =>
-      ['stock', 'low-stock', scope, branches] as const,
+    /* The cards and the attention list are two views of the same `GET /stock`
+       pages, so they share one query rather than fetching every branch twice. */
+    overview: (scope: BranchScope, branches: string) => ['stock', 'overview', scope, branches] as const,
     byBranch: (branchId: string) => ['stock', 'by-branch', branchId] as const,
     /* On-hand per variant at one branch. Its own key, not `byBranch`: that one
        answers with a single total, and two queries of different shapes under
@@ -72,6 +82,8 @@ export const queryKeys = {
     replenishment: (scope: BranchScope) => ['stock', 'replenishment', scope] as const,
     operations: (scope: BranchScope) => ['stock', 'operations', scope] as const,
     picker: (branchId: string, search: string) => ['stock', 'picker', branchId, search] as const,
+    saleModels: (search: string) => ['stock', 'sale-models', search] as const,
+    saleVariants: (branchId: string, productId: string) => ['stock', 'sale-variants', branchId, productId] as const,
   },
   transfers: {
     all: ['transfers'] as const,

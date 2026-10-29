@@ -61,8 +61,8 @@ export async function createTransfer(input: TransferRequestInput, idempotencyKey
 
   if (input.fromBranchId === input.toBranchId) return delayedFailure('Pick two different locations.')
   const denied =
-    permissionError('transfers:request', input.fromBranchId, db) &&
-    permissionError('transfers:request', input.toBranchId, db)
+    permissionError('movements.request', input.fromBranchId, db) &&
+    permissionError('movements.request', input.toBranchId, db)
   if (denied) return delayedFailure(denied)
   if (input.lines.length === 0) return delayedFailure('Add at least one variant.')
 
@@ -119,7 +119,7 @@ export function cancelTransfer(transferId: string, reason: string, idempotencyKe
   return runTransferAction({
     transferId,
     idempotencyKey,
-    action: 'transfers:approve',
+    permission: 'movements.approve',
     side: 'from',
     change: (db, transfer) => {
       if (!canCancelTransfer(transfer)) return 'Units have already been dispatched, so this transfer can no longer be cancelled.'

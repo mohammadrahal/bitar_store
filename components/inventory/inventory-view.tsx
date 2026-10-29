@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { ArrowLeftRight, Download, Search } from 'lucide-react'
+import { ArrowLeftRight, Download } from 'lucide-react'
+import { SearchInput } from '@/components/shared/search-input'
 import { BalanceTiles } from '@/components/inventory/balance-tiles'
 import { InventoryTable } from '@/components/inventory/inventory-table'
 import { SelectedVariantCard } from '@/components/inventory/selected-variant-card'
@@ -79,7 +80,7 @@ export function InventoryView() {
               <Download size={16} aria-hidden="true" />
               Export CSV
             </button>
-            <Can action="transfers:request">
+            <Can permission="movements.request">
               <Link href="/transfers/new" className="btn btn-primary">
                 <ArrowLeftRight size={16} aria-hidden="true" />
                 New transfer
@@ -99,19 +100,15 @@ export function InventoryView() {
           <div className="split">
             <Panel title="Variants" description={`${total} ${total === 1 ? 'variant' : 'variants'}`}>
               <div className="toolbar">
-                <div className="search-field">
-                  <Search size={16} aria-hidden="true" />
-                  <input
-                    type="search"
-                    value={searchInput}
-                    onChange={(event) => {
-                      setSearchInput(event.target.value)
-                      setPage(1)
-                    }}
-                    placeholder="Search model, code, SKU, color or size"
-                    aria-label="Search inventory"
-                  />
-                </div>
+                <SearchInput
+                  value={searchInput}
+                  onChange={(value) => {
+                    setSearchInput(value)
+                    setPage(1)
+                  }}
+                  placeholder="Search model, code, SKU, color or size"
+                  aria-label="Search inventory"
+                />
                 <FilterChips
                   label="Filter variants"
                   options={FILTERS}

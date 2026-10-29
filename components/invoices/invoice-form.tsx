@@ -141,7 +141,7 @@ export function InvoiceForm({
 
   // Switching kind would leave sell prices on a purchase, so it locks once lines exist.
   const kindLocked = (lines?.length ?? 0) > 0
-  const kinds = INVOICE_KINDS.filter((option) => can('purchases:manage') || !pricedAtCost(option))
+  const kinds = INVOICE_KINDS.filter((option) => can('documents.manage') || !pricedAtCost(option))
   const isAdjustment = isAdjustmentKind(kind)
   const lockedChannel = salesChannel ?? invoice?.salesChannel
   const saleDrawer = saleOnly && lockedChannel ? SALE_DRAWER_COPY[lockedChannel] : null
@@ -191,7 +191,7 @@ export function InvoiceForm({
             {pending ? 'Saving…' : invoice ? 'Save draft' : 'Save as draft'}
           </button>
           {!invoice && (
-            <Can action="invoices:issue">
+            <Can permission="documents.manage">
               <button type="button" className="btn btn-primary" onClick={save(true)} disabled={pending}>
                 {pending ? 'Saving…' : 'Save and issue'}
               </button>

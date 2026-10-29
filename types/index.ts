@@ -1,16 +1,29 @@
-export type Role = 'admin' | 'manager' | 'employee'
+export type Role = 'super_admin' | 'manager' | 'employee'
+
+/** What an employee may do at one of their locations. */
+export type LocationAccess = 'full' | 'view_only'
+
+export interface LocationAssignment {
+  locationId: string
+  access: LocationAccess
+}
 
 export interface User {
   id: string
   name: string
   email: string
   role: Role
-  /** null for admins, who are not scoped to a single branch. */
+  /** The location an employee works in by default; null for the owner roles. */
   branchId: string | null
   /** Every branch `GET /auth/me` says this user may see. */
   branchIds: string[]
-  /** Permission keys from `GET /auth/me`, kept for backend-driven checks. */
+  /** Assignments with their access level. The API only returns ids, so
+      view-only comes from the local store until it can store the grant. */
+  locations: LocationAssignment[]
+  /** Permission keys from `GET /auth/me`, platform-wide as far as the API knows. */
   permissions: string[]
+  /** Per-location keys kept locally, plus platform-wide ones under `*`. */
+  grants: Record<string, string[]>
   canViewCosts: boolean
 }
 
@@ -244,6 +257,13 @@ export interface InvoiceRow extends Invoice {
   total: number
 }
 
+/** A style row on the new-sale model picker. */
+export interface SaleModelOption {
+  productId: string
+  productCode: string
+  productName: string
+}
+
 /** A catalog variant offered to the invoice line picker. */
 export interface VariantOption {
   variantId: string
@@ -251,6 +271,8 @@ export interface VariantOption {
   barcode: string
   productId: string
   productName: string
+  /** Style code, set on till variants for labels. */
+  productCode?: string
   size: string
   color: string
   costPrice: number

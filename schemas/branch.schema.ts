@@ -20,6 +20,13 @@ export const branchCreateSchema = z.object({
 
 export type BranchCreateFormValues = z.infer<typeof branchCreateSchema>
 
+/** PATCH /branches/:id — name and active flag; code is read-only in the UI. */
+export const branchEditSchema = branchCreateSchema.extend({
+  isActive: z.boolean(),
+})
+
+export type BranchEditFormValues = z.infer<typeof branchEditSchema>
+
 export const emptyBranchCreateValues: BranchCreateFormValues = {
   code: '',
   name: '',

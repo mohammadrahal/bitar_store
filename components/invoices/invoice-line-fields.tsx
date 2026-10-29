@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useFieldArray, type Control, type FieldErrors, type UseFormRegister, type UseFormWatch } from 'react-hook-form'
-import { Plus, Search, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { Field } from '@/components/shared/field'
+import { SearchInput } from '@/components/shared/search-input'
 import { useBranchStock, useVariantSearch } from '@/hooks/use-invoices'
 import { formatPrice } from '@/lib/format'
 import { lineTotal } from '@/lib/invoice-totals'
@@ -73,16 +74,13 @@ export function InvoiceLineFields({
         </div>
       </div>
 
-      <div className="search-field">
-        <Search size={16} aria-hidden="true" />
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Scan a barcode, or search a SKU or product"
-          aria-label="Search the catalog for a line to add"
-        />
-      </div>
+      <SearchInput
+        className="search-field--full"
+        value={search}
+        onChange={setSearch}
+        placeholder="Scan a barcode, or search a SKU or product"
+        aria-label="Search the catalog for a line to add"
+      />
 
       {isPending && <p className="field-hint">Searching the catalog…</p>}
       {isError && <p className="field-error">The catalog could not be searched. Try again.</p>}

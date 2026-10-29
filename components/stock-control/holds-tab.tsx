@@ -34,7 +34,7 @@ export function HoldsTab({ branchId }: { branchId: string }) {
       title="On hold"
       description="Units here are counted on hand but cannot be sold or sent."
       actions={
-        <Can action="stock:hold" branchId={branchId}>
+        <Can permission="holds.manage" locationId={branchId}>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPlacing(true)}>
             <Lock size={14} aria-hidden="true" />
             Put on hold
@@ -80,12 +80,12 @@ export function HoldsTab({ branchId }: { branchId: string }) {
                   <td className="tabular" data-label="Since">{formatRelativeDateTime(hold.createdAt)}</td>
                   <td>
                     <div className="row-actions">
-                      <Can action="stock:hold" branchId={hold.branchId}>
+                      <Can permission="holds.manage" locationId={hold.branchId}>
                         <button type="button" className="btn btn-secondary btn-sm" disabled={release.isPending} onClick={() => release.mutate({ id: hold.id, key: idempotency.current() }, { onSuccess: done })}>
                           Release
                         </button>
                       </Can>
-                      <Can action="stock:dispose" branchId={hold.branchId}>
+                      <Can permission="stock.dispose" locationId={hold.branchId}>
                         <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => setDisposing(hold)}>
                           Dispose
                         </button>

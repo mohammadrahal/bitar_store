@@ -52,7 +52,7 @@ export interface CreateBranchInput {
   name: string
 }
 
-/** Shape the branch edit screen sends. No endpoint accepts it yet. */
+/** PATCH /branches/:id */
 export interface UpdateBranchInput {
   name?: string
   isActive?: boolean
@@ -149,6 +149,127 @@ export interface UpdateSkuInput {
   size?: string
   color?: string
   isActive?: boolean
+}
+
+export interface StockListParams {
+  branchId: string
+  search?: string
+  styleId?: string
+  activeOnly?: boolean
+  limit?: number
+  offset?: number
+}
+
+export interface ApiStockItem {
+  sku: ApiSkuWithStyle
+  sellable: number
+  nonSellable: number
+  inTransit: number
+}
+
+export interface OpeningStockInput {
+  branchId: string
+  lines: { skuId: string; quantity: number }[]
+}
+
+export interface OpeningStockResult {
+  batchId: string
+  lines: number
+}
+
+export type ApiSaleChannel = 'in_store' | 'social_media'
+export type ApiSocialPlatform = 'facebook' | 'instagram' | 'whatsapp' | 'other'
+export type ApiPaymentMethod = 'cash' | 'whish'
+
+export interface ApiSaleLineDiscountPercent {
+  type: 'percent'
+  percent: string
+  reason: string
+  approvedBy: string
+}
+
+export interface ApiSaleLineDiscountOverride {
+  type: 'override'
+  unitPrice: string
+  reason: string
+  approvedBy: string
+}
+
+export interface ApiSaleLine {
+  lineNo: number
+  skuId: string
+  skuCode: string
+  styleName: string
+  size: string
+  color: string
+  quantity: number
+  unitPrice: string
+  discount: ApiSaleLineDiscountPercent | ApiSaleLineDiscountOverride | null
+  lineTotal: string
+}
+
+export interface ApiSalePayment {
+  method: ApiPaymentMethod
+  amount: string
+  tendered: string | null
+  change: string | null
+  reference: string | null
+}
+
+export interface ApiSale {
+  id: string
+  reference: string
+  branchId: string
+  soldBy: { id: string; name: string }
+  status: string
+  channel: ApiSaleChannel
+  socialPlatform: ApiSocialPlatform | null
+  currency: string
+  subtotal: string
+  totalDiscount: string
+  total: string
+  totalPaid: string
+  soldAt: string
+  businessDate: string
+  note: string | null
+  lines: ApiSaleLine[]
+  payments: ApiSalePayment[]
+}
+
+export interface CreateSaleLineInput {
+  skuId: string
+  quantity: number
+  discount?:
+    | { type: 'percent'; percent: string; reason: string }
+    | { type: 'override'; unitPrice: string; reason: string }
+}
+
+export interface CreateSalePaymentInput {
+  method: ApiPaymentMethod
+  amount: string
+  tendered?: string
+  reference?: string
+}
+
+export interface CreateSaleInput {
+  branchId: string
+  channel?: ApiSaleChannel
+  socialPlatform?: ApiSocialPlatform
+  note?: string | null
+  lines: CreateSaleLineInput[]
+  payments: CreateSalePaymentInput[]
+}
+
+export interface SalesListParams {
+  branchId: string
+  date?: string
+  limit?: number
+  offset?: number
+}
+
+export interface SalesListResult {
+  businessDate: string
+  sales: ApiSale[]
 }
 
 export interface HealthResponse {

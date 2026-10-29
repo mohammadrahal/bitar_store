@@ -57,7 +57,7 @@ export function CountReportsPanel({ branchId }: { branchId: string }) {
                     <small>{report.reportedBy}, {formatRelativeDateTime(report.createdAt)}</small>
                   </td>
                   <td>
-                    <Can action="stock:count" branchId={report.branchId}>
+                    <Can permission="counts.apply" locationId={report.branchId}>
                       <div className="row-actions">
                         <button type="button" className="btn btn-primary btn-sm" disabled={resolve.isPending} onClick={() => decide(report.id, true)}>
                           Apply

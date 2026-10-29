@@ -53,7 +53,7 @@ export async function placeHold(input: HoldInput, idempotencyKey?: string): Prom
   const db = readDb()
   const replay = replayOf<HoldRow>(db, idempotencyKey)
   if (replay) return delay(replay)
-  const denied = permissionError('stock:hold', input.branchId, db)
+  const denied = permissionError('holds.manage', input.branchId, db)
   if (denied) return delayedFailure(denied)
   const available = availableOf(levelOf(db, input.variantId, input.branchId))
   if (input.quantity < 1 || input.quantity > available) {
@@ -84,7 +84,7 @@ export async function releaseHold(holdId: string, idempotencyKey?: string): Prom
   if (replay) return delay(replay)
   const hold = db.holds.find((candidate) => candidate.id === holdId)
   if (!hold || hold.releasedAt) return delayedFailure('This hold has already been released.')
-  const denied = permissionError('stock:hold', hold.branchId, db)
+  const denied = permissionError('holds.manage', hold.branchId, db)
   if (denied) return delayedFailure(denied)
 
   hold.releasedAt = new Date().toISOString()
@@ -111,7 +111,7 @@ export async function disposeStock(input: DisposalInput, idempotencyKey?: string
   const db = readDb()
   const replay = replayOf<string>(db, idempotencyKey)
   if (replay) return delay(replay)
-  const denied = permissionError('stock:dispose', input.branchId, db)
+  const denied = permissionError('stock.dispose', input.branchId, db)
   if (denied) return delayedFailure(denied)
   if (input.reason.trim().length < 3) return delayedFailure('Give a reason for the disposal.')
   if (!Number.isInteger(input.quantity) || input.quantity < 1) return delayedFailure('Dispose at least one whole unit.')

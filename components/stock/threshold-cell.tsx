@@ -28,7 +28,7 @@ export function ThresholdCell({
     setDraft(String(value))
   }, [value])
 
-  if (!can('stock:manage')) return <span className="tabular muted">{value}</span>
+  if (!can('thresholds.manage')) return <span className="tabular muted">{value}</span>
 
   const commit = () => {
     const next = Number(draft)

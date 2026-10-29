@@ -20,7 +20,7 @@ type Dialog =
   | { kind: 'delete'; branch: Branch }
 
 export function BranchesView() {
-  const { branchScoped } = usePermission()
+  const { locationScoped } = usePermission()
   const { data: branches, isPending, isError, error, refetch } = useBranches()
   const remove = useDeleteBranch()
   const [dialog, setDialog] = useState<Dialog | null>(null)
@@ -32,12 +32,12 @@ export function BranchesView() {
         eyebrow="Network"
         title="Branches"
         description={
-          branchScoped
+          locationScoped
             ? 'The branch you work from.'
             : 'Create stores and assign employees to them from Users.'
         }
         actions={
-          <Can action="branches:create">
+          <Can permission="settings.manage">
             <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
               <Plus size={16} aria-hidden="true" />
               Add branch
@@ -74,9 +74,9 @@ export function BranchesView() {
       )}
       {dialog?.kind === 'delete' && (
         <ConfirmDialog
-          title={`Delete ${dialog.branch.name}?`}
-          description="Staff granted access to this branch lose it, and anything recorded against it — stock and documents — goes with it. This cannot be undone."
-          confirmLabel="Delete branch"
+          title={`Mark ${dialog.branch.name} inactive?`}
+          description="Inactive branches disappear from day-to-day lists. Staff keep their access, but the branch must have no stock on hand. You can turn it active again from Edit."
+          confirmLabel="Mark inactive"
           tone="danger"
           onResolve={(confirmed) => {
             const { id, name } = dialog.branch

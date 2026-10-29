@@ -33,7 +33,7 @@ export function BranchDetailView({ branchId }: { branchId: string }) {
         actions={
           <>
             <ActiveStatusPill isActive={branch.isActive} />
-            <Can action="branches:manage">
+            <Can permission="locations.view_all">
               <Link href="/branches" className="btn btn-secondary">
                 <ArrowLeft size={16} aria-hidden="true" />
                 All branches

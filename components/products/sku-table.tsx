@@ -61,7 +61,7 @@ export function SkuTable({
                 </td>
                 <td>
                   {editable && (
-                    <Can action="products:edit">
+                    <Can permission="catalog.edit">
                       <div className="row-actions">
                         <button type="button" className="icon-btn" onClick={() => onPrice(variant)} aria-label={`Price of ${variant.sku}`} title="Price and history">
                           <Tag size={16} />

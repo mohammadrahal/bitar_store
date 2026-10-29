@@ -48,7 +48,7 @@ export async function applyCount(input: CountInput, idempotencyKey?: string): Pr
   const db = readDb()
   const replay = replayOf<string[]>(db, idempotencyKey)
   if (replay) return delay(replay)
-  const denied = permissionError('stock:count', input.branchId, db)
+  const denied = permissionError('counts.apply', input.branchId, db)
   if (denied) return delayedFailure(denied)
 
   const items: AdjustmentItem[] = []
@@ -80,7 +80,7 @@ export async function reportCount(input: CountReportInput, idempotencyKey?: stri
   const db = readDb()
   const replay = replayOf<CountReport>(db, idempotencyKey)
   if (replay) return delay(replay)
-  const denied = permissionError('stock:report', input.branchId, db)
+  const denied = permissionError('counts.enter', input.branchId, db)
   if (denied) return delayedFailure(denied)
   const expected = levelOf(db, input.variantId, input.branchId)?.quantity ?? 0
   if (input.counted === expected) return delayedFailure('That matches what is on file, so there is nothing to report.')
@@ -130,7 +130,7 @@ export async function resolveCountReport(reportId: string, apply: boolean, idemp
   if (replay) return delay(replay)
   const report = db.countReports.find((candidate) => candidate.id === reportId)
   if (!report || report.status !== 'open') return delayedFailure('This report has already been resolved.')
-  const denied = permissionError('stock:count', report.branchId, db)
+  const denied = permissionError('counts.apply', report.branchId, db)
   if (denied) return delayedFailure(denied)
 
   if (apply) {

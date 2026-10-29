@@ -29,9 +29,12 @@ interface UIState {
   setProductCategory: (category: string) => void
   productShow: 'active' | 'archived'
   setProductShow: (show: 'active' | 'archived') => void
-  /** Header branch filter, only offered to users who can see every branch. */
+  /** Header branch filter, only offered to users who can see every location. */
   branchScope: BranchScope
   setBranchScope: (scope: BranchScope) => void
+  /** The location an employee with several assignments is working in. */
+  activeLocationId: string | null
+  setActiveLocationId: (locationId: string | null) => void
   invoiceSearch: string
   setInvoiceSearch: (search: string) => void
   /** 'all', or one InvoiceKind. Kept as a string so the select needs no cast. */
@@ -67,6 +70,8 @@ export const useUIStore = create<UIState>()(
       setProductShow: (productShow) => set({ productShow }),
       branchScope: ALL_BRANCHES,
       setBranchScope: (branchScope) => set({ branchScope }),
+      activeLocationId: null,
+      setActiveLocationId: (activeLocationId) => set({ activeLocationId }),
       invoiceSearch: '',
       setInvoiceSearch: (invoiceSearch) => set({ invoiceSearch }),
       invoiceKind: 'all',
@@ -77,7 +82,12 @@ export const useUIStore = create<UIState>()(
     {
       name: 'bitar-fashion:ui:v1',
       skipHydration: true,
-      partialize: ({ theme, sidebarCollapsed, branchScope }) => ({ theme, sidebarCollapsed, branchScope }),
+      partialize: ({ theme, sidebarCollapsed, branchScope, activeLocationId }) => ({
+        theme,
+        sidebarCollapsed,
+        branchScope,
+        activeLocationId,
+      }),
     },
   ),
 )

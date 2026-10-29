@@ -6,7 +6,7 @@ import { setLocalProductFields } from '@/mocks/mirror'
 import { readDb } from '@/mocks/store'
 import { mintBarcode } from '@/services/barcodes.service'
 import { refreshStyle, syncCatalog } from '@/services/catalog-sync.service'
-import { branchesCarrying, placeOpeningStock } from '@/services/opening-stock.service'
+import { placeOpeningStock } from '@/services/opening-stock.service'
 import { callerSeesCosts } from '@/services/mock-ledger'
 import type { Product, ProductDetails, ProductWithVariants, Variant } from '@/types'
 
@@ -160,7 +160,7 @@ export async function createProduct(input: ProductInput): Promise<CreatedProduct
   const { created, ...outcome } = await createSkus(style.id, style.code, input.variants, input.sellPrice)
   await refreshStyle(style.id)
   setLocalProductFields(style.id, localFields(input))
-  placeOpeningStock(
+  await placeOpeningStock(
     input.branches.map(({ branchId, quantities }) => ({
       branchId,
       quantities: Object.fromEntries([...created].map(([key, skuId]) => [skuId, quantities[key] ?? 0])),
@@ -186,12 +186,9 @@ export async function updateProduct(productId: string, input: ProductDetailsInpu
 export async function addVariants(productId: string, combos: Combination[]): Promise<CreatedProduct> {
   if (combos.length === 0) throw new Error('Pick at least one new combination.')
   const product = await getProduct(productId)
-  const carriedAt = branchesCarrying(productId)
   const { created, ...outcome } = await createSkus(product.id, product.code, combos, product.sellPrice)
   if (outcome.skipped.length === combos.length) throw new Error(`No variants were added. ${outcome.skipped[0]}`)
   await refreshStyle(productId)
-  const placed = Object.fromEntries([...created.values()].map((skuId) => [skuId, 0]))
-  placeOpeningStock(carriedAt.map((branchId) => ({ branchId, quantities: placed })))
   return { product: await getProduct(productId), ...outcome }
 }
 

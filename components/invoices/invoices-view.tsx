@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { SearchInput } from '@/components/shared/search-input'
 import { InvoiceForm } from '@/components/invoices/invoice-form'
 import { InvoiceTable } from '@/components/invoices/invoice-table'
 import { Can } from '@/components/shared/can'
@@ -63,7 +64,7 @@ export function InvoicesView() {
         title="Invoices"
         description="Sales, supplier purchases and the returns that reverse them. Issuing an invoice moves branch stock."
         actions={
-          <Can action="invoices:create">
+          <Can permission="documents.manage">
             <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
               <Plus size={16} aria-hidden="true" />
               New invoice
@@ -77,16 +78,12 @@ export function InvoicesView() {
         description={isPending ? 'Loading…' : `${total} ${total === 1 ? 'invoice' : 'invoices'}`}
       >
         <div className="toolbar">
-          <div className="search-field">
-            <Search size={16} aria-hidden="true" />
-            <input
-              type="search"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search number, party or SKU"
-              aria-label="Search invoices"
-            />
-          </div>
+          <SearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="Search number, party or SKU"
+            aria-label="Search invoices"
+          />
           <SelectInput
             variant="inline"
             aria-label="Filter by kind"

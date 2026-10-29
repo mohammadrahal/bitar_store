@@ -1,5 +1,5 @@
 import { createId } from '@/lib/ids'
-import { canUser, isBranchScoped } from '@/lib/permissions'
+import { canViewCosts, isLocationScoped } from '@/lib/permissions'
 import { isOpenTransfer, lineInTransit } from '@/lib/transfers'
 import { DEFAULT_LOW_STOCK_AT, emptyLevel, type MockDb } from '@/mocks/store'
 import { useUserStore } from '@/store/user-store'
@@ -83,14 +83,14 @@ export function logMovement(db: MockDb, event: Omit<StockEvent, 'id' | 'at'> & {
  */
 export function visibleScope(scope: BranchScope): BranchScope {
   const user = useUserStore.getState().user
-  if (!user || !isBranchScoped(user)) return scope
+  if (!user || !isLocationScoped(user)) return scope
   if (scope !== ALL_BRANCHES && user.branchIds.includes(scope)) return scope
   return user.branchId ?? '__none__'
 }
 
 export function visibleBranchIds(db: MockDb): string[] {
   const user = useUserStore.getState().user
-  if (!user || !isBranchScoped(user)) return db.branches.map((branch) => branch.id)
+  if (!user || !isLocationScoped(user)) return db.branches.map((branch) => branch.id)
   return db.branches.filter((branch) => user.branchIds.includes(branch.id)).map((branch) => branch.id)
 }
 
@@ -102,7 +102,7 @@ export function actorName(): string {
 /** Cost fields are left out for anyone who may not see them, as the API will do. */
 export function callerSeesCosts(): boolean {
   const user = useUserStore.getState().user
-  return user ? canUser(user, 'products:read-cost') : false
+  return user ? canViewCosts(user) : false
 }
 
 /**

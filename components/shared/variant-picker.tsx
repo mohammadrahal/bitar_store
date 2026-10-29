@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { SearchInput } from '@/components/shared/search-input'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useStockPicker } from '@/hooks/use-inventory'
 import type { VariantOption } from '@/types'
@@ -26,16 +27,13 @@ export function VariantPicker({
 
   return (
     <div className="stack">
-      <div className="search-field">
-        <Search size={16} aria-hidden="true" />
-        <input
-          type="search"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder="Search model, code, SKU, color or size"
-          aria-label="Search variants to add"
-        />
-      </div>
+      <SearchInput
+        className="search-field--full"
+        value={input}
+        onChange={setInput}
+        placeholder="Search model, code, SKU, color or size"
+        aria-label="Search variants to add"
+      />
       {isPending ? (
         <p className="muted">Searching…</p>
       ) : isError ? (

@@ -1,24 +1,25 @@
 'use client'
 
 import { usePermission } from '@/hooks/use-permission'
-import type { Action } from '@/lib/permissions'
+import type { Permission } from '@/lib/permissions'
 
 /**
- * Renders children only when the current role may perform `action`.
- * Pass `branchId` to also require access to that specific branch.
+ * Renders children only when the current user holds `permission` at the
+ * location in question — the active location unless one is named. Hiding a
+ * control is for usability; the backend is the real check.
  */
 export function Can({
-  action,
-  branchId,
+  permission,
+  locationId,
   fallback = null,
   children,
 }: {
-  action: Action
-  branchId?: string
+  permission: Permission
+  locationId?: string
   fallback?: React.ReactNode
   children: React.ReactNode
 }) {
-  const { can, canAccessBranch } = usePermission()
-  const allowed = can(action) && (branchId === undefined || canAccessBranch(branchId))
+  const { can, canAccessLocation } = usePermission()
+  const allowed = can(permission, locationId) && (locationId === undefined || canAccessLocation(locationId))
   return <>{allowed ? children : fallback}</>
 }

@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { SearchInput } from '@/components/shared/search-input'
+import { B2cRetailSalesPanel } from '@/components/sales/b2c-retail-sales-panel'
 import { InvoiceForm } from '@/components/invoices/invoice-form'
 import { InvoiceTable } from '@/components/invoices/invoice-table'
 import { Can } from '@/components/shared/can'
@@ -16,16 +18,17 @@ import { useBranchScope, useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useWarehouseId } from '@/hooks/use-inventory'
 import { useInvoices } from '@/hooks/use-invoices'
 import { INVOICE_STATUS_LABELS } from '@/lib/invoices'
+import type { Permission } from '@/lib/permissions'
 import { ALL_BRANCHES, type InvoiceStatus, type SalesChannel } from '@/types'
 
 const PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 250
 const STATUSES: InvoiceStatus[] = ['draft', 'issued', 'paid', 'void']
 
-const CREATE_ACTION = {
-  b2b: 'sales:b2b:create',
-  b2c: 'sales:b2c:create',
-} as const satisfies Record<SalesChannel, 'sales:b2b:create' | 'sales:b2c:create'>
+const CREATE_PERMISSION = {
+  b2b: 'documents.manage',
+  b2c: 'sales.create',
+} as const satisfies Record<SalesChannel, Permission>
 
 const COPY: Record<
   SalesChannel,
@@ -100,7 +103,7 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
         title={copy.title}
         description={copy.description}
         actions={
-          <Can action={CREATE_ACTION[channel]}>
+          <Can permission={CREATE_PERMISSION[channel]}>
             <button type="button" className="btn btn-primary" onClick={startSale} disabled={channel === 'b2b' && !warehouseId}>
               <Plus size={16} aria-hidden="true" />
               {copy.newLabel}
@@ -109,73 +112,73 @@ export function SalesChannelView({ channel }: { channel: SalesChannel }) {
         }
       />
 
-      <Panel
-        title={copy.panelTitle}
-        description={isPending ? 'Loading…' : `${total} ${total === 1 ? 'document' : 'documents'}`}
-      >
-        <div className="toolbar">
-          <div className="search-field">
-            <Search size={16} aria-hidden="true" />
-            <input
-              type="search"
+      {channel === 'b2c' ? (
+        <B2cRetailSalesPanel onCreate={startSale} />
+      ) : (
+        <Panel
+          title={copy.panelTitle}
+          description={isPending ? 'Loading…' : `${total} ${total === 1 ? 'document' : 'documents'}`}
+        >
+          <div className="toolbar">
+            <SearchInput
               value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
+              onChange={setSearchInput}
               placeholder="Search number, customer or SKU"
               aria-label="Search sales"
             />
-          </div>
-          <SelectInput
-            variant="inline"
-            aria-label="Filter by status"
-            value={status}
-            onValueChange={(next) => setStatus(next as InvoiceStatus | 'all')}
-            options={[
-              { value: 'all', label: 'Any status' },
-              ...STATUSES.map((option) => ({
-                value: option,
-                label: INVOICE_STATUS_LABELS[option],
-              })),
-            ]}
-          />
-          {isFiltered && (
-            <button
-              type="button"
-              className="text-btn"
-              onClick={() => {
-                setSearchInput('')
-                setSearch('')
-                setStatus('all')
-              }}
-            >
-              Clear filters
-            </button>
-          )}
-        </div>
-
-        {isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={1} stats={0} />
-          </div>
-        ) : isError ? (
-          <div className="panel-body">
-            <ErrorState title="Could not load sales" error={error} onRetry={() => void refetch()} />
-          </div>
-        ) : (
-          <>
-            <InvoiceTable
-              invoices={visible}
-              filtered={isFiltered}
-              showBranch={scope === ALL_BRANCHES}
-              onCreate={startSale}
-              createAction={CREATE_ACTION[channel]}
-              emptyTitle={copy.emptyTitle}
-              emptyDescription={copy.emptyDescription}
-              emptyActionLabel={copy.newLabel}
+            <SelectInput
+              variant="inline"
+              aria-label="Filter by status"
+              value={status}
+              onValueChange={(next) => setStatus(next as InvoiceStatus | 'all')}
+              options={[
+                { value: 'all', label: 'Any status' },
+                ...STATUSES.map((option) => ({
+                  value: option,
+                  label: INVOICE_STATUS_LABELS[option],
+                })),
+              ]}
             />
-            <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
-          </>
-        )}
-      </Panel>
+            {isFiltered && (
+              <button
+                type="button"
+                className="text-btn"
+                onClick={() => {
+                  setSearchInput('')
+                  setSearch('')
+                  setStatus('all')
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={1} stats={0} />
+            </div>
+          ) : isError ? (
+            <div className="panel-body">
+              <ErrorState title="Could not load sales" error={error} onRetry={() => void refetch()} />
+            </div>
+          ) : (
+            <>
+              <InvoiceTable
+                invoices={visible}
+                filtered={isFiltered}
+                showBranch={scope === ALL_BRANCHES}
+                onCreate={startSale}
+                createPermission={CREATE_PERMISSION[channel]}
+                emptyTitle={copy.emptyTitle}
+                emptyDescription={copy.emptyDescription}
+                emptyActionLabel={copy.newLabel}
+              />
+              <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
+            </>
+          )}
+        </Panel>
+      )}
 
       {channel === 'b2b' && warehouseId === null && (
         <p className="notice notice-warning" role="status">

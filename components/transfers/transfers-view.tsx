@@ -37,7 +37,7 @@ export function TransfersView() {
         title="Transfers"
         description="Stock moving between locations. Approving reserves it, dispatching puts it in transit, receiving makes it sellable."
         actions={
-          <Can action="transfers:request">
+          <Can permission="movements.request">
             <Link href="/transfers/new" className="btn btn-primary">
               <Plus size={16} aria-hidden="true" />
               New transfer

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { ReceiptText } from 'lucide-react'
 import { InvoiceKindBadge, InvoiceStatusPill } from '@/components/invoices/invoice-badges'
 import { Can } from '@/components/shared/can'
-import type { Action } from '@/lib/permissions'
+import type { Permission } from '@/lib/permissions'
 import { EmptyState } from '@/components/shared/empty-state'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
 import { documentSubject } from '@/lib/invoices'
@@ -15,7 +15,7 @@ export function InvoiceTable({
   filtered,
   showBranch,
   onCreate,
-  createAction = 'invoices:create',
+  createPermission = 'documents.manage',
   emptyTitle = 'No documents yet',
   emptyDescription = 'Raise a sale at the till or record a supplier purchase to start the ledger.',
   emptyActionLabel = 'New document',
@@ -26,7 +26,7 @@ export function InvoiceTable({
   /** Hidden for branch-scoped roles, where every row is the same branch. */
   showBranch: boolean
   onCreate: () => void
-  createAction?: Action
+  createPermission?: Permission
   emptyTitle?: string
   emptyDescription?: string
   emptyActionLabel?: string
@@ -46,7 +46,7 @@ export function InvoiceTable({
             title={emptyTitle}
             description={emptyDescription}
             action={
-              <Can action={createAction}>
+              <Can permission={createPermission}>
                 <button type="button" className="btn btn-primary" onClick={onCreate}>
                   {emptyActionLabel}
                 </button>

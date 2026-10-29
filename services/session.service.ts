@@ -1,6 +1,7 @@
 import { ApiError, fetchMe } from '@/lib/api'
-import type { MeResponse } from '@/lib/api'
-import type { User } from '@/types'
+import type { MeResponse, UserRole } from '@/lib/api'
+import { assignmentsFor, getUserAccess } from '@/lib/user-access'
+import type { Role, User } from '@/types'
 
 /** Names typed in lower case ("admin", "rana haddad") read as proper names; mixed case is left alone. */
 function displayName(fullName: string) {
@@ -9,15 +10,33 @@ function displayName(fullName: string) {
   return trimmed.replace(/(^|[\s-])(\p{L})/gu, (_match, gap: string, letter: string) => gap + letter.toUpperCase())
 }
 
+/**
+ * The one place the API's role vocabulary is translated. The backend still
+ * says `admin` for the owner who may change settings, roles and accounts; the
+ * app calls that role `super_admin` everywhere else.
+ */
+export function toRole(role: UserRole): Role {
+  return role === 'admin' ? 'super_admin' : role
+}
+
+/** The reverse, for writing a role back through `POST`/`PATCH /users`. */
+export function toApiRole(role: Role): UserRole {
+  return role === 'super_admin' ? 'admin' : role
+}
+
 export function toSessionUser({ user, permissions, branchIds, canViewCosts }: MeResponse): User {
+  const role = toRole(user.role)
+  const locations = assignmentsFor(user.id, branchIds)
   return {
     id: user.id,
     name: displayName(user.fullName),
     email: user.email,
-    role: user.role,
-    branchId: user.role === 'admin' ? null : (branchIds[0] ?? null),
+    role,
+    branchId: role === 'employee' ? (locations[0]?.locationId ?? null) : null,
     branchIds,
+    locations,
     permissions,
+    grants: getUserAccess(user.id).grants,
     canViewCosts,
   }
 }

@@ -90,6 +90,7 @@ Admin-only routes require the `admin` role.
 | `GET` | `/auth/me` | Authenticated | — | `200` user and access context |
 | `GET` | `/branches` | Authenticated | — | `200` array of visible branches |
 | `POST` | `/branches` | Admin | `{ "code", "name" }` | `201` branch |
+| `PATCH` | `/branches/:id` | Admin | Any of `name`, `isActive` | `200` branch |
 | `GET` | `/users` | Admin | — | `200` array of users |
 | `POST` | `/users` | Admin | `{ "email", "fullName", "role" }` | `201` user |
 | `PATCH` | `/users/:id` | Admin | Any of `email`, `fullName`, `role`, `isActive` | `200` user |

@@ -7,9 +7,8 @@ import { queryKeys } from '@/lib/query-keys'
 import { syncCatalog } from '@/services/catalog-sync.service'
 import {
   getBranchStockUnits,
-  getInventoryStats,
+  getStockOverview,
   listBranchStock,
-  listLowStock,
   setLowStockAt,
   type LowStockAtInput,
 } from '@/services/stock.service'
@@ -43,11 +42,24 @@ export function useMirroredBranches(): string | null {
   const { data: branches } = useBranches()
   const { data: skuCount } = useCatalogSync()
   if (!branches || skuCount === undefined) return null
-  const ids = branches
+  return `${branchKey(branches)}#${skuCount}`
+}
+
+function branchKey(branches: { id: string }[]): string {
+  return branches
     .map((branch) => branch.id)
     .sort()
     .join(',')
-  return `${ids}#${skuCount}`
+}
+
+/**
+ * The branch half of the gate above, for reads that never touch the mirrored
+ * catalog. They would otherwise wait on a full catalog sweep to show figures
+ * that do not depend on one.
+ */
+export function useBranchesKey(): string | null {
+  const { data: branches } = useBranches()
+  return branches ? branchKey(branches) : null
 }
 
 /* Rows, not the quantity map: hooks/use-invoices.ts owns useBranchStock. */
@@ -71,20 +83,15 @@ export function useSetLowStockAt() {
   })
 }
 
-export function useInventoryStats(scope: BranchScope) {
+/**
+ * Stat cards and attention list together. Still gated on the catalog, because
+ * the Products card counts the mirrored catalog rather than anything in scope.
+ */
+export function useStockOverview(scope: BranchScope) {
   const branches = useMirroredBranches()
   return useQuery({
-    queryKey: queryKeys.stock.stats(scope, branches ?? ''),
-    queryFn: () => getInventoryStats(scope),
-    enabled: branches !== null,
-  })
-}
-
-export function useLowStock(scope: BranchScope) {
-  const branches = useMirroredBranches()
-  return useQuery({
-    queryKey: queryKeys.stock.lowStock(scope, branches ?? ''),
-    queryFn: () => listLowStock(scope),
+    queryKey: queryKeys.stock.overview(scope, branches ?? ''),
+    queryFn: () => getStockOverview(scope),
     enabled: branches !== null,
   })
 }

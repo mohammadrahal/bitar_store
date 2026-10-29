@@ -13,15 +13,15 @@ import { usePermission } from '@/hooks/use-permission'
 type Tab = 'holds' | 'count' | 'disposal'
 
 export function StockControlView() {
-  const { can, branchScoped } = usePermission()
+  const { can, locationScoped } = usePermission()
   const defaultBranch = useDefaultBranchId()
   const [branchChoice, setBranch] = useState<string | null>(null)
   const branchId = branchChoice ?? defaultBranch
 
   const tabs: { id: Tab; label: string; visible: boolean }[] = [
     { id: 'holds', label: 'Holds', visible: true },
-    { id: 'count', label: 'Physical count', visible: can('stock:count') || can('stock:report') },
-    { id: 'disposal', label: 'Disposal', visible: can('stock:dispose') },
+    { id: 'count', label: 'Physical count', visible: can('counts.apply') || can('counts.enter') },
+    { id: 'disposal', label: 'Disposal', visible: can('stock.dispose') },
   ]
   const visibleTabs = tabs.filter((tab) => tab.visible)
   const [tab, setTab] = useState<Tab>('holds')
@@ -33,7 +33,7 @@ export function StockControlView() {
         title="Stock control"
         description="Keep damaged or doubtful units out of sale, check the shelf against the system, and write off what cannot be sold."
         actions={
-          !branchScoped && (
+          !locationScoped && (
             <Field label="Location" className="inline-field">
               <LocationSelect value={branchId} onChange={setBranch} onlyAccessible />
             </Field>

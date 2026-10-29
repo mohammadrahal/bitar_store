@@ -11,7 +11,7 @@ export function LocationSelect({
   onChange,
   exclude,
   onlyAccessible = false,
-  placeholder = 'Select a location',
+  placeholder = 'Select',
   ...aria
 }: {
   value: string
@@ -24,17 +24,26 @@ export function LocationSelect({
   'aria-invalid'?: boolean
   'aria-describedby'?: string
 }) {
-  const { data: branches } = useBranches()
+  const { data: branches, isPending } = useBranches()
   const { data: warehouseId } = useWarehouseId()
-  const { canAccessBranch } = usePermission()
+  const { canAccessLocation } = usePermission()
 
   const options = (branches ?? [])
     .filter((branch) => branch.id !== exclude && branch.isActive)
-    .filter((branch) => !onlyAccessible || canAccessBranch(branch.id))
+    .filter((branch) => !onlyAccessible || canAccessLocation(branch.id))
     .map((branch) => ({
       value: branch.id,
       label: branch.id === warehouseId ? `${branch.name} (warehouse)` : branch.name,
     }))
 
-  return <SelectInput value={value} onValueChange={onChange} options={options} placeholder={placeholder} {...aria} />
+  return (
+    <SelectInput
+      value={value}
+      onValueChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      disabled={isPending || options.length === 0}
+      {...aria}
+    />
+  )
 }

@@ -1,8 +1,8 @@
 # Frontend–Backend Integration
 
 This document describes the HTTP API currently exposed by the Bitar Store backend.
-It includes user and branch administration, plus the product catalog (styles, SKUs,
-barcodes, and SKU price history).
+It includes user and branch administration, the product catalog (styles, SKUs,
+barcodes, and SKU price history), sales, and branch stock.
 
 ## Base URL and requests
 
@@ -104,6 +104,11 @@ Admin-only routes require the `admin` role.
 | `GET` | `/skus/:id/price-history` | `catalog.create` | — | `200` array of price changes |
 | `POST` | `/skus/:id/barcodes` | `catalog.create` | `{ "code" }` | `201` barcode |
 | `DELETE` | `/barcodes/:id` | `catalog.create` | — | `204` |
+| `GET` | `/stock?branchId=...` | Authenticated, assigned branch | — | `200` array of stock items |
+| `POST` | `/stock/opening` | `adjustments.create`, assigned branch | `{ "branchId", "lines": [{ "skuId", "quantity" }] }` plus `Idempotency-Key` header | `201` batch result |
+| `POST` | `/sales` | `sales.create`, assigned branch | Sale details plus `Idempotency-Key` header | `201` completed sale |
+| `GET` | `/sales?branchId=...` | Authenticated, assigned branch | — | `200` business date and sales |
+| `GET` | `/sales/:id` | Authenticated, assigned branch | — | `200` sale |
 | `GET` | `/users` | Admin | — | `200` array of users |
 | `POST` | `/users` | Admin | `{ "email", "fullName", "role" }` | `201` user |
 | `PATCH` | `/users/:id` | Admin | Any of `email`, `fullName`, `role`, `isActive` | `200` user |
@@ -195,6 +200,111 @@ detail result includes its `skus`. Price-history entries contain `id`, `skuId`,
 `oldPrice`, `newPrice`, `effectiveAt`, and `changedBy`; `oldPrice` is null for the
 initial price record.
 
+### Stock
+
+Stock is tracked separately for each branch. Every authenticated user can read
+stock for a branch they can access. `GET /stock` requires `branchId` and accepts
+optional `search`, `styleId`, `activeOnly`, `limit`, and `offset` query parameters.
+Paging and search use the same defaults and limits as the catalog lists. The
+response is an array; each item contains the SKU and style summary under `sku`,
+plus `sellable`, `nonSellable`, and `inTransit` quantities. Variants with no
+movement are included with zero quantities.
+
+Set initial counted quantities with `POST /stock/opening`:
+
+```http
+POST /stock/opening
+Content-Type: application/json
+Authorization: Bearer <access-token>
+Idempotency-Key: <unique-random-key>
+```
+
+```json
+{
+  "branchId": "branch-uuid",
+  "lines": [
+    { "skuId": "sku-uuid", "quantity": 12 }
+  ]
+}
+```
+
+The key is required and must be 8–200 characters. Send a new key for each
+operation; retrying the same request with the same key safely replays the
+original result, while reusing the key for a different request returns `409`.
+Each request must include 1–500 unique SKU lines with whole-number quantities
+from 1 to 1,000,000. Opening quantities can only be set for a SKU that has no
+stock movement yet at that branch. The caller must have the `adjustments.create`
+permission and branch access; the branch must also be active. A successful response is
+`{ "batchId": "uuid", "lines": 1 }`; a replay also sets
+`Idempotent-Replay: true`.
+
+### Sales
+
+Create a sale with `POST /sales`. The caller needs the `sales.create` permission
+and access to the requested branch. Use a unique `Idempotency-Key` header for
+each sale; the key must be 8–200 characters. Retrying the same request with the
+same key returns the original sale without charging stock a second time. Reusing
+the key with a different request returns `409`; a replay is marked with the
+`Idempotent-Replay: true` response header.
+
+Example:
+
+```http
+POST /sales
+Content-Type: application/json
+Authorization: Bearer <access-token>
+Idempotency-Key: <unique-random-key>
+```
+
+```json
+{
+  "branchId": "branch-uuid",
+  "channel": "in_store",
+  "lines": [
+    { "skuId": "sku-uuid", "quantity": 1 }
+  ],
+  "payments": [
+    { "method": "cash", "amount": "20.00", "tendered": "50.00" },
+    { "method": "whish", "amount": "25.00", "reference": "WH-12345" }
+  ]
+}
+```
+
+`channel` defaults to `in_store`; allowed values are `in_store` and
+`social_media`. Social media sales require `socialPlatform`, one of `facebook`,
+`instagram`, `whatsapp`, or `other`. `note` is optional and limited to 500
+characters. A sale requires 1–50 unique SKU lines. Each line contains a `skuId`
+and an integer `quantity` from 1 to 10,000. The server reads current SKU prices;
+client-supplied prices are ignored. All SKUs must be active and use the same
+currency, and available stock must cover the requested quantities.
+
+`payments` is a list of at most four payments and defaults to empty. A completed
+sale must be paid in full. Payment amounts are zero-or-greater money values with
+up to two decimals, but each payment must be above zero. Methods are `cash` and
+`whish`. Cash can include optional `tendered` (at least the amount) and returns
+the change; Whish requires a visible, non-space `reference` up to 64 characters.
+
+An optional line `discount` requires `discounts.apply` permission. A percentage
+discount has `{ "type": "percent", "percent": "10", "reason": "..." }`, where
+the percentage is greater than 0 and at most 100. A unit-price override has
+`{ "type": "override", "unitPrice": "40.00", "reason": "..." }` and cannot exceed
+the catalog price. Both forms require a non-empty reason of at most 200
+characters. The API records the approving user with the discount.
+
+`GET /sales` requires `branchId` and accepts an optional `date` in `YYYY-MM-DD`
+format (defaults to the current business date in the configured business time
+zone), plus `limit` and `offset` (defaults 50 and 0; maximum limit 200). It
+returns `{ "businessDate": "YYYY-MM-DD", "sales": [...] }`. `GET /sales/:id`
+returns a sale only if the caller can access its branch; otherwise it returns
+`404`.
+
+Sale responses include identifiers and reference, branch, seller, status,
+channel/platform, currency, `subtotal`, `totalDiscount`, `total`, `totalPaid`,
+timestamps, business date, note, lines, and payments. Money values are strings
+with two decimal places. Each line includes SKU details, quantity, unit price,
+discount (or null), and line total. Each payment includes method, amount,
+tendered, change, and reference (cash-only fields are null for Whish).
+
 ### User roles
 
 Allowed role values are `admin`, `manager`, and `employee`. Do not allow a user to
@@ -205,6 +315,11 @@ Catalog mutations are permission-based rather than admin-only. Users with
 `catalog.create` can create or update styles and SKUs, change prices, and add or
 remove barcodes. A user without that permission can still read catalog endpoints
 when authenticated.
+
+Sales creation and discounts are controlled by `sales.create` and
+`discounts.apply`, respectively. Stock opening is controlled by
+`adjustments.create`. Sales and stock reads, as well as sales and stock mutations,
+are restricted to branches the caller can access (admins can access all branches).
 
 ### Branch visibility
 
