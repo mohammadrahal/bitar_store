@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { usePermission } from '@/hooks/use-permission'
+import { isEnabled } from '@/lib/features'
 
 export interface NavLinkItem {
   type: 'link'
@@ -66,7 +67,8 @@ export function useNavEntries(): NavEntry[] {
   if (can('sales.create')) salesChildren.push({ href: '/sales/new', label: 'New sale', icon: ScanLine })
   if (canAny(['sales.view_own', 'sales.view_branch']))
     salesChildren.push({ href: '/sales/b2c', label: 'B2C', icon: ShoppingBag })
-  if (can('documents.manage')) salesChildren.push({ href: '/sales/b2b', label: 'B2B', icon: Building2 })
+  if (can('documents.manage') && isEnabled('b2bSales'))
+    salesChildren.push({ href: '/sales/b2b', label: 'B2B', icon: Building2 })
   if (salesChildren.length) items.push({ type: 'group', label: 'Sales', icon: TrendingUp, children: salesChildren })
 
   if (can('documents.manage')) items.push({ type: 'link', href: '/invoices', label: 'Invoices', icon: ReceiptText })

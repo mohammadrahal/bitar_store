@@ -1,3 +1,4 @@
+import { isEnabled } from '@/lib/features'
 import {
   BASELINE_PERMISSIONS,
   MANAGER_PERMISSIONS,
@@ -100,6 +101,11 @@ export function homePathFor(user: User): string {
   return user.branchId ? `/branches/${user.branchId}` : '/products'
 }
 
+/** Routes behind a feature flag: hidden entirely while the flag is off. */
+const FLAGGED_ROUTES: [prefix: string, flag: 'b2bSales' | 'replenishmentSuggestions'][] = [
+  ['/sales/b2b', 'b2bSales'],
+]
+
 /** Path prefixes and what each one needs. Longest prefix is checked first. */
 const ROUTE_PERMISSIONS: [prefix: string, rule: PermissionRule][] = [
   ['/products/new', 'catalog.create'],
@@ -130,6 +136,9 @@ export function redirectPathFor(user: User, pathname: string): string | null {
 
   if (pathname === '/dashboard' && !can(user, 'locations.view_all')) return home
   if (pathname === '/branches' && !can(user, 'locations.view_all')) return home
+
+  const flagged = FLAGGED_ROUTES.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  if (flagged && !isEnabled(flagged[1])) return home
 
   const rule = ROUTE_PERMISSIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
   if (rule && !canAny(user, rule[1])) return home

@@ -87,7 +87,14 @@ export interface ReplenishmentRequest {
   decisionReason?: string
 }
 
-export interface ReplenishmentRequestRow extends ReplenishmentRequest {
+/** A request line with the SKU and name a table needs. */
+export interface ReplenishmentLineRow extends ReplenishmentLine {
+  sku: string
+  label: string
+}
+
+export interface ReplenishmentRequestRow extends Omit<ReplenishmentRequest, 'lines'> {
+  lines: ReplenishmentLineRow[]
   branchName: string
   requestedUnits: number
   approvedUnits: number
