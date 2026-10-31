@@ -22,7 +22,7 @@ export function NavGroup({
   onNavigate?: () => void
 }) {
   const [open, setOpen] = useState(groupActive)
-  const panelId = `nav-group-${entry.label.toLowerCase()}`
+  const panelId = `nav-group-${entry.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
 
   /* Navigating into the group opens it, so the active child is never hidden. */
   useEffect(() => {

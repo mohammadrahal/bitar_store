@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/shared/skeleton'
-import { ApiError } from '@/lib/api'
+import { isUnauthorized } from '@/lib/errors'
 import { bootstrapSession } from '@/services/session.service'
 import { useUIStore } from '@/store/ui-store'
 import { clearLegacySessionStorage, useUserStore } from '@/store/user-store'
@@ -31,7 +31,7 @@ export function HydrationGate({
           setUser(await bootstrapSession(token))
         } catch (error) {
           /* A network blip keeps the cached session; a rejected token does not. */
-          if (!user || (error instanceof ApiError && error.status === 401)) signOut()
+          if (!user || isUnauthorized(error)) signOut()
         }
       }
       setHydrated(true)

@@ -14,6 +14,7 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useProduct } from '@/hooks/use-products'
 import { usePermission } from '@/hooks/use-permission'
 import { formatPrice } from '@/lib/format'
@@ -27,15 +28,13 @@ export function ProductDetailView({ productId }: { productId: string }) {
   const { data: product, isPending, isError, error, refetch } = useProduct(productId)
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const close = () => setDialog(null)
+  useDocumentTitle(product?.name)
 
   if (isPending) return <Skeleton rows={1} stats={0} />
   if (isError) return <ErrorState title="Could not load this product" error={error} onRetry={() => void refetch()} />
 
   const count = product.variants.length
-  const details = [product.details?.season, product.details?.brand, product.details?.material].filter(Boolean)
-  const prices = can('products:read-cost')
-    ? `From ${formatPrice(product.sellPrice)} · Cost ${formatPrice(product.costPrice)}`
-    : `From ${formatPrice(product.sellPrice)}`
+  const prices = `From ${formatPrice(product.sellPrice)}`
   /* Looked up on every render so the dialogs show the SKU as it is after a refetch. */
   const selected = dialog && 'variantId' in dialog ? product.variants.find((variant) => variant.id === dialog.variantId) : undefined
 
@@ -48,11 +47,11 @@ export function ProductDetailView({ productId }: { productId: string }) {
       <PageHeader
         eyebrow={product.archived ? `${product.code} · Archived` : product.code}
         title={product.name}
-        description={[product.category, ...details].join(' · ')}
+        description={product.category}
         actions={
           <>
             {!product.archived && (
-              <Can action="products:edit">
+              <Can permission="catalog.edit">
                 <button type="button" className="btn btn-secondary" onClick={() => setDialog({ kind: 'edit' })}>
                   <Pencil size={16} aria-hidden="true" />
                   Edit
@@ -63,7 +62,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
                 </button>
               </Can>
             )}
-            <Can action="products:archive">
+            <Can permission="catalog.edit">
               <button type="button" className="btn btn-secondary" onClick={() => setDialog({ kind: 'archive' })}>
                 {product.archived ? <ArchiveRestore size={16} aria-hidden="true" /> : <Archive size={16} aria-hidden="true" />}
                 {product.archived ? 'Reactivate' : 'Archive'}

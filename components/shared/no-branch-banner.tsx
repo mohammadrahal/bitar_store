@@ -2,14 +2,14 @@
 
 import { usePermission } from '@/hooks/use-permission'
 
-/** Shown to scoped roles who have not been granted a branch yet. */
+/** Shown to employees who have not been assigned a location yet. */
 export function NoBranchBanner() {
-  const { branchScoped, user } = usePermission()
-  if (!branchScoped || user.branchId) return null
+  const { locationScoped, user } = usePermission()
+  if (!locationScoped || user.locations.length > 0) return null
 
   return (
     <div className="auth-alert" role="status">
-      You do not have a branch yet. Ask your admin to assign one, then sign in again.
+      You have no location yet. Ask a manager to assign one, then sign in again.
     </div>
   )
 }

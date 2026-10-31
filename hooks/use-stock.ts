@@ -5,14 +5,8 @@ import { toast } from 'sonner'
 import { useBranches } from '@/hooks/use-branches'
 import { queryKeys } from '@/lib/query-keys'
 import { syncCatalog } from '@/services/catalog-sync.service'
-import {
-  getBranchStockUnits,
-  getInventoryStats,
-  listBranchStock,
-  listLowStock,
-  setLowStockAt,
-  type LowStockAtInput,
-} from '@/services/stock.service'
+import { unitsByProduct, unitsByVariant } from '@/services/product-stock.service'
+import { getBranchStockUnits, getStockOverview, listBranchStock } from '@/services/stock.service'
 import type { BranchScope } from '@/types'
 
 export function useBranchStockUnits(branchId: string) {
@@ -43,11 +37,24 @@ export function useMirroredBranches(): string | null {
   const { data: branches } = useBranches()
   const { data: skuCount } = useCatalogSync()
   if (!branches || skuCount === undefined) return null
-  const ids = branches
+  return `${branchKey(branches)}#${skuCount}`
+}
+
+function branchKey(branches: { id: string }[]): string {
+  return branches
     .map((branch) => branch.id)
     .sort()
     .join(',')
-  return `${ids}#${skuCount}`
+}
+
+/**
+ * The branch half of the gate above, for reads that never touch the mirrored
+ * catalog. They would otherwise wait on a full catalog sweep to show figures
+ * that do not depend on one.
+ */
+export function useBranchesKey(): string | null {
+  const { data: branches } = useBranches()
+  return branches ? branchKey(branches) : null
 }
 
 /* Rows, not the quantity map: hooks/use-invoices.ts owns useBranchStock. */
@@ -60,31 +67,35 @@ export function useBranchStockRows(branchId: string) {
   })
 }
 
-export function useSetLowStockAt() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (input: LowStockAtInput) => setLowStockAt(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stock.all })
-    },
-    onError: (error: Error) => toast.error(error.message),
-  })
-}
-
-export function useInventoryStats(scope: BranchScope) {
-  const branches = useMirroredBranches()
+/** Units per model for the products list, narrowed by the header filter. */
+export function useProductUnits(scope: BranchScope) {
+  const branches = useBranchesKey()
   return useQuery({
-    queryKey: queryKeys.stock.stats(scope, branches ?? ''),
-    queryFn: () => getInventoryStats(scope),
+    queryKey: queryKeys.stock.byProduct(scope),
+    queryFn: () => unitsByProduct(scope),
     enabled: branches !== null,
   })
 }
 
-export function useLowStock(scope: BranchScope) {
+/** The same, per SKU of one model. */
+export function useVariantUnits(productId: string, scope: BranchScope) {
+  const branches = useBranchesKey()
+  return useQuery({
+    queryKey: queryKeys.stock.styleUnits(productId, scope),
+    queryFn: () => unitsByVariant(productId, scope),
+    enabled: branches !== null && Boolean(productId),
+  })
+}
+
+/**
+ * The stat cards. Gated on the catalog, because the Products card counts the
+ * mirrored catalog rather than anything in scope.
+ */
+export function useStockOverview(scope: BranchScope) {
   const branches = useMirroredBranches()
   return useQuery({
-    queryKey: queryKeys.stock.lowStock(scope, branches ?? ''),
-    queryFn: () => listLowStock(scope),
+    queryKey: queryKeys.stock.overview(scope, branches ?? ''),
+    queryFn: () => getStockOverview(scope),
     enabled: branches !== null,
   })
 }

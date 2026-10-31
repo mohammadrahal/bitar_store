@@ -1,4 +1,8 @@
+'use client'
+
 import Link from 'next/link'
+import { useBranchHref } from '@/hooks/use-branches'
+import { balanceText } from '@/lib/balances'
 import { formatNumber } from '@/lib/format'
 import type { Balances, LocationBalance } from '@/types'
 
@@ -13,6 +17,8 @@ export function LocationBalancesTable({
   /** The side card shows four numbers; the full page shows all five. */
   compact?: boolean
 }) {
+  const hrefOf = useBranchHref()
+
   return (
     <div className="table-wrap">
       <table className="card-table">
@@ -34,15 +40,15 @@ export function LocationBalancesTable({
                 {location.isWarehouse ? (
                   <strong>{location.branchName}</strong>
                 ) : (
-                  <Link href={`/branches/${location.branchId}`} className="link-cell">
+                  <Link href={hrefOf(location.branchId)} className="link-cell">
                     {location.branchName}
                   </Link>
                 )}
                 {location.isWarehouse && <small>Main warehouse</small>}
               </td>
               <td className="num tabular" data-label="On hand">{formatNumber(location.onHand)}</td>
-              <td className="num tabular" data-label="Reserved">{formatNumber(location.reserved)}</td>
-              <td className="num tabular" data-label="On hold">{formatNumber(location.onHold)}</td>
+              <td className="num tabular" data-label="Reserved">{balanceText(location.reserved, formatNumber)}</td>
+              <td className="num tabular" data-label="On hold">{balanceText(location.onHold, formatNumber)}</td>
               <td className="num tabular" data-label="Available">
                 <strong>{formatNumber(location.available)}</strong>
               </td>
@@ -57,8 +63,8 @@ export function LocationBalancesTable({
             <tr>
               <td className="card-title">All locations</td>
               <td className="num tabular" data-label="On hand">{formatNumber(totals.onHand)}</td>
-              <td className="num tabular" data-label="Reserved">{formatNumber(totals.reserved)}</td>
-              <td className="num tabular" data-label="On hold">{formatNumber(totals.onHold)}</td>
+              <td className="num tabular" data-label="Reserved">{balanceText(totals.reserved, formatNumber)}</td>
+              <td className="num tabular" data-label="On hold">{balanceText(totals.onHold, formatNumber)}</td>
               <td className="num tabular" data-label="Available">{formatNumber(totals.available)}</td>
               {!compact && <td className="num tabular" data-label="In transit">{formatNumber(totals.inTransit)}</td>}
             </tr>

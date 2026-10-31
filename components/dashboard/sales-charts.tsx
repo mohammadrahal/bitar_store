@@ -57,8 +57,8 @@ export function SalesCharts({
         <div className="panel-body">
           <EmptyState
             icon={ReceiptText}
-            title="No sales recorded in this period."
-            description="Best sellers appear here once a sale is confirmed."
+            title="No sales on this business date."
+            description="Best sellers come from completed till sales, and appear here as soon as one is confirmed."
           />
         </div>
       </Panel>
@@ -72,8 +72,8 @@ export function SalesCharts({
       <Panel
         title={heading}
         description={`${formatNumber(data.totalUnits)} units across ${formatNumber(data.documentCount)} ${
-          data.documentCount === 1 ? 'document' : 'documents'
-        }, returns deducted.`}
+          data.documentCount === 1 ? 'sale' : 'sales'
+        } on ${data.businessDate || 'the current business date'}.`}
         actions={
           <div className="segmented compact">
             <button type="button" className={view === 'chart' ? 'active' : ''} onClick={() => setView('chart')}>
@@ -95,7 +95,7 @@ export function SalesCharts({
       </Panel>
 
       {showBranchChart && (
-        <Panel title="Revenue by branch" description={`${formatPrice(data.totalRevenue)} in total.`}>
+        <Panel title="Revenue by location" description={`${formatPrice(data.totalRevenue)} in total.`}>
           <div className="panel-body">
             <BranchSalesChart analytics={data} />
           </div>

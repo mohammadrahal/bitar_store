@@ -1,8 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState } from 'react'
-import { ArrowLeftRight, Download, Search } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeftRight, Download } from 'lucide-react'
+import { MotionSwap } from '@/components/motion/motion-swap'
+import { SearchInput } from '@/components/shared/search-input'
 import { BalanceTiles } from '@/components/inventory/balance-tiles'
 import { InventoryTable } from '@/components/inventory/inventory-table'
 import { SelectedVariantCard } from '@/components/inventory/selected-variant-card'
@@ -18,14 +21,15 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useInventory } from '@/hooks/use-inventory'
 import { downloadCsv } from '@/lib/csv'
 import { sumBalances } from '@/lib/balances'
+import { parseInventoryFilter } from '@/lib/inventory-filters'
 import type { InventoryFilter, InventoryRow } from '@/types'
 
 const PAGE_SIZE = 12
 
 const FILTERS: ChipOption<InventoryFilter>[] = [
   { value: 'all', label: 'All' },
-  { value: 'low', label: 'Low stock' },
-  { value: 'on_hold', label: 'On hold' },
+  { value: 'out', label: 'Out of stock' },
+  { value: 'on_hold', label: 'Non-sellable' },
   { value: 'in_transit', label: 'In transit' },
   { value: 'archived', label: 'Archived' },
 ]
@@ -33,7 +37,19 @@ const FILTERS: ChipOption<InventoryFilter>[] = [
 function exportRows(rows: InventoryRow[]) {
   downloadCsv(
     'inventory.csv',
-    ['Product', 'Code', 'SKU', 'Color', 'Size', 'On hand', 'Reserved', 'On hold', 'Available', 'In transit'],
+    [
+      'Product',
+      'Code',
+      'SKU',
+      'Color',
+      'Size',
+      'On hand',
+      'Non-sellable',
+      'Reserved',
+      'On hold',
+      'Available',
+      'In transit',
+    ],
     rows.map((row) => [
       row.productName,
       row.productCode,
@@ -41,8 +57,10 @@ function exportRows(rows: InventoryRow[]) {
       row.color,
       row.size,
       row.onHand,
-      row.reserved,
-      row.onHold,
+      row.nonSellable,
+      /* The API cannot report these two yet; an empty cell says so. */
+      row.reserved ?? '',
+      row.onHold ?? '',
       row.available,
       row.inTransit,
     ]),
@@ -51,11 +69,17 @@ function exportRows(rows: InventoryRow[]) {
 
 export function InventoryView() {
   const scope = useBranchScope()
+  const searchParams = useSearchParams()
   const [searchInput, setSearchInput] = useState('')
   const search = useDebouncedValue(searchInput)
-  const [filter, setFilter] = useState<InventoryFilter>('all')
+  const [filter, setFilter] = useState<InventoryFilter>(() => parseInventoryFilter(searchParams.get('filter')))
   const [page, setPage] = useState(1)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setFilter(parseInventoryFilter(searchParams.get('filter')))
+    setPage(1)
+  }, [searchParams])
 
   const { data: rows, isPending, isError, error, refetch } = useInventory({ scope, filter, search })
   const totals = useMemo(() => sumBalances(rows ?? []), [rows])
@@ -79,64 +103,57 @@ export function InventoryView() {
               <Download size={16} aria-hidden="true" />
               Export CSV
             </button>
-            <Can action="transfers:request">
-              <Link href="/transfers/new" className="btn btn-primary">
-                <ArrowLeftRight size={16} aria-hidden="true" />
-                New transfer
-              </Link>
-            </Can>
           </>
         }
       />
 
-      {isPending ? (
-        <Skeleton rows={4} stats={5} />
-      ) : isError ? (
-        <ErrorState title="Could not load inventory" error={error} onRetry={() => void refetch()} />
-      ) : (
-        <div className="stack">
-          <BalanceTiles totals={totals} />
-          <div className="split">
-            <Panel title="Variants" description={`${total} ${total === 1 ? 'variant' : 'variants'}`}>
-              <div className="toolbar">
-                <div className="search-field">
-                  <Search size={16} aria-hidden="true" />
-                  <input
-                    type="search"
+      <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+        {isPending ? (
+          <Skeleton rows={4} stats={5} />
+        ) : isError ? (
+          <ErrorState title="Could not load inventory" error={error} onRetry={() => void refetch()} />
+        ) : (
+          <div className="stack">
+            <BalanceTiles totals={totals} />
+            <div className="split">
+              <Panel title="Variants" description={`${total} ${total === 1 ? 'variant' : 'variants'}`}>
+                <div className="toolbar">
+                  <SearchInput
                     value={searchInput}
-                    onChange={(event) => {
-                      setSearchInput(event.target.value)
+                    onChange={(value) => {
+                      setSearchInput(value)
                       setPage(1)
                     }}
                     placeholder="Search model, code, SKU, color or size"
                     aria-label="Search inventory"
                   />
+                  <FilterChips
+                    label="Filter variants"
+                    options={FILTERS}
+                    value={filter}
+                    onChange={(value) => {
+                      setFilter(value)
+                      setPage(1)
+                    }}
+                  />
                 </div>
-                <FilterChips
-                  label="Filter variants"
-                  options={FILTERS}
-                  value={filter}
-                  onChange={(value) => {
-                    setFilter(value)
-                    setPage(1)
-                  }}
+                <InventoryTable
+                  rows={visible}
+                  dataset={`${scope}-${currentPage}`}
+                  totals={totals}
+                  selectedId={selected}
+                  onSelect={(row) => setSelectedId(row.variantId)}
+                  filtered={filtered}
                 />
-              </div>
-              <InventoryTable
-                rows={visible}
-                totals={totals}
-                selectedId={selected}
-                onSelect={(row) => setSelectedId(row.variantId)}
-                filtered={filtered}
-              />
-              <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
-            </Panel>
-            <aside className="split-aside" aria-label="Selected variant">
-              {selected && <SelectedVariantCard variantId={selected} />}
-            </aside>
+                <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
+              </Panel>
+              <aside className="split-aside" aria-label="Selected variant">
+                {selected && <SelectedVariantCard variantId={selected} />}
+              </aside>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </MotionSwap>
     </>
   )
 }

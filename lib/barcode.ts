@@ -2,7 +2,8 @@
  * In-store EAN-13 barcodes for own-brand goods.
  *
  * GS1 reserves the prefixes 20–29 for a retailer's internal use, so codes
- * minted here can never collide with a supplier's registered range. Layout:
+ * minted here can never collide with a supplier's registered range: a leading
+ * `2` followed by any digit puts every code we mint in 200–299. Layout:
  * `2` + an 11-digit body + the mod-10 check digit = 13 digits.
  */
 const IN_STORE_PREFIX = '2'
@@ -26,6 +27,11 @@ export function randomEan13(): string {
   const digits = crypto.getRandomValues(new Uint8Array(BODY_LENGTH - 1))
   const body = IN_STORE_PREFIX + Array.from(digits, (value) => value % 10).join('')
   return body + checkDigit(body)
+}
+
+/** True for a code in the in-store range, which is one Bitar minted itself. */
+export function isInStoreEan13(value: string): boolean {
+  return isValidEan13(value) && value.startsWith(IN_STORE_PREFIX)
 }
 
 /** True for 13 digits whose last one matches the other twelve. */

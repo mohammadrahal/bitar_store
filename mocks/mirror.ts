@@ -3,18 +3,26 @@ import type { Branch, Product, Variant } from '@/types'
 
 const WAREHOUSE_PATTERN = /warehouse|depot|\bwh\b|^wh[-_]?|main|hub/i
 
-/** Branches have no type on the API yet, so the warehouse is recognised by its name or code. */
+/**
+ * `GET /branches` carries `kind`, so the warehouse is whatever the server says
+ * it is. The name pattern stays as the fallback for a server that predates the
+ * field, and for a network where nobody has marked one yet.
+ */
 function detectWarehouse(branches: Branch[]): string | null {
+  const marked = branches.find((branch) => branch.kind === 'warehouse')
+  if (marked) return marked.id
   const match = branches.find((branch) => WAREHOUSE_PATTERN.test(branch.name) || WAREHOUSE_PATTERN.test(branch.code ?? ''))
   return match?.id ?? null
 }
 
-/**
- * Runs after either mirror. Stock rows are deliberately not created here: a
- * SKU is carried only at the branches it was placed in, so a branch that never
- * stocked it does not list it as out of stock.
- */
+/** Runs after either mirror, so the warehouse is known as soon as branches are. */
 function settle(db: MockDb) {
+  /* A location marked on the server outranks an older local pick. */
+  const marked = db.branches.find((branch) => branch.kind === 'warehouse')
+  if (marked) {
+    db.warehouseId = marked.id
+    return
+  }
   if (!db.warehouseId) db.warehouseId = detectWarehouse(db.branches)
 }
 
@@ -27,9 +35,16 @@ function settle(db: MockDb) {
  * stock. Only a viewer of the whole network may `prune`.
  */
 export function mirrorBranches(branches: Branch[], { prune = false } = {}): void {
-  if (branches.length === 0) return
-
   writeDb((db) => {
+    if (branches.length === 0) {
+      /* An empty API answer with prune means the network really has none — drop
+         stale rows left from an older session. Scoped users never prune. */
+      if (prune) {
+        db.branches = []
+        db.warehouseId = null
+      }
+      return
+    }
     for (const incoming of branches) {
       const existing = db.branches.find((branch) => branch.id === incoming.id)
       if (existing) Object.assign(existing, incoming)
@@ -39,7 +54,6 @@ export function mirrorBranches(branches: Branch[], { prune = false } = {}): void
     if (prune) {
       const live = new Set(branches.map((branch) => branch.id))
       db.branches = db.branches.filter((branch) => live.has(branch.id))
-      db.stock = db.stock.filter((level) => live.has(level.branchId))
       if (db.warehouseId && !live.has(db.warehouseId)) db.warehouseId = null
     }
     settle(db)
@@ -73,17 +87,8 @@ export function mirrorCatalog(products: Product[], variants: Variant[], { comple
       const liveVariants = new Set(variants.map((variant) => variant.id))
       db.products = db.products.filter((product) => liveProducts.has(product.id))
       db.variants = db.variants.filter((variant) => liveVariants.has(variant.id))
-      db.stock = db.stock.filter((level) => liveVariants.has(level.variantId))
       db.catalogSynced = true
     }
     settle(db)
-  })
-}
-
-/** Sets what only this device keeps for a model: its cost and extra details. */
-export function setLocalProductFields(productId: string, fields: Pick<Product, 'costPrice' | 'details'>): void {
-  writeDb((db) => {
-    const product = db.products.find((candidate) => candidate.id === productId)
-    if (product) Object.assign(product, fields)
   })
 }

@@ -33,14 +33,43 @@ function BranchFilter() {
   )
 }
 
-function ScopedBranchLabel() {
-  const { user } = usePermission()
-  const { data: branches } = useBranches()
-  const branch = branches?.find((candidate) => candidate.id === user.branchId)
-  const label = branch?.name ?? (user.branchId ? 'Your branch' : 'No branch assigned')
+/**
+ * Where an employee is working. One assignment is simply shown; several have to
+ * be switched between, because every action is recorded against the location
+ * that is active here.
+ */
+function ActiveLocationSwitcher() {
+  const { user, activeLocationId } = usePermission()
+  const { data: branches, isPending } = useBranches()
+  const setActiveLocationId = useUIStore((state) => state.setActiveLocationId)
 
+  const options = user.locations.map((entry) => {
+    const branch = branches?.find((candidate) => candidate.id === entry.locationId)
+    return {
+      value: entry.locationId,
+      label: `${branch?.name ?? 'Location'}${entry.access === 'view_only' ? ' — view only' : ''}`,
+    }
+  })
+
+  if (options.length > 1) {
+    return (
+      <SelectInput
+        variant="inline"
+        className="max-w-[240px]"
+        aria-label="Active location"
+        value={activeLocationId ?? ''}
+        onValueChange={setActiveLocationId}
+        disabled={isPending}
+        placeholder="Choose your location"
+        icon={<span className="switcher-dot" aria-hidden="true" />}
+        options={options}
+      />
+    )
+  }
+
+  const label = options[0]?.label ?? 'No location assigned'
   return (
-    <span className="branch-switcher" aria-label={`Scoped to ${label}`}>
+    <span className="branch-switcher" aria-label={`Working at ${label}`}>
       <span className="switcher-dot" aria-hidden="true" />
       {label}
     </span>
@@ -66,7 +95,7 @@ export function Topbar() {
         <BrandLogo />
       </div>
       <div className="top-actions">
-        <Can action="branches:view-all" fallback={<ScopedBranchLabel />}>
+        <Can permission="locations.view_all" fallback={<ActiveLocationSwitcher />}>
           <BranchFilter />
         </Can>
         <ThemeToggle />

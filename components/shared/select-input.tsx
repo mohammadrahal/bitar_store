@@ -47,12 +47,14 @@ export function SelectInput({
   size,
   ...aria
 }: SelectInputProps) {
+  const selectedValue = value && options.some((option) => option.value === value) ? value : null
+
   return (
-    /* `items` is what lets the trigger read as a label: without it Base UI
-       prints the raw value, which for a branch is its id. */
+    /* `items` resolves labels; if the value is not in `options` yet, keep the
+       control empty so the trigger never shows a raw id. */
     <Select<string>
       items={options}
-      value={value}
+      value={selectedValue}
       onValueChange={(next) => onValueChange(next ?? '')}
       disabled={disabled}
     >

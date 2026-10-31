@@ -1,20 +1,21 @@
 import type { RequestFn } from '@/lib/api/client'
-import { ALL_BRANCHES, type BranchScope, type SalesAnalytics } from '@/types'
+import type { ApiSale, CreateSaleInput, SalesListParams, SalesListResult } from '@/lib/api/types'
 
-function salesQuery(scope: BranchScope): string {
-  if (scope === ALL_BRANCHES) return ''
-  const params = new URLSearchParams({ branchId: scope })
-  return `?${params.toString()}`
+function queryOf(params: Record<string, string | number | boolean | undefined>): string {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') query.set(key, String(value))
+  }
+  const text = query.toString()
+  return text ? `?${text}` : ''
 }
 
-/**
- * Product sales analytics. The backend has not shipped this route yet (see API_GUIDE.md §9).
- * Wire `analytics.service` here when it does; until then calls will 404.
- */
 export function createSalesApi(request: RequestFn) {
   return {
-    getProductSales: (scope: BranchScope = ALL_BRANCHES) =>
-      request<SalesAnalytics>(`/analytics/product-sales${salesQuery(scope)}`),
+    createSale: (input: CreateSaleInput, idempotencyKey: string) =>
+      request<ApiSale>('/sales', 'POST', input, { idempotencyKey }),
+    listSales: (params: SalesListParams) => request<SalesListResult>(`/sales${queryOf({ ...params })}`),
+    getSale: (id: string) => request<ApiSale>(`/sales/${id}`),
   }
 }
 

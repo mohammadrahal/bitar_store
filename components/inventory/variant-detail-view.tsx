@@ -4,15 +4,16 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { BalanceTiles } from '@/components/inventory/balance-tiles'
 import { LocationBalancesTable } from '@/components/inventory/location-balances-table'
-import { MovementTable } from '@/components/inventory/movement-table'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useVariantDetail } from '@/hooks/use-inventory'
 
 export function VariantDetailView({ variantId }: { variantId: string }) {
   const { data, isPending, isError, error, refetch } = useVariantDetail(variantId)
+  useDocumentTitle(data && `${data.productName} ${data.color} / ${data.size}`)
 
   return (
     <>
@@ -40,9 +41,6 @@ export function VariantDetailView({ variantId }: { variantId: string }) {
             <BalanceTiles totals={data.totals} />
             <Panel title="By location" description="Only locations you can see are listed.">
               <LocationBalancesTable locations={data.locations} totals={data.totals} />
-            </Panel>
-            <Panel title="Movement history" description="Every change to this variant, newest first.">
-              <MovementTable movements={data.movements} />
             </Panel>
           </div>
         </>

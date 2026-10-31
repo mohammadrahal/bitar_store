@@ -4,13 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query-keys'
 import {
-  createUserWithBranch,
-  deleteUser,
+  createUser,
+  getUserGrants,
+  getUserLocations,
   listUsers,
+  saveUserGrants,
   setUserActive,
-  updateUserWithBranch,
-  type CreateUserWithBranchInput,
-  type UpdateUserWithBranchInput,
+  updateUser,
+  type SaveUserInput,
 } from '@/services/users.service'
 
 export function useUsers(enabled = true) {
@@ -32,7 +33,7 @@ function useUsersMutationCallbacks() {
 export function useCreateUser() {
   const { invalidate, reportError } = useUsersMutationCallbacks()
   return useMutation({
-    mutationFn: (input: CreateUserWithBranchInput) => createUserWithBranch(input),
+    mutationFn: (input: SaveUserInput) => createUser(input),
     onSuccess: (user) => {
       invalidate()
       toast.success(`${user.fullName} added`)
@@ -45,10 +46,10 @@ export function useCreateUser() {
   })
 }
 
-export function useUpdateUserWithBranch() {
+export function useUpdateUser() {
   const { invalidate, reportError } = useUsersMutationCallbacks()
   return useMutation({
-    mutationFn: (input: UpdateUserWithBranchInput) => updateUserWithBranch(input),
+    mutationFn: ({ id, ...input }: SaveUserInput & { id: string }) => updateUser(id, input),
     onSuccess: (user, input) => {
       invalidate()
       toast.success(
@@ -74,13 +75,25 @@ export function useSetUserActive() {
   })
 }
 
-export function useDeleteUser() {
+/** Locations and keys for one account, as remembered in this browser. */
+export function useUserAccess(userId: string) {
+  return useQuery({
+    queryKey: queryKeys.users.access(userId),
+    queryFn: () => ({ locations: getUserLocations(userId), grants: getUserGrants(userId) }),
+    enabled: Boolean(userId),
+  })
+}
+
+export function useSaveUserGrants() {
   const { invalidate, reportError } = useUsersMutationCallbacks()
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id }: { id: string; name: string }) => deleteUser(id),
-    onSuccess: (_result, { name }) => {
+    mutationFn: ({ userId, grants }: { userId: string; name: string; grants: Record<string, string[]> }) =>
+      saveUserGrants(userId, grants),
+    onSuccess: (_result, { userId, name }) => {
       invalidate()
-      toast.success(`${name} deleted`)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.users.access(userId) })
+      toast.success(`Permissions saved for ${name}`)
     },
     onError: reportError,
   })

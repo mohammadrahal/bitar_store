@@ -2,15 +2,15 @@
 
 import Link from 'next/link'
 import { Pencil, Store, Trash2, Warehouse } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
 import { useSetWarehouse, useWarehouseId } from '@/hooks/use-inventory'
+import { branchHref } from '@/lib/branch-slug'
 import { BRANCH_WRITES } from '@/services/branches.service'
 import type { Branch } from '@/types'
 
-/* The server has no branch edit or delete yet, so the controls say why they
-   are off rather than failing when pressed. */
 const UNAVAILABLE = 'Not supported by the API yet'
 
 export function BranchTable({
@@ -35,7 +35,7 @@ export function BranchTable({
           title="No branches yet"
           description="Add your first branch, then assign staff to it from the Users screen."
           action={
-            <Can action="branches:create">
+            <Can permission="settings.manage">
               <button type="button" className="btn btn-primary" onClick={onCreate}>
                 Add branch
               </button>
@@ -60,11 +60,11 @@ export function BranchTable({
             </th>
           </tr>
         </thead>
-        <tbody>
-          {branches.map((branch) => (
-            <tr key={branch.id}>
+        <MotionTbody>
+          {branches.map((branch, index) => (
+            <MotionTr key={branch.id} index={index}>
               <td>
-                <Link href={`/branches/${branch.id}`} className="link-cell">
+                <Link href={branchHref(branch)} className="link-cell">
                   {branch.name}
                 </Link>
               </td>
@@ -72,13 +72,15 @@ export function BranchTable({
               <td>
                 <span className="row-actions">
                   <ActiveStatusPill isActive={branch.isActive} />
-                  {branch.id === warehouseId && <span className="pill pill-accent">Warehouse</span>}
+                  {(branch.kind === 'warehouse' || branch.id === warehouseId) && (
+                    <span className="pill pill-accent">Warehouse</span>
+                  )}
                 </span>
               </td>
               <td>
                 <div className="row-actions">
-                  {branch.id !== warehouseId && (
-                    <Can action="locations:set-warehouse">
+                  {branch.kind !== 'warehouse' && branch.id !== warehouseId && (
+                    <Can permission="settings.manage">
                       <button
                         type="button"
                         className="icon-btn"
@@ -91,7 +93,7 @@ export function BranchTable({
                       </button>
                     </Can>
                   )}
-                  <Can action="branches:edit">
+                  <Can permission="settings.manage">
                     <button
                       type="button"
                       className="icon-btn"
@@ -103,23 +105,29 @@ export function BranchTable({
                       <Pencil size={16} />
                     </button>
                   </Can>
-                  <Can action="branches:delete">
+                  <Can permission="settings.manage">
                     <button
                       type="button"
                       className="icon-btn danger"
                       onClick={() => onDelete(branch)}
-                      disabled={!BRANCH_WRITES.delete}
-                      aria-label={`Delete ${branch.name}`}
-                      title={BRANCH_WRITES.delete ? 'Delete' : UNAVAILABLE}
+                      disabled={!BRANCH_WRITES.deactivate || !branch.isActive}
+                      aria-label={`Mark ${branch.name} inactive`}
+                      title={
+                        !branch.isActive
+                          ? 'Already inactive'
+                          : BRANCH_WRITES.deactivate
+                            ? 'Mark inactive'
+                            : UNAVAILABLE
+                      }
                     >
                       <Trash2 size={16} />
                     </button>
                   </Can>
                 </div>
               </td>
-            </tr>
+            </MotionTr>
           ))}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

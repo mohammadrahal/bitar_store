@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { INVOICE_KINDS, INVOICE_STATUSES } from '@/lib/invoices'
-import { ALL_BRANCHES, type BranchScope, type InvoiceKind, type InvoiceStatus } from '@/types'
+import { ALL_BRANCHES, type BranchScope } from '@/types'
 
 export type Theme = 'light' | 'dark'
 
@@ -29,24 +28,12 @@ interface UIState {
   setProductCategory: (category: string) => void
   productShow: 'active' | 'archived'
   setProductShow: (show: 'active' | 'archived') => void
-  /** Header branch filter, only offered to users who can see every branch. */
+  /** Header branch filter, only offered to users who can see every location. */
   branchScope: BranchScope
   setBranchScope: (scope: BranchScope) => void
-  invoiceSearch: string
-  setInvoiceSearch: (search: string) => void
-  /** 'all', or one InvoiceKind. Kept as a string so the select needs no cast. */
-  invoiceKind: InvoiceKind | 'all'
-  setInvoiceKind: (kind: string) => void
-  invoiceStatus: InvoiceStatus | 'all'
-  setInvoiceStatus: (status: string) => void
-}
-
-function asKind(value: string): InvoiceKind | 'all' {
-  return INVOICE_KINDS.includes(value as InvoiceKind) ? (value as InvoiceKind) : 'all'
-}
-
-function asStatus(value: string): InvoiceStatus | 'all' {
-  return INVOICE_STATUSES.includes(value as InvoiceStatus) ? (value as InvoiceStatus) : 'all'
+  /** The location an employee with several assignments is working in. */
+  activeLocationId: string | null
+  setActiveLocationId: (locationId: string | null) => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -67,17 +54,18 @@ export const useUIStore = create<UIState>()(
       setProductShow: (productShow) => set({ productShow }),
       branchScope: ALL_BRANCHES,
       setBranchScope: (branchScope) => set({ branchScope }),
-      invoiceSearch: '',
-      setInvoiceSearch: (invoiceSearch) => set({ invoiceSearch }),
-      invoiceKind: 'all',
-      setInvoiceKind: (kind) => set({ invoiceKind: asKind(kind) }),
-      invoiceStatus: 'all',
-      setInvoiceStatus: (status) => set({ invoiceStatus: asStatus(status) }),
+      activeLocationId: null,
+      setActiveLocationId: (activeLocationId) => set({ activeLocationId }),
     }),
     {
       name: 'bitar-fashion:ui:v1',
       skipHydration: true,
-      partialize: ({ theme, sidebarCollapsed, branchScope }) => ({ theme, sidebarCollapsed, branchScope }),
+      partialize: ({ theme, sidebarCollapsed, branchScope, activeLocationId }) => ({
+        theme,
+        sidebarCollapsed,
+        branchScope,
+        activeLocationId,
+      }),
     },
   ),
 )

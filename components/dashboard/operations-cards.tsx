@@ -1,34 +1,50 @@
 'use client'
 
-import Link from 'next/link'
-import { ArrowLeftRight, Lock, Receipt, Truck } from 'lucide-react'
+import { useState } from 'react'
+import { Receipt } from 'lucide-react'
 import { StatCard, countOf } from '@/components/dashboard/stat-cards'
+import { TodaySalesDrawer } from '@/components/dashboard/today-sales-drawer'
+import { StaggerList } from '@/components/motion/stagger'
 import { useOperationsSummary } from '@/hooks/use-inventory'
 import { usePermission } from '@/hooks/use-permission'
 import { formatPrice } from '@/lib/format'
 import type { BranchScope } from '@/types'
 
-/** What needs attention today: open transfers, stock in motion, stock held back, and today's takings. */
+/** What the till has taken today, at the locations in scope. */
 export function OperationsCards({ scope }: { scope: BranchScope }) {
   const { data, isPending, isError } = useOperationsSummary(scope)
-  const { can } = usePermission()
-  if (isPending) return <div className="stats-grid" aria-busy="true"><div className="skeleton skeleton-card" /><div className="skeleton skeleton-card" /><div className="skeleton skeleton-card" /><div className="skeleton skeleton-card" /></div>
+  const { canAny, role } = usePermission()
+  const [todayOpen, setTodayOpen] = useState(false)
+  const sales = canAny(['sales.view_branch', 'sales.view_own'])
+  const employee = role === 'employee'
+  if (isPending)
+    return (
+      <div className="stats-grid" aria-busy="true"><div className="skeleton skeleton-card" /></div>
+    )
   if (isError) return <p className="field-error">Operations figures could not be loaded.</p>
 
   return (
-    <div className="stats-grid">
-      <Link href="/transfers" className="stat-link" aria-label={`${countOf(data.openTransfers, 'open transfer')}. View transfers`}>
-        <StatCard label="Open transfers" value={String(data.openTransfers)} detail="Requested, approved or on the way" icon={ArrowLeftRight} />
-      </Link>
-      <StatCard label="In transit" value={String(data.inTransitUnits)} detail={data.inTransitUnits === 1 ? 'Unit on the road' : 'Units on the road'} icon={Truck} />
-      {can('inventory:read') ? (
-        <Link href="/stock-control" className="stat-link" aria-label={`${countOf(data.onHoldUnits, 'unit')} on hold. View stock control`}>
-          <StatCard label="On hold" value={String(data.onHoldUnits)} detail="Kept out of sale" alert={data.onHoldUnits > 0} icon={Lock} />
-        </Link>
-      ) : (
-        <StatCard label="On hold" value={String(data.onHoldUnits)} detail="Kept out of sale" icon={Lock} />
+    <>
+      <StaggerList className="stats-grid">
+        <StatCard
+          label="Today's sales"
+          value={formatPrice(data.todayRevenue)}
+          detail={countOf(data.todaySales, 'sale')}
+          icon={Receipt}
+          highlight={employee}
+          onClick={employee || sales ? () => setTodayOpen(true) : undefined}
+          href={sales ? '/sales/b2c' : undefined}
+        />
+      </StaggerList>
+      {todayOpen && (
+        <TodaySalesDrawer
+          revenue={data.todayRevenue}
+          sales={data.todaySales}
+          mix={data.todayMix}
+          canViewList={sales}
+          onClose={() => setTodayOpen(false)}
+        />
       )}
-      <StatCard label="Today's sales" value={formatPrice(data.todayRevenue)} detail={countOf(data.todaySales, 'sale')} icon={Receipt} />
-    </div>
+    </>
   )
 }

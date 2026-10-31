@@ -1,205 +1,140 @@
-import type { Role, User } from '@/types'
+import { isBranchId } from '@/lib/branch-slug'
+import {
+  BASELINE_PERMISSIONS,
+  MANAGER_PERMISSIONS,
+  PLATFORM_SCOPE,
+  SUPER_ADMIN_PERMISSIONS,
+  VIEW_ONLY_PERMISSIONS,
+  isPlatformPermission,
+  type Permission,
+} from '@/lib/permission-keys'
+import type { LocationAccess, Role, User } from '@/types'
 
-export const ACTIONS = [
-  /** List and create staff accounts (admin). */
-  'users:manage',
-  /** Reach the branches management page. */
-  'branches:manage',
-  /** View a single branch's detail page (still limited to branches the user can access). */
-  'branches:read',
-  'branches:create',
-  'branches:edit',
-  'branches:delete',
-  /** See data across every branch rather than just one. */
-  'branches:view-all',
-  /** Mark which location is the main warehouse. */
-  'locations:set-warehouse',
-  'products:read',
-  'products:create',
-  'products:edit',
-  /** Archive a model so it leaves sale and transfer pickers, or bring it back. */
-  'products:archive',
-  /** Set a variant's low-stock threshold at a branch. */
-  'stock:manage',
-  /** See cost price and margin. */
-  'products:read-cost',
-  /** Five balances per variant and per location. */
-  'inventory:read',
-  'transfers:read',
-  'transfers:request',
-  /** Approve (reserves stock), reduce or cancel before dispatch. */
-  'transfers:approve',
-  'transfers:dispatch',
-  'transfers:receive',
-  /** Place and release holds. */
-  'stock:hold',
-  /** Apply a physical count as a correction. */
-  'stock:count',
-  /** Report a count difference for a manager to resolve. */
-  'stock:report',
-  /** Write off stock with a reason. */
-  'stock:dispose',
-  'replenishment:read',
-  'invoices:read',
-  'invoices:create',
-  /** Rewrite or throw away a draft. */
-  'invoices:edit',
-  /** Post a draft, which moves stock. */
-  'invoices:issue',
-  /** Reverse a posted document. Admin only: it gives stock back. */
-  'invoices:void',
-  /** See unit cost and margin on a document. */
-  'invoices:read-cost',
-  /** Raise supplier purchases and returns, not just sales. */
-  'purchases:manage',
-  /** Wholesale and account sales. */
-  'sales:b2b:read',
-  /** In-store and direct consumer sales. */
-  'sales:b2c:read',
-  /** Record a wholesale sale (same ledger as invoices, tagged B2B). */
-  'sales:b2b:create',
-  /** Record a retail sale (same ledger as invoices, tagged B2C). */
-  'sales:b2c:create',
-  /** Take money off a sale. */
-  'sales:discount',
-] as const
+export type { Permission } from '@/lib/permission-keys'
 
-export type Action = (typeof ACTIONS)[number]
+/** A rule may accept any one of several keys, for screens two roles reach differently. */
+export type PermissionRule = Permission | readonly Permission[]
 
-const PERMISSIONS: Record<Role, readonly Action[]> = {
-  admin: ACTIONS,
-  /* Business Managers run stock, catalog and transfers; only admins shape the
-     network itself (users, branches, the warehouse) or void documents. */
-  manager: [
-    'branches:manage',
-    'branches:read',
-    'branches:edit',
-    'products:read',
-    'products:create',
-    'products:edit',
-    'products:archive',
-    'products:read-cost',
-    'stock:manage',
-    'inventory:read',
-    'transfers:read',
-    'transfers:request',
-    'transfers:approve',
-    'transfers:dispatch',
-    'transfers:receive',
-    'stock:hold',
-    'stock:count',
-    'stock:report',
-    'stock:dispose',
-    'replenishment:read',
-    'invoices:read',
-    'invoices:create',
-    'invoices:edit',
-    'invoices:issue',
-    'invoices:read-cost',
-    'purchases:manage',
-    'sales:b2b:read',
-    'sales:b2c:read',
-    'sales:b2b:create',
-    'sales:b2c:create',
-    'sales:discount',
-  ],
-  /*
-   * A branch employee works the till and the stockroom: they sell, see their
-   * own branch's balances, receive transfers and report count differences.
-   * Corrections, holds and disposal stay with managers, and costs stay hidden.
-   */
-  employee: [
-    'branches:read',
-    'products:read',
-    'inventory:read',
-    'transfers:read',
-    'transfers:receive',
-    'stock:report',
-    'invoices:read',
-    'invoices:create',
-    'invoices:issue',
-    'sales:b2c:read',
-    'sales:b2c:create',
-  ],
+function holds(set: readonly string[], permission: Permission): boolean {
+  return set.includes(permission)
 }
 
-export function can(role: Role, action: Action) {
-  return PERMISSIONS[role].includes(action)
+/** Which keys this employee holds at one location, including the platform-wide ones. */
+function employeeKeysAt(user: User, locationId: string): readonly string[] {
+  const assignment = user.locations.find((entry) => entry.locationId === locationId)
+  if (!assignment) return []
+  const granted = [...(user.grants[locationId] ?? []), ...(user.grants[PLATFORM_SCOPE] ?? []), ...user.permissions]
+  if (assignment.access === 'view_only') {
+    return granted.filter((key) => (VIEW_ONLY_PERMISSIONS as readonly string[]).includes(key))
+  }
+  return granted
 }
-
-const COST_ACTIONS: readonly Action[] = ['products:read-cost', 'invoices:read-cost']
-
-/** Backend permission key that guards every catalog write. */
-export const CATALOG_WRITE = 'catalog.create'
-const CATALOG_ACTIONS: readonly Action[] = ['products:create', 'products:edit', 'products:archive']
 
 /**
- * Like `can`, but cost visibility follows the backend's `canViewCosts` flag
- * and catalog changes follow its `catalog.create` permission.
+ * The single permission check.
+ *
+ * - A super admin may do everything.
+ * - A manager may do every business operation, except the three keys reserved
+ *   for the super admin.
+ * - An employee needs the key, at the location they are working in. Leaving
+ *   `locationId` out asks whether they hold it anywhere, which is what the
+ *   sidebar and the route guard want; anything that writes passes the active
+ *   location, which `usePermission` fills in.
+ *
+ * Hiding a control is for usability. The backend is the real check.
  */
-export function canUser(user: User, action: Action) {
-  if (COST_ACTIONS.includes(action)) return user.canViewCosts && can(user.role, action)
-  if (CATALOG_ACTIONS.includes(action)) return user.permissions.includes(CATALOG_WRITE)
-  return can(user.role, action)
+export function can(user: User, permission: Permission, locationId?: string): boolean {
+  if (holds(BASELINE_PERMISSIONS, permission)) return true
+  if (user.role === 'super_admin') return true
+  if (user.role === 'manager') return !holds(SUPER_ADMIN_PERMISSIONS, permission)
+
+  if (holds(SUPER_ADMIN_PERMISSIONS, permission) || holds(MANAGER_PERMISSIONS, permission)) return false
+
+  if (isPlatformPermission(permission)) {
+    return user.permissions.includes(permission) || (user.grants[PLATFORM_SCOPE] ?? []).includes(permission)
+  }
+
+  if (locationId) return employeeKeysAt(user, locationId).includes(permission)
+  return user.locations.some((entry) => employeeKeysAt(user, entry.locationId).includes(permission))
 }
 
-/** True when the user may only ever see their own branch (managers and employees). */
-export function isBranchScoped(user: User) {
-  return !can(user.role, 'branches:view-all')
+export function canAny(user: User, rule: PermissionRule, locationId?: string): boolean {
+  const list = Array.isArray(rule) ? rule : [rule]
+  return list.some((permission) => can(user, permission, locationId))
 }
 
-export function canAccessBranch(user: User, branchId: string) {
-  if (can(user.role, 'branches:view-all')) return true
-  return user.branchIds.includes(branchId)
+export function isSuperAdmin(user: User): boolean {
+  return user.role === 'super_admin'
 }
 
-/** The landing page a user is allowed to see: the overview, their own branch, or the catalog. */
-export function homePathFor(user: User) {
-  if (isBranchScoped(user)) return user.branchId ? `/branches/${user.branchId}` : '/products'
-  return can(user.role, 'branches:view-all') ? '/dashboard' : '/products'
+/** Owners work at every location; only employees are tied to assignments. */
+export function isLocationScoped(user: User): boolean {
+  return !can(user, 'locations.view_all')
 }
 
-/** Path prefixes and the action each one needs. Longest prefix is checked first. */
-const ROUTE_ACTIONS: [prefix: string, action: Action][] = [
-  ['/products/new', 'products:create'],
-  ['/sales/new', 'sales:b2c:create'],
-  ['/sales/b2b', 'sales:b2b:read'],
-  ['/sales/b2c', 'sales:b2c:read'],
-  ['/transfers/new', 'transfers:request'],
-  ['/transfers', 'transfers:read'],
-  ['/inventory', 'inventory:read'],
-  ['/stock-control', 'stock:report'],
-  ['/replenishment', 'replenishment:read'],
-  ['/users', 'users:manage'],
-  // A document's own branch is only known once it loads, so /invoices/:id is
-  // checked by the detail view rather than here.
-  ['/invoices', 'invoices:read'],
+export function canAccessLocation(user: User, locationId: string): boolean {
+  if (can(user, 'locations.view_all')) return true
+  return user.locations.some((entry) => entry.locationId === locationId)
+}
+
+/** 'full', 'view_only', or null when the location is not theirs at all. */
+export function locationAccess(user: User, locationId: string): LocationAccess | null {
+  if (can(user, 'locations.view_all')) return 'full'
+  return user.locations.find((entry) => entry.locationId === locationId)?.access ?? null
+}
+
+export function isViewOnlyAt(user: User, locationId: string): boolean {
+  return locationAccess(user, locationId) === 'view_only'
+}
+
+/** The landing page: the combined overview for owners, their own location otherwise. */
+export function homePathFor(user: User): string {
+  if (can(user, 'locations.view_all')) return '/dashboard'
+  return user.branchId ? `/branches/${user.branchId}` : '/products'
+}
+
+/** Routes behind a feature flag: hidden entirely while the flag is off. */
+const FLAGGED_ROUTES: [prefix: string, flag: 'b2bSales' | 'replenishmentSuggestions'][] = [
+]
+
+/** Path prefixes and what each one needs. Longest prefix is checked first. */
+const ROUTE_PERMISSIONS: [prefix: string, rule: PermissionRule][] = [
+  ['/products/new', 'catalog.create'],
+  ['/sales/new', 'sales.create'],
+  ['/sales/b2c', ['sales.view_own', 'sales.view_branch']],
+  ['/sales/', ['sales.view_own', 'sales.view_branch']],
+  ['/inventory', 'stock.view'],
+  ['/opening-stock', 'opening_stock.post'],
+  ['/users', 'users.manage'],
 ]
 
 /**
- * Where a user must be sent instead of `pathname`, or null when the path is allowed.
- * Scoped users never see the cross-branch overview or another branch's page.
+ * Where a user must be sent instead of `pathname`, or null when the path is
+ * allowed. Employees never reach the combined overview or another location.
  */
 export function redirectPathFor(user: User, pathname: string): string | null {
   const home = homePathFor(user)
   if (pathname === home) return null
 
-  if (pathname === '/dashboard' && !can(user.role, 'branches:view-all')) return home
-  if (pathname === '/branches' && !can(user.role, 'branches:manage')) return home
+  if (pathname === '/dashboard' && !can(user, 'locations.view_all')) return home
+  if (pathname === '/branches' && !can(user, 'locations.view_all')) return home
 
-  const rule = ROUTE_ACTIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
-  if (rule && !canUser(user, rule[1])) return home
+  const rule = ROUTE_PERMISSIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  if (rule && !canAny(user, rule[1])) return home
 
-  const branchMatch = /^\/branches\/([^/]+)/.exec(pathname)
-  if (branchMatch && !canAccessBranch(user, branchMatch[1])) return home
+  /* A branch page is addressed by its store code, which only the branch list
+     can resolve, so the check here covers the id form and BranchGuard does the
+     rest once the list has loaded. */
+  const locationMatch = /^\/branches\/([^/]+)/.exec(pathname)
+  if (locationMatch && isBranchId(locationMatch[1]) && !canAccessLocation(user, locationMatch[1])) return home
 
   return null
 }
 
 /**
  * Where to land after signing in: back to the page that was asked for when the
- * role may open it, otherwise that role's own home. Only in-app paths are
- * honoured, so a crafted `next` cannot bounce the user off-site.
+ * user may open it, otherwise their own home. Only in-app paths are honoured,
+ * so a crafted `next` cannot bounce the user off-site.
  */
 export function postLoginPathFor(user: User, next: string | null): string {
   const home = homePathFor(user)
@@ -208,7 +143,7 @@ export function postLoginPathFor(user: User, next: string | null): string {
 }
 
 export const ROLE_LABELS: Record<Role, string> = {
-  admin: 'Admin',
+  super_admin: 'Super admin',
   manager: 'Manager',
   employee: 'Employee',
 }

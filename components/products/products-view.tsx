@@ -2,7 +2,9 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { MotionSwap } from '@/components/motion/motion-swap'
+import { SearchInput } from '@/components/shared/search-input'
 import { ArchiveProductDialog } from '@/components/products/archive-product-dialog'
 import { ProductForm } from '@/components/products/product-form'
 import { ProductTable } from '@/components/products/product-table'
@@ -14,7 +16,9 @@ import { Panel } from '@/components/shared/panel'
 import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useCategories, useProducts } from '@/hooks/use-products'
+import { useProductUnits } from '@/hooks/use-stock'
 import { useUIStore } from '@/store/ui-store'
 import type { ProductWithVariants } from '@/types'
 
@@ -46,6 +50,8 @@ export function ProductsView() {
   const filters = useMemo(() => ({ search, category, show }), [search, category, show])
   const { data: products, isPending, isError, error, refetch } = useProducts(filters)
   const { data: categories } = useCategories()
+  const scope = useBranchScope()
+  const { data: units } = useProductUnits(scope)
 
   const total = products?.length ?? 0
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -60,7 +66,7 @@ export function ProductsView() {
         title="Products"
         description="Every model with its color and size variants."
         actions={
-          <Can action="products:create">
+          <Can permission="catalog.create">
             <Link href="/products/new" className="btn btn-primary">
               <Plus size={16} aria-hidden="true" />
               Add product
@@ -90,16 +96,12 @@ export function ProductsView() {
         }
       >
         <div className="toolbar">
-          <div className="search-field">
-            <Search size={16} aria-hidden="true" />
-            <input
-              type="search"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search name, code, category, SKU or barcode"
-              aria-label="Search products"
-            />
-          </div>
+          <SearchInput
+            value={searchInput}
+            onChange={setSearchInput}
+            placeholder="Search name, code, category, SKU or barcode"
+            aria-label="Search products"
+          />
           <SelectInput
             variant="inline"
             aria-label="Filter by category"
@@ -125,26 +127,30 @@ export function ProductsView() {
           )}
         </div>
 
-        {isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={1} stats={0} />
-          </div>
-        ) : isError ? (
-          <div className="panel-body">
-            <ErrorState title="Could not load products" error={error} onRetry={() => void refetch()} />
-          </div>
-        ) : (
-          <>
-            <ProductTable
-              products={visible}
-              filtered={isFiltered}
-              archivedView={show === 'archived'}
-              onEdit={(product) => setDialog({ kind: 'edit', product })}
-              onArchive={(product) => setDialog({ kind: 'archive', product })}
-            />
-            <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
-          </>
-        )}
+        <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+          {isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={1} stats={0} />
+            </div>
+          ) : isError ? (
+            <div className="panel-body">
+              <ErrorState title="Could not load products" error={error} onRetry={() => void refetch()} />
+            </div>
+          ) : (
+            <>
+              <ProductTable
+                products={visible}
+                units={units}
+                dataset={`${show}-${currentPage}`}
+                filtered={isFiltered}
+                archivedView={show === 'archived'}
+                onEdit={(product) => setDialog({ kind: 'edit', product })}
+                onArchive={(product) => setDialog({ kind: 'archive', product })}
+              />
+              <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
+            </>
+          )}
+        </MotionSwap>
       </Panel>
 
       {dialog?.kind === 'edit' && <ProductForm key={dialog.product.id} product={dialog.product} onClose={() => setDialog(null)} />}

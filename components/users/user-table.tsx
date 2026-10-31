@@ -1,35 +1,50 @@
 'use client'
 
-import { Pencil, Trash2, Users } from 'lucide-react'
+import { KeyRound, Pencil, Users } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { SwitchToggle } from '@/components/shared/switch'
-import type { ApiUser } from '@/lib/api'
+import { usePermission } from '@/hooks/use-permission'
 import { ROLE_LABELS } from '@/lib/permissions'
+import type { StaffUser } from '@/services/users.service'
 
 export function UserTable({
   users,
   currentUserId,
+  lastSuperAdminId,
   onCreate,
   onEdit,
+  onPermissions,
   onActiveChange,
-  onDelete,
   pendingUserId,
 }: {
-  users: ApiUser[]
+  users: StaffUser[]
   currentUserId: string
+  /** The only active super admin, who may not be switched off. */
+  lastSuperAdminId: string | null
   onCreate: () => void
-  onEdit: (user: ApiUser) => void
-  onActiveChange: (user: ApiUser, isActive: boolean) => void
-  onDelete: (user: ApiUser) => void
+  onEdit: (user: StaffUser) => void
+  onPermissions: (user: StaffUser) => void
+  onActiveChange: (user: StaffUser, isActive: boolean) => void
   pendingUserId?: string | null
 }) {
+  const { can } = usePermission()
+  const mayDeactivate = can('users.deactivate')
+
+  function activeLabel(user: StaffUser, isSelf: boolean) {
+    if (isSelf) return `${user.fullName} — you cannot deactivate your own account`
+    if (user.id === lastSuperAdminId) return `${user.fullName} is the only active super admin`
+    if (!mayDeactivate) return `${user.fullName} — only a super admin can deactivate accounts`
+    return `${user.isActive ? 'Deactivate' : 'Activate'} ${user.fullName}`
+  }
+
   if (users.length === 0) {
     return (
       <div className="panel-body">
         <EmptyState
           icon={Users}
           title="No users yet"
-          description="Create staff accounts and assign each one to a branch."
+          description="Create staff accounts and assign each one to the locations they work at."
           action={
             <button type="button" className="btn btn-primary" onClick={onCreate}>
               Add user
@@ -55,28 +70,36 @@ export function UserTable({
             </th>
           </tr>
         </thead>
-        <tbody>
-          {users.map((user) => {
+        <MotionTbody>
+          {users.map((user, index) => {
             const isSelf = user.id === currentUserId
+            const locked = isSelf || user.id === lastSuperAdminId || !mayDeactivate
             return (
-              <tr key={user.id}>
+              <MotionTr key={user.id} index={index}>
                 <td>{user.fullName}</td>
                 <td>{user.email}</td>
                 <td>{ROLE_LABELS[user.role]}</td>
                 <td>
                   <SwitchToggle
                     checked={user.isActive}
-                    disabled={isSelf || pendingUserId === user.id}
-                    label={
-                      isSelf
-                        ? `${user.fullName} — you cannot deactivate your own account`
-                        : `${user.isActive ? 'Deactivate' : 'Activate'} ${user.fullName}`
-                    }
+                    disabled={locked || pendingUserId === user.id}
+                    label={activeLabel(user, isSelf)}
                     onCheckedChange={(isActive) => onActiveChange(user, isActive)}
                   />
                 </td>
                 <td>
                   <div className="row-actions">
+                    {user.role === 'employee' && (
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        onClick={() => onPermissions(user)}
+                        aria-label={`Permissions for ${user.fullName}`}
+                        title="Permissions"
+                      >
+                        <KeyRound size={16} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="icon-btn"
@@ -86,22 +109,12 @@ export function UserTable({
                     >
                       <Pencil size={16} />
                     </button>
-                    <button
-                      type="button"
-                      className="icon-btn danger"
-                      disabled={isSelf || pendingUserId === user.id}
-                      onClick={() => onDelete(user)}
-                      aria-label={isSelf ? 'You cannot delete your own account' : `Delete ${user.fullName}`}
-                      title={isSelf ? 'Cannot delete yourself' : 'Delete'}
-                    >
-                      <Trash2 size={16} />
-                    </button>
                   </div>
                 </td>
-              </tr>
+              </MotionTr>
             )
           })}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

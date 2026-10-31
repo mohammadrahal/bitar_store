@@ -16,13 +16,23 @@ export const branchCreateSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, - and _ only')
     .transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
+  /** `POST /branches` takes this; it cannot be changed afterwards. */
+  kind: z.enum(['branch', 'warehouse']),
 })
 
 export type BranchCreateFormValues = z.infer<typeof branchCreateSchema>
 
+/** PATCH /branches/:id — name and active flag; code is read-only in the UI. */
+export const branchEditSchema = branchCreateSchema.extend({
+  isActive: z.boolean(),
+})
+
+export type BranchEditFormValues = z.infer<typeof branchEditSchema>
+
 export const emptyBranchCreateValues: BranchCreateFormValues = {
   code: '',
   name: '',
+  kind: 'branch',
 }
 
 /** Legacy mock fields — unused by the API client. */

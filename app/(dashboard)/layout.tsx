@@ -1,3 +1,4 @@
+import { ActiveLocationGate } from '@/components/shared/active-location-gate'
 import { AppShell } from '@/components/dashboard/app-shell'
 import { AuthGate } from '@/components/shared/auth-gate'
 import { BranchGuard } from '@/components/shared/branch-guard'
@@ -8,7 +9,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <HydrationGate>
       <AuthGate>
         <AppShell>
-          <BranchGuard>{children}</BranchGuard>
+          <ActiveLocationGate>
+            <BranchGuard>{children}</BranchGuard>
+          </ActiveLocationGate>
         </AppShell>
       </AuthGate>
     </HydrationGate>

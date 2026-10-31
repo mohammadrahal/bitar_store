@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import type { UserRole } from '@/lib/api/types'
+import type { Role } from '@/types'
 
-const roleField = z.enum(['admin', 'manager', 'employee'])
+const roleField = z.enum(['super_admin', 'manager', 'employee'])
 
 const MAX_PASSWORD_BYTES = 72
 
@@ -11,7 +11,7 @@ function utf8Bytes(value: string) {
 
 export const emailField = z.string().trim().toLowerCase().email('Enter a valid email').max(254, 'Email is too long')
 
-const fullNameField = z
+export const fullNameField = z
   .string()
   .trim()
   .min(2, 'Full name must be at least 2 characters')
@@ -22,58 +22,53 @@ export const passwordField = z
   .min(8, 'Password must be at least 8 characters')
   .refine((value) => utf8Bytes(value) <= MAX_PASSWORD_BYTES, 'Password is too long')
 
-const branchIdField = z.string().uuid('Choose a branch').optional().or(z.literal(''))
+const locationsField = z.array(
+  z.object({
+    locationId: z.string().uuid(),
+    access: z.enum(['full', 'view_only']),
+  }),
+)
 
-function requireBranch(values: { role: UserRole; branchId?: string }, ctx: z.RefinementCtx) {
-  if (values.role !== 'admin' && !values.branchId) {
-    ctx.addIssue({ code: 'custom', message: 'Assign a branch for managers and employees', path: ['branchId'] })
-  }
+/**
+ * One shape for create and edit, so the form keeps a single resolver. A new
+ * account must set a password; editing leaves the field blank to keep it.
+ */
+export function userFormSchema(requirePassword: boolean) {
+  return z
+    .object({
+      email: emailField,
+      fullName: fullNameField,
+      password: requirePassword ? passwordField : z.union([z.literal(''), passwordField]),
+      role: roleField,
+      locations: locationsField,
+    })
+    .superRefine((values, ctx) => {
+      /* Owners work everywhere; an employee without a location cannot do anything. */
+      if (values.role === 'employee' && values.locations.length === 0) {
+        ctx.addIssue({ code: 'custom', message: 'Assign at least one location', path: ['locations'] })
+      }
+    })
 }
 
-export const createUserSchema = z
-  .object({
-    email: emailField,
-    password: passwordField,
-    fullName: fullNameField,
-    role: roleField,
-    branchId: branchIdField,
-  })
-  .superRefine(requireBranch)
+export type UserFormValues = z.infer<ReturnType<typeof userFormSchema>>
 
-export type CreateUserFormValues = z.infer<typeof createUserSchema>
-
-export const emptyCreateUserValues: CreateUserFormValues = {
+export const emptyUserValues: UserFormValues = {
   email: '',
   password: '',
   fullName: '',
   role: 'employee',
-  branchId: '',
+  locations: [],
 }
 
-export const updateUserSchema = z
-  .object({
-    email: emailField,
-    fullName: fullNameField,
-    /* Blank keeps the current password. */
-    password: z.union([z.literal(''), passwordField]),
-    role: roleField,
-    branchId: branchIdField,
-    isActive: z.boolean(),
-  })
-  .superRefine(requireBranch)
-
-export type UpdateUserFormValues = z.infer<typeof updateUserSchema>
-
-export function toUpdateUserFormValues(
-  user: { email: string; fullName: string; role: UserRole; isActive: boolean },
-  branchId?: string,
-): UpdateUserFormValues {
+export function toUserFormValues(
+  user: { email: string; fullName: string; role: Role },
+  locations: UserFormValues['locations'],
+): UserFormValues {
   return {
     email: user.email,
     fullName: user.fullName,
     password: '',
     role: user.role,
-    branchId: branchId ?? '',
-    isActive: user.isActive,
+    locations,
   }
 }

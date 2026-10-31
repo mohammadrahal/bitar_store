@@ -1,14 +1,21 @@
 'use client'
 
 import { useEffect, useMemo } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
+import { Switch } from '@/components/shared/switch'
 import { useBranches, useCreateBranch, useUpdateBranch } from '@/hooks/use-branches'
-import { ApiError } from '@/lib/api'
+import { isConflict } from '@/lib/errors'
 import { buildBranchCode } from '@/lib/branch-code'
-import { branchCreateSchema, emptyBranchCreateValues, type BranchCreateFormValues } from '@/schemas/branch.schema'
+import {
+  branchCreateSchema,
+  branchEditSchema,
+  emptyBranchCreateValues,
+  type BranchCreateFormValues,
+  type BranchEditFormValues,
+} from '@/schemas/branch.schema'
 import type { Branch } from '@/types'
 
 /** One form for both: with `branch` it edits, without it creates. */
@@ -21,15 +28,16 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
 
   const {
     register,
+    control,
     handleSubmit,
     watch,
     setValue,
     setError,
     formState: { errors, dirtyFields },
-  } = useForm<BranchCreateFormValues>({
-    resolver: zodResolver(branchCreateSchema),
+  } = useForm<BranchCreateFormValues | BranchEditFormValues>({
+    resolver: zodResolver(isEdit ? branchEditSchema : branchCreateSchema),
     defaultValues: branch
-      ? { code: branch.code ?? '', name: branch.name }
+      ? { code: branch.code ?? '', name: branch.name, isActive: branch.isActive, kind: branch.kind }
       : emptyBranchCreateValues,
   })
 
@@ -63,15 +71,21 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
   const submit = handleSubmit((values) => {
     if (clashes) return
     if (branch) {
-      /* The code is fixed after creation, so only the name travels. */
-      update.mutate({ id: branch.id, changes: { name: values.name } }, { onSuccess: onClose })
+      const editValues = values as BranchEditFormValues
+      update.mutate(
+        {
+          id: branch.id,
+          changes: { name: editValues.name, isActive: editValues.isActive },
+        },
+        { onSuccess: onClose },
+      )
       return
     }
-    create.mutate(values, {
+    create.mutate(values as BranchCreateFormValues, {
       onSuccess: onClose,
       /* Another admin may have taken the code since the list was fetched. */
       onError: (error) => {
-        if (error instanceof ApiError && error.status === 409) {
+        if (isConflict(error)) {
           setError('code', { message: error.message || 'That code is already used.' })
         }
       },
@@ -84,7 +98,7 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
       title={isEdit ? `Edit ${branch?.name}` : 'New branch'}
       description={
         isEdit
-          ? 'The code identifies the branch everywhere it is used, so only the display name can change.'
+          ? 'The code is fixed after creation. You can change the display name and whether the branch is active.'
           : 'The code is taken from the name, stored in upper case, and must be unique across the network. Edit it if you need something different.'
       }
       onClose={onClose}
@@ -101,6 +115,30 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
       }
     >
       <div className="form-grid">
+        {!isEdit && (
+          <Controller
+            control={control}
+            name="kind"
+            render={({ field }) => (
+              <Field label="Kind" hint="A warehouse holds stock for the branches. It cannot be changed later." className="full">
+                <div className="segmented" role="radiogroup" aria-label="Kind">
+                  {(['branch', 'warehouse'] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={field.value === option}
+                      className={field.value === option ? 'active' : ''}
+                      onClick={() => field.onChange(option)}
+                    >
+                      {option === 'branch' ? 'Branch' : 'Warehouse'}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
+          />
+        )}
         <Field
           label="Display name"
           error={nameTaken ? `A branch is already called “${name.trim()}”.` : errors.name?.message}
@@ -120,6 +158,23 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
         >
           <input {...register('code')} autoComplete="off" placeholder="HAMRA" readOnly={isEdit} />
         </Field>
+        {isEdit && (
+          <div className="full">
+            <Controller
+              control={control}
+              name="isActive"
+              render={({ field }) => (
+                <Switch
+                  id="branch-is-active"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  label="Active branch"
+                  description="Inactive branches are hidden from pickers. Clear stock before turning off."
+                />
+              )}
+            />
+          </div>
+        )}
       </div>
     </Drawer>
   )

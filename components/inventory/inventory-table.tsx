@@ -1,8 +1,10 @@
 'use client'
 
 import { PackageSearch } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { StockBadge } from '@/components/shared/stock-badge'
+import { balanceText } from '@/lib/balances'
 import { formatNumber } from '@/lib/format'
 import type { Balances, InventoryRow } from '@/types'
 
@@ -14,12 +16,16 @@ const COLUMNS: { key: keyof Balances; label: string }[] = [
   { key: 'inTransit', label: 'In transit' },
 ]
 
+/** Reserved and on hold come back null until the API can report them. */
+const cell = (value: number | null) => balanceText(value, formatNumber)
+
 export function InventoryTable({
   rows,
   totals,
   selectedId,
   onSelect,
   filtered,
+  dataset,
 }: {
   rows: InventoryRow[]
   /** Totals over every row that matched, not just this page. */
@@ -27,6 +33,8 @@ export function InventoryTable({
   selectedId: string | null
   onSelect: (row: InventoryRow) => void
   filtered: boolean
+  /** Names the scope and page on screen, so the entrance plays once per set. */
+  dataset?: string
 }) {
   if (rows.length === 0) {
     return (
@@ -56,9 +64,9 @@ export function InventoryTable({
             <th scope="col">Status</th>
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.variantId} className={`row-button ${row.variantId === selectedId ? 'selected' : ''}`}>
+        <MotionTbody dataset={dataset}>
+          {rows.map((row, index) => (
+            <MotionTr key={row.variantId} className={`row-button ${row.variantId === selectedId ? 'selected' : ''}`} index={index}>
               <td className="card-title">
                 <button
                   type="button"
@@ -75,22 +83,22 @@ export function InventoryTable({
               </td>
               {COLUMNS.map((column) => (
                 <td key={column.key} className="num tabular" data-label={column.label}>
-                  {column.key === 'available' ? <strong>{formatNumber(row[column.key])}</strong> : formatNumber(row[column.key])}
+                  {column.key === 'available' ? <strong>{cell(row[column.key])}</strong> : cell(row[column.key])}
                 </td>
               ))}
               <td data-label="Status">
                 <StockBadge row={row} />
               </td>
-            </tr>
+            </MotionTr>
           ))}
-        </tbody>
+        </MotionTbody>
         <tfoot>
           <tr>
             <td className="card-title">Totals</td>
             <td />
             {COLUMNS.map((column) => (
               <td key={column.key} className="num tabular" data-label={column.label}>
-                {formatNumber(totals[column.key])}
+                {cell(totals[column.key])}
               </td>
             ))}
             <td />

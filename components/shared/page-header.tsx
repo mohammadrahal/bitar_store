@@ -1,3 +1,5 @@
+import { FadeIn } from '@/components/motion/fade-in'
+
 export function PageHeader({
   eyebrow,
   title,
@@ -10,13 +12,13 @@ export function PageHeader({
   actions?: React.ReactNode
 }) {
   return (
-    <div className="page-heading">
+    <FadeIn className="page-heading">
       <div>
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1>{title}</h1>
         {description && <p className="subtitle">{description}</p>}
       </div>
       {actions && <div className="heading-actions">{actions}</div>}
-    </div>
+    </FadeIn>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, X } from 'lucide-react'
 import { BrandLogo, NavLinks, SidebarFooter } from '@/components/dashboard/sidebar-nav'
 import { Topbar } from '@/components/dashboard/topbar'
 import { NoBranchBanner } from '@/components/shared/no-branch-banner'
@@ -40,7 +40,7 @@ function MobileNav() {
           </button>
         </div>
         <NavLinks collapsed={false} onNavigate={() => setOpen(false)} />
-        <SidebarFooter />
+        <SidebarFooter onNavigate={() => setOpen(false)} />
       </aside>
     </div>
   )
@@ -57,30 +57,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
 
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`} aria-label="Sidebar">
+        <button
+          type="button"
+          className={`sidebar-toggle ${collapsed ? 'is-collapsed' : ''}`}
+          onClick={toggleSidebar}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!collapsed}
+        >
+          <ChevronLeft className="sidebar-toggle-icon" size={18} strokeWidth={2} aria-hidden="true" />
+        </button>
         <div className="brand">
           <BrandLogo compact={collapsed} />
-          <button
-            type="button"
-            className="icon-btn collapse-btn"
-            onClick={toggleSidebar}
-            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            aria-expanded={!collapsed}
-          >
-            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
         </div>
         <NavLinks collapsed={collapsed} />
-        {!collapsed && <SidebarFooter />}
+        <SidebarFooter compact={collapsed} />
       </aside>
 
       <MobileNav />
 
       <div className="main-content">
         <Topbar />
-        <main id="main" className="page-content" tabIndex={-1}>
-          <NoBranchBanner />
-          <OfflineBanner />
-          {children}
+        <main id="main" className="page-scroll" tabIndex={-1}>
+          <div className="page-content">
+            <NoBranchBanner />
+            <OfflineBanner />
+            {children}
+          </div>
         </main>
       </div>
     </div>
