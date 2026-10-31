@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { INVOICE_KINDS, INVOICE_STATUSES } from '@/lib/invoices'
-import { ALL_BRANCHES, type BranchScope, type InvoiceKind, type InvoiceStatus } from '@/types'
+import { ALL_BRANCHES, type BranchScope } from '@/types'
 
 export type Theme = 'light' | 'dark'
 
@@ -35,21 +34,6 @@ interface UIState {
   /** The location an employee with several assignments is working in. */
   activeLocationId: string | null
   setActiveLocationId: (locationId: string | null) => void
-  invoiceSearch: string
-  setInvoiceSearch: (search: string) => void
-  /** 'all', or one InvoiceKind. Kept as a string so the select needs no cast. */
-  invoiceKind: InvoiceKind | 'all'
-  setInvoiceKind: (kind: string) => void
-  invoiceStatus: InvoiceStatus | 'all'
-  setInvoiceStatus: (status: string) => void
-}
-
-function asKind(value: string): InvoiceKind | 'all' {
-  return INVOICE_KINDS.includes(value as InvoiceKind) ? (value as InvoiceKind) : 'all'
-}
-
-function asStatus(value: string): InvoiceStatus | 'all' {
-  return INVOICE_STATUSES.includes(value as InvoiceStatus) ? (value as InvoiceStatus) : 'all'
 }
 
 export const useUIStore = create<UIState>()(
@@ -72,12 +56,6 @@ export const useUIStore = create<UIState>()(
       setBranchScope: (branchScope) => set({ branchScope }),
       activeLocationId: null,
       setActiveLocationId: (activeLocationId) => set({ activeLocationId }),
-      invoiceSearch: '',
-      setInvoiceSearch: (invoiceSearch) => set({ invoiceSearch }),
-      invoiceKind: 'all',
-      setInvoiceKind: (kind) => set({ invoiceKind: asKind(kind) }),
-      invoiceStatus: 'all',
-      setInvoiceStatus: (status) => set({ invoiceStatus: asStatus(status) }),
     }),
     {
       name: 'bitar-fashion:ui:v1',

@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { Field } from '@/components/shared/field'
-import { useAddColor, useColors } from '@/hooks/use-attributes'
 import { colorSchema } from '@/schemas/product.schema'
 
-const DEFAULT_HEX = '#8F8C86'
-
-/** Toggle chips for the shared color list, plus an inline add that rejects case-insensitive duplicates. */
+/**
+ * The colours this model comes in. The API stores a colour as a plain string on
+ * the SKU, so there is no shared palette: each one is typed in here and the
+ * chips are what has been picked so far.
+ */
 export function ColorPicker({
   value,
   onChange,
@@ -16,57 +17,53 @@ export function ColorPicker({
 }: {
   value: string[]
   onChange: (colors: string[]) => void
-  /** Colors the model already has; shown selected and not removable. */
+  /** Colours the model already has; shown selected and not removable. */
   locked?: string[]
 }) {
-  const { data: colors, isPending, isError } = useColors()
-  const add = useAddColor()
   const [name, setName] = useState('')
-  const [hex, setHex] = useState(DEFAULT_HEX)
   const [error, setError] = useState<string | null>(null)
 
-  const toggle = (color: string) =>
-    onChange(value.includes(color) ? value.filter((entry) => entry !== color) : [...value, color])
+  const chips = [...new Set([...locked, ...value])]
 
   const submit = () => {
-    const parsed = colorSchema.safeParse({ name, hex })
+    const parsed = colorSchema.safeParse({ name })
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Check the color')
+      setError(parsed.error.issues[0]?.message ?? 'Check the colour')
+      return
+    }
+    /* Same colour in another case is the same colour. */
+    const taken = chips.find((entry) => entry.toLowerCase() === parsed.data.name.toLowerCase())
+    if (taken) {
+      setError(`${taken} is already on this model.`)
       return
     }
     setError(null)
-    add.mutate(parsed.data, {
-      onSuccess: (created) => {
-        onChange([...value, created.name])
-        setName('')
-      },
-      onError: (failure: Error) => setError(failure.message),
-    })
+    onChange([...value, parsed.data.name])
+    setName('')
   }
-
-  if (isPending) return <p className="muted">Loading colors…</p>
-  if (isError) return <p className="field-error">Colors could not be loaded. Reload to try again.</p>
 
   return (
     <>
-      <div className="chip-row" role="group" aria-label="Colors">
-        {colors.map((color) => {
-          const isLocked = locked.includes(color.name)
-          return (
-            <button
-              key={color.name}
-              type="button"
-              className="chip chip-lg"
-              aria-pressed={isLocked || value.includes(color.name)}
-              disabled={isLocked}
-              onClick={() => toggle(color.name)}
-            >
-              <span className="swatch" style={{ background: color.hex }} aria-hidden="true" />
-              {color.name}
-            </button>
-          )
-        })}
-      </div>
+      {chips.length > 0 && (
+        <div className="chip-row" role="group" aria-label="Colors">
+          {chips.map((color) => {
+            const isLocked = locked.includes(color)
+            return (
+              <button
+                key={color}
+                type="button"
+                className="chip chip-lg"
+                aria-pressed
+                disabled={isLocked}
+                title={isLocked ? `${color} already has variants` : `Remove ${color}`}
+                onClick={() => onChange(value.filter((entry) => entry !== color))}
+              >
+                {color}
+              </button>
+            )
+          })}
+        </div>
+      )}
       <div className="inline-add">
         <Field label="Add a color" error={error ?? undefined}>
           <input
@@ -82,10 +79,7 @@ export function ColorPicker({
             placeholder="Terracotta"
           />
         </Field>
-        <Field label="Shade">
-          <input type="color" value={hex} onChange={(event) => setHex(event.target.value)} />
-        </Field>
-        <button type="button" className="btn btn-secondary" onClick={submit} disabled={add.isPending}>
+        <button type="button" className="btn btn-secondary" onClick={submit}>
           <Plus size={16} aria-hidden="true" />
           Add
         </button>

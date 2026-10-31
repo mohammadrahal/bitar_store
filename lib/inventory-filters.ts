@@ -1,6 +1,6 @@
 import type { InventoryFilter } from '@/types'
 
-const FILTERS: InventoryFilter[] = ['all', 'low', 'on_hold', 'in_transit', 'archived']
+const FILTERS: InventoryFilter[] = ['all', 'out', 'on_hold', 'in_transit', 'archived']
 
 export function parseInventoryFilter(value: string | null | undefined): InventoryFilter {
   if (value && FILTERS.includes(value as InventoryFilter)) return value as InventoryFilter

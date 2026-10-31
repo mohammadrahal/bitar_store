@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
 import { LineDiscountField, type LineDiscount } from '@/components/sales/line-discount'
@@ -12,15 +12,14 @@ import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
 import { ViewOnlyNotice } from '@/components/shared/view-only-notice'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
-import { useOpenDiscountRequests, useRequestDiscount } from '@/hooks/use-discount-requests'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { useCreateSale } from '@/hooks/use-sales'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { usePermission } from '@/hooks/use-permission'
 import { isConflict, messageOf } from '@/lib/errors'
 import { formatPrice } from '@/lib/format'
-import { fromCents, toCents } from '@/lib/invoice-totals'
-import { emptyPayment, paymentProblem, paymentsFor, type PaymentDraft } from '@/lib/sale-payments'
+import { fromCents, toCents } from '@/lib/money'
+import { emptyPayment, paymentProblem, paymentsFor, syncTendered, type PaymentDraft } from '@/lib/sale-payments'
 import type { VariantOption } from '@/types'
 
 interface CartLine {
@@ -41,7 +40,6 @@ export function NewSaleView() {
   const online = useOnlineStatus()
   const defaultBranch = useDefaultBranchId()
   const create = useCreateSale()
-  const requestDiscount = useRequestDiscount()
   const idempotency = useIdempotencyKey()
 
   const [branchChoice, setBranch] = useState('')
@@ -51,42 +49,17 @@ export function NewSaleView() {
   const branchId = locationScoped ? defaultBranch : branchChoice
 
   const mayApplyDiscount = can('discounts.apply', branchId || undefined)
-  const mayRequestDiscount = can('discounts.request', branchId || undefined)
-  const { data: discountRequests } = useOpenDiscountRequests(branchId)
 
   const total = fromCents(lines.reduce((sum, line) => sum + lineNet(line), 0))
   const units = lines.reduce((sum, line) => sum + line.quantity, 0)
   const inCart = Object.fromEntries(lines.map((line) => [line.option.variantId, line.quantity]))
 
-  /* A split the cashier has not touched yet should still add up, so the cash
-     part follows the total until they move money to Whish. */
+  /* Cash received follows the sale total until the cashier types a larger bill. */
   useEffect(() => {
-    setPayment((current) =>
-      current.mode === 'split' && toCents(current.cashAmount) + toCents(current.whishAmount) !== toCents(total)
-        ? current
-        : { ...current, cashAmount: current.mode === 'split' ? current.cashAmount : total },
-    )
+    setPayment((current) => syncTendered(current, total))
   }, [total])
 
-  const requestFor = (variantId: string) =>
-    discountRequests?.find((request) => request.variantId === variantId)
-
-  /* An ask nobody has decided yet blocks the sale: the price is not settled. */
-  const awaitingApproval = lines.some((line) => requestFor(line.option.variantId)?.status === 'pending')
-
-  const effectiveLines = useMemo(
-    () =>
-      lines.map((line) => {
-        const approved = discountRequests?.find(
-          (request) => request.variantId === line.option.variantId && request.status === 'approved',
-        )
-        return approved ? { ...line, discount: { percent: approved.percent, reason: approved.reason } } : line
-      }),
-    [lines, discountRequests],
-  )
-
-  const approvedTotal = fromCents(effectiveLines.reduce((sum, line) => sum + lineNet(line), 0))
-  const problem = paymentProblem(payment, approvedTotal)
+  const problem = paymentProblem(payment, total)
   /* The server refuses a Whish reference it has already recorded. */
   const referenceError = isConflict(create.error) ? messageOf(create.error) : undefined
 
@@ -99,20 +72,20 @@ export function NewSaleView() {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
-    if (effectiveLines.length === 0 || problem || awaitingApproval) return
+    if (lines.length === 0 || problem) return
     create.mutate(
       {
         input: {
           branchId,
           note: customer.trim() || undefined,
-          lines: effectiveLines.map((line) => ({
+          lines: lines.map((line) => ({
             skuId: line.option.variantId,
             quantity: line.quantity,
             unitPrice: line.option.sellPrice,
             discountPercent: line.discount?.percent,
             discountReason: line.discount?.reason,
           })),
-          payments: paymentsFor(payment, approvedTotal),
+          payments: paymentsFor(payment, total),
         },
         idempotencyKey: idempotency.current(),
       },
@@ -169,24 +142,12 @@ export function NewSaleView() {
                 </div>
                 <LineDiscountField
                   lineTotal={line.quantity * line.option.sellPrice}
-                  variantId={line.option.variantId}
                   mayApply={mayApplyDiscount}
-                  mayRequest={mayRequestDiscount}
                   value={line.discount}
-                  request={requestFor(line.option.variantId)}
-                  pending={requestDiscount.isPending}
                   onChange={(discount) =>
                     setLines((current) =>
                       current.map((entry) => (entry === line ? { ...entry, discount } : entry)),
                     )
-                  }
-                  onRequest={(variantId, discount) =>
-                    requestDiscount.mutate({
-                      branchId,
-                      variantId,
-                      percent: discount.percent,
-                      reason: discount.reason,
-                    })
                   }
                 />
               </li>
@@ -206,24 +167,18 @@ export function NewSaleView() {
       {lines.length > 0 && (
         <PaymentFields
           draft={payment}
-          total={approvedTotal}
+          total={total}
           onChange={setPayment}
           referenceError={referenceError}
         />
       )}
 
       <SaleFooter
-        total={approvedTotal}
+        total={total}
         units={units}
         pending={create.isPending}
-        disabled={lines.length === 0 || !online || !branchId || Boolean(problem) || awaitingApproval}
-        problem={
-          awaitingApproval
-            ? 'A requested discount is still waiting for approval.'
-            : lines.length > 0
-              ? (problem ?? undefined)
-              : undefined
-        }
+        disabled={lines.length === 0 || !online || !branchId || Boolean(problem)}
+        problem={lines.length > 0 ? (problem ?? undefined) : undefined}
       />
     </form>
   )

@@ -1,19 +1,10 @@
-import type { BranchScope, InventoryFilter, InvoiceKind, InvoiceStatus, SalesChannel, TransferStatus } from '@/types'
+import type { BranchScope, InventoryFilter } from '@/types'
 
 export interface ProductFilters {
   search: string
   category: string
   /** Active models by default; archived ones stay findable for history. */
   show?: 'active' | 'archived' | 'all'
-}
-
-export interface InvoiceFilters {
-  scope: BranchScope
-  kind: InvoiceKind | 'all'
-  status: InvoiceStatus | 'all'
-  search: string
-  /** When set, only customer sales and returns for this channel are returned. */
-  salesChannel?: SalesChannel
 }
 
 /** Completed POS sales from `GET/POST /sales`. */
@@ -51,12 +42,6 @@ export const queryKeys = {
     sales: (scope: BranchScope) => ['analytics', 'sales', scope] as const,
   },
   sales: salesQueryKeys,
-  invoices: {
-    all: ['invoices'] as const,
-    list: (filters: InvoiceFilters) => ['invoices', 'list', filters] as const,
-    detail: (invoiceId: string) => ['invoices', 'detail', invoiceId] as const,
-    byProduct: (productId: string) => ['invoices', 'by-product', productId] as const,
-  },
   stock: {
     all: ['stock'] as const,
     /* `branches` is the mirrored branch set these figures were computed from,
@@ -66,6 +51,10 @@ export const queryKeys = {
        pages, so they share one query rather than fetching every branch twice. */
     overview: (scope: BranchScope, branches: string) => ['stock', 'overview', scope, branches] as const,
     byBranch: (branchId: string) => ['stock', 'by-branch', branchId] as const,
+    /* Units behind the catalog screens, one key per scope so the header filter
+       narrows them like every other stock read. */
+    byProduct: (scope: BranchScope) => ['stock', 'by-product', scope] as const,
+    styleUnits: (productId: string, scope: BranchScope) => ['stock', 'style-units', productId, scope] as const,
     /* On-hand per variant at one branch. Its own key, not `byBranch`: that one
        answers with a single total, and two queries of different shapes under
        one key serve each other's data to whichever mounted second. */
@@ -85,35 +74,8 @@ export const queryKeys = {
     saleModels: (search: string) => ['stock', 'sale-models', search] as const,
     saleVariants: (branchId: string, productId: string) => ['stock', 'sale-variants', branchId, productId] as const,
   },
-  transfers: {
-    all: ['transfers'] as const,
-    list: (scope: BranchScope, status: TransferStatus | 'open' | 'all') => ['transfers', 'list', scope, status] as const,
-    detail: (transferId: string) => ['transfers', 'detail', transferId] as const,
-  },
-  attributes: {
-    all: ['attributes'] as const,
-    colors: () => ['attributes', 'colors'] as const,
-  },
   locations: {
     warehouse: () => ['locations', 'warehouse'] as const,
-  },
-  suppliers: {
-    all: ['suppliers'] as const,
-    list: (includeArchived: boolean) => ['suppliers', 'list', includeArchived] as const,
-  },
-  receipts: {
-    all: ['receipts'] as const,
-    list: (status: string) => ['receipts', 'list', status] as const,
-    detail: (receiptId: string) => ['receipts', 'detail', receiptId] as const,
-  },
-  discountRequests: {
-    all: ['discount-requests'] as const,
-    list: (scope: BranchScope) => ['discount-requests', 'list', scope] as const,
-    atBranch: (branchId: string) => ['discount-requests', 'at-branch', branchId] as const,
-  },
-  replenishmentRequests: {
-    all: ['replenishment-requests'] as const,
-    list: (scope: BranchScope, status: string) => ['replenishment-requests', 'list', scope, status] as const,
   },
   openingStock: {
     all: ['opening-stock'] as const,

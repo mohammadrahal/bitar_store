@@ -1,15 +1,13 @@
 import type { RequestFn } from '@/lib/api/client'
 import { parseStockList } from '@/lib/api/map-stock'
-import type { OpeningStockInput, OpeningStockResult, StockListParams } from '@/lib/api/types'
-
-function queryOf(params: Record<string, string | number | boolean | undefined>): string {
-  const query = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') query.set(key, String(value))
-  }
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
+import { queryOf } from '@/lib/api/query'
+import type {
+  OpeningStockInput,
+  OpeningStockResult,
+  StockListParams,
+  StockMovementParams,
+  StockOverviewParams,
+} from '@/lib/api/types'
 
 export function createStockApi(request: RequestFn) {
   return {
@@ -19,6 +17,12 @@ export function createStockApi(request: RequestFn) {
     },
     setOpeningStock: (input: OpeningStockInput, idempotencyKey: string) =>
       request<OpeningStockResult>('/stock/opening', 'POST', input, { idempotencyKey }),
+    /* Admin only, and every branch at once; the shape is not documented yet. */
+    stockOverview: (params: StockOverviewParams = {}) => request<unknown>(`/stock/overview${queryOf({ ...params })}`),
+    /* Needs `adjustments.create`. The server's movement log, which the variant
+       page still reads from the local ledger. */
+    listStockMovements: (params: StockMovementParams = {}) =>
+      request<unknown>(`/stock/movements${queryOf({ ...params })}`),
   }
 }
 

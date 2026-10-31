@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useBranchHref } from '@/hooks/use-branches'
 import { balanceText } from '@/lib/balances'
 import { formatNumber } from '@/lib/format'
 import type { Balances, LocationBalance } from '@/types'
@@ -14,6 +17,8 @@ export function LocationBalancesTable({
   /** The side card shows four numbers; the full page shows all five. */
   compact?: boolean
 }) {
+  const hrefOf = useBranchHref()
+
   return (
     <div className="table-wrap">
       <table className="card-table">
@@ -35,7 +40,7 @@ export function LocationBalancesTable({
                 {location.isWarehouse ? (
                   <strong>{location.branchName}</strong>
                 ) : (
-                  <Link href={`/branches/${location.branchId}`} className="link-cell">
+                  <Link href={hrefOf(location.branchId)} className="link-cell">
                     {location.branchName}
                   </Link>
                 )}

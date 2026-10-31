@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { usePermission } from '@/hooks/use-permission'
 import { ApiError } from '@/lib/api'
+import { branchHref } from '@/lib/branch-slug'
 import { queryKeys } from '@/lib/query-keys'
 import type { UpdateBranchInput } from '@/lib/api'
 import {
@@ -30,11 +31,24 @@ export function useBranches() {
   })
 }
 
-export function useBranch(branchId: string) {
+/**
+ * The readable href for a branch page, for callers that only hold an id. Falls
+ * back to the id until the branch list has arrived.
+ */
+export function useBranchHref() {
+  const { data: branches } = useBranches()
+  return (branchId: string) => {
+    const branch = branches?.find((candidate) => candidate.id === branchId)
+    return branch ? branchHref(branch) : `/branches/${branchId}`
+  }
+}
+
+/** `segment` is the code or the id in the URL. */
+export function useBranch(segment: string) {
   return useQuery({
-    queryKey: queryKeys.branches.detail(branchId),
-    queryFn: () => getBranch(branchId),
-    enabled: Boolean(branchId),
+    queryKey: queryKeys.branches.detail(segment),
+    queryFn: () => getBranch(segment),
+    enabled: Boolean(segment),
   })
 }
 

@@ -34,10 +34,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
   if (isError) return <ErrorState title="Could not load this product" error={error} onRetry={() => void refetch()} />
 
   const count = product.variants.length
-  const details = [product.details?.season, product.details?.brand, product.details?.material].filter(Boolean)
-  const prices = can('costs.view')
-    ? `From ${formatPrice(product.sellPrice)} · Cost ${formatPrice(product.costPrice)}`
-    : `From ${formatPrice(product.sellPrice)}`
+  const prices = `From ${formatPrice(product.sellPrice)}`
   /* Looked up on every render so the dialogs show the SKU as it is after a refetch. */
   const selected = dialog && 'variantId' in dialog ? product.variants.find((variant) => variant.id === dialog.variantId) : undefined
 
@@ -50,7 +47,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
       <PageHeader
         eyebrow={product.archived ? `${product.code} · Archived` : product.code}
         title={product.name}
-        description={[product.category, ...details].join(' · ')}
+        description={product.category}
         actions={
           <>
             {!product.archived && (

@@ -16,7 +16,9 @@ import { Panel } from '@/components/shared/panel'
 import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useCategories, useProducts } from '@/hooks/use-products'
+import { useProductUnits } from '@/hooks/use-stock'
 import { useUIStore } from '@/store/ui-store'
 import type { ProductWithVariants } from '@/types'
 
@@ -48,6 +50,8 @@ export function ProductsView() {
   const filters = useMemo(() => ({ search, category, show }), [search, category, show])
   const { data: products, isPending, isError, error, refetch } = useProducts(filters)
   const { data: categories } = useCategories()
+  const scope = useBranchScope()
+  const { data: units } = useProductUnits(scope)
 
   const total = products?.length ?? 0
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -136,6 +140,7 @@ export function ProductsView() {
             <>
               <ProductTable
                 products={visible}
+                units={units}
                 dataset={`${show}-${currentPage}`}
                 filtered={isFiltered}
                 archivedView={show === 'archived'}

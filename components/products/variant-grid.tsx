@@ -1,7 +1,3 @@
-'use client'
-
-import { useColors } from '@/hooks/use-attributes'
-
 /** Color rows × size columns. Each tick is one variant; existing ones are ticked and locked. */
 export function VariantGrid({
   colors,
@@ -16,9 +12,6 @@ export function VariantGrid({
   isLocked?: (color: string, size: string) => boolean
   onToggle: (color: string, size: string) => void
 }) {
-  const { data: palette } = useColors()
-  const hexOf = (name: string) => palette?.find((entry) => entry.name === name)?.hex
-
   if (colors.length === 0 || sizes.length === 0) {
     return <p className="muted">Pick at least one color and one size to see the combinations.</p>
   }
@@ -41,10 +34,7 @@ export function VariantGrid({
           {colors.map((color) => (
             <tr key={color}>
               <th scope="row">
-                <span className="grid-color">
-                  <span className="swatch" style={{ background: hexOf(color) }} aria-hidden="true" />
-                  {color}
-                </span>
+                <span className="grid-color">{color}</span>
               </th>
               {sizes.map((size) => {
                 const locked = isLocked(color, size)

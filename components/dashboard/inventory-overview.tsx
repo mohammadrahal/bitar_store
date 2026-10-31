@@ -1,18 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { LowStockTable } from '@/components/dashboard/low-stock-table'
 import { MotionSwap } from '@/components/motion/motion-swap'
 import { OperationsCards } from '@/components/dashboard/operations-cards'
 import { BranchStatCards, NetworkStatCards } from '@/components/dashboard/stat-cards'
-import { ErrorState } from '@/components/shared/error-state'
-import { Pagination } from '@/components/shared/pagination'
-import { Panel } from '@/components/shared/panel'
-import { Skeleton } from '@/components/shared/skeleton'
 import { useStockOverview } from '@/hooks/use-stock'
-import { ALL_BRANCHES, type BranchScope } from '@/types'
-
-const PAGE_SIZE = 10
+import type { BranchScope } from '@/types'
 
 /** Placeholders that hold the figures' space while they load. */
 function StatCardsSkeleton() {
@@ -25,18 +17,10 @@ function StatCardsSkeleton() {
   )
 }
 
-function attentionDescription(isPending: boolean, isError: boolean, count: number): string {
-  if (isError) return 'These figures could not be loaded.'
-  if (isPending) return 'Checking stock against each threshold.'
-  if (count === 0) return 'Every variant is above its low-stock threshold.'
-  return `${count} ${count === 1 ? 'variant' : 'variants'} at or below the threshold, emptiest first.`
-}
-
 /**
- * Stat cards plus the low-stock table, shared by the overview and a single
- * branch page. The figures, the operations cards and the charts are three
- * separate reads, so each carries its own loading state instead of one
- * skeleton holding back all three.
+ * The figures for a scope: the stat cards from `GET /stock` and the operations
+ * cards from `GET /sales`. Each is its own read, so one slow answer does not
+ * hold the other back.
  */
 export function InventoryOverview({
   scope,
@@ -45,21 +29,11 @@ export function InventoryOverview({
 }: {
   scope: BranchScope
   mode: 'network' | 'branch'
-  /** Slot between the figures and the attention list, for the overview charts. */
+  /** Slot under the figures, for the overview charts. */
   children?: React.ReactNode
 }) {
   const overview = useStockOverview(scope)
-  const [page, setPage] = useState(1)
-
-  useEffect(() => {
-    setPage(1)
-  }, [scope])
-
   const stats = overview.data?.stats
-  const rows = overview.data?.lowStock ?? []
-  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const visible = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   return (
     <>
@@ -76,42 +50,6 @@ export function InventoryOverview({
       <OperationsCards scope={scope} />
 
       {children}
-
-      <Panel
-        title="Needs attention"
-        description={attentionDescription(overview.isPending, overview.isError, rows.length)}
-      >
-        <MotionSwap state={overview.isError ? 'error' : overview.isPending ? 'loading' : 'ready'}>
-          {overview.isError ? (
-            <div className="panel-body">
-              <ErrorState
-                title="Could not load stock figures"
-                error={overview.error}
-                onRetry={() => void overview.refetch()}
-              />
-            </div>
-          ) : overview.isPending ? (
-            <div className="panel-body">
-              <Skeleton rows={3} stats={0} />
-            </div>
-          ) : (
-            <>
-              <LowStockTable
-                rows={visible}
-                showBranch={mode === 'network' && scope === ALL_BRANCHES}
-                dataset={`${scope}-${currentPage}`}
-              />
-              <Pagination
-                page={currentPage}
-                pageCount={pageCount}
-                total={rows.length}
-                pageSize={PAGE_SIZE}
-                onPage={setPage}
-              />
-            </>
-          )}
-        </MotionSwap>
-      </Panel>
     </>
   )
 }

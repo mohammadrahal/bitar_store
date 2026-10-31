@@ -2,7 +2,7 @@
 
 import { Field } from '@/components/shared/field'
 import { formatPrice } from '@/lib/format'
-import { amountsOf, changeDue, type PaymentDraft, type PaymentMode } from '@/lib/sale-payments'
+import { amountsOf, changeDue, syncTendered, type PaymentDraft, type PaymentMode } from '@/lib/sale-payments'
 
 const MODES: { value: PaymentMode; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -45,13 +45,19 @@ export function PaymentFields({
             aria-checked={draft.mode === mode.value}
             className={draft.mode === mode.value ? 'active' : ''}
             onClick={() =>
-              set({
-                mode: mode.value,
-                /* Splitting starts from the whole total in cash, so the cashier
-                   moves part of it to Whish rather than typing both. */
-                cashAmount: mode.value === 'split' ? total : 0,
-                whishAmount: 0,
-              })
+              onChange(
+                syncTendered(
+                  {
+                    ...draft,
+                    mode: mode.value,
+                    /* Splitting starts from the whole total in cash, so the cashier
+                       moves part of it to Whish rather than typing both. */
+                    cashAmount: mode.value === 'split' ? total : 0,
+                    whishAmount: 0,
+                  },
+                  total,
+                ),
+              )
             }
           >
             {mode.label}
@@ -92,18 +98,24 @@ export function PaymentFields({
 
         {cash > 0 && (
           <>
-            <Field label="Cash tendered" hint={`Cash due ${formatPrice(cash)}`}>
+            <Field
+              label="Cash received"
+              hint="Filled with the sale total. Edit if they paid with a larger bill."
+            >
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 inputMode="decimal"
                 className="tabular"
-                value={draft.tendered || ''}
+                value={draft.tendered > 0 ? draft.tendered : cash || ''}
                 onChange={(event) => set({ tendered: amount(event.target.value) })}
               />
             </Field>
-            <Field label="Change" hint="Handed back; not revenue">
+            <Field
+              label="Change"
+              hint={change > 0 ? 'Give this back to the customer' : 'Exact payment — nothing to hand back'}
+            >
               <input type="text" className="tabular" value={formatPrice(change)} readOnly tabIndex={-1} />
             </Field>
           </>

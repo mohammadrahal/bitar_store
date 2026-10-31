@@ -5,8 +5,8 @@ import { Archive, ArchiveRestore, Package, Pencil } from 'lucide-react'
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
-import { formatPrice } from '@/lib/format'
-import type { ProductWithVariants } from '@/types'
+import { formatNumber, formatPrice } from '@/lib/format'
+import type { ProductWithVariants, Units } from '@/types'
 
 function variantSummary(product: ProductWithVariants) {
   const sizes = new Set(product.variants.map((variant) => variant.size)).size
@@ -19,6 +19,19 @@ function hasPriceRange(product: ProductWithVariants) {
   return new Set(product.variants.filter((variant) => !variant.archived).map((variant) => variant.sellPrice)).size > 1
 }
 
+/** Available units, with on hand named beside it when some are not sellable. */
+function StockCell({ units, loading }: { units?: Units; loading: boolean }) {
+  if (loading) return <span className="muted">…</span>
+  const available = units?.available ?? 0
+  const onHand = units?.onHand ?? 0
+  return (
+    <>
+      {formatNumber(available)}
+      {onHand !== available && <small>{formatNumber(onHand)} on hand</small>}
+    </>
+  )
+}
+
 export function ProductTable({
   products,
   filtered,
@@ -26,6 +39,7 @@ export function ProductTable({
   onEdit,
   onArchive,
   dataset,
+  units,
 }: {
   products: ProductWithVariants[]
   /** True when a search or category filter is narrowing the list. */
@@ -35,6 +49,8 @@ export function ProductTable({
   onArchive: (product: ProductWithVariants) => void
   /** Names the page and view on screen, so the entrance plays once per set. */
   dataset?: string
+  /** Units per model id in the scope on screen; undefined while they load. */
+  units?: Record<string, Units>
 }) {
   if (products.length === 0) {
     return (
@@ -71,9 +87,7 @@ export function ProductTable({
             <th scope="col">Code</th>
             <th scope="col">Category</th>
             <th scope="col" className="num">Variants</th>
-            <Can permission="costs.view">
-              <th scope="col" className="num">Cost</th>
-            </Can>
+            <th scope="col" className="num">Stock</th>
             <th scope="col" className="num">Sell</th>
             <th scope="col">
               <span className="sr-only">Actions</span>
@@ -92,9 +106,9 @@ export function ProductTable({
               <td className="td-code" data-label="Code">{product.code}</td>
               <td data-label="Category">{product.category}</td>
               <td className="num tabular" data-label="Variants">{product.variants.length}</td>
-              <Can permission="costs.view">
-                <td className="num tabular" data-label="Cost">{formatPrice(product.costPrice)}</td>
-              </Can>
+              <td className="num tabular" data-label="Stock">
+                <StockCell units={units?.[product.id]} loading={units === undefined} />
+              </td>
               <td className="num tabular" data-label="Sell">
                 {hasPriceRange(product) && <small>from </small>}
                 {formatPrice(product.sellPrice)}

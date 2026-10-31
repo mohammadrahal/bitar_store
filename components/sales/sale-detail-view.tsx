@@ -56,14 +56,18 @@ export function SaleDetailView({ saleId }: { saleId: string }) {
         </div>
       </Panel>
       <Panel title="Payment">
-        <ul className="summary-list">
-          {sale.payments.map((payment, index) => (
-            <li key={index}>
-              <span className="capitalize">{payment.method}</span>
-              <span className="tabular">{formatPrice(Number(payment.amount))}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="table-wrap">
+          <table className="card-table">
+            <tbody>
+              {sale.payments.map((payment, index) => (
+                <tr key={index}>
+                  <td className="card-title capitalize">{payment.method}</td>
+                  <td className="num tabular">{formatPrice(Number(payment.amount))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Panel>
     </>
   )

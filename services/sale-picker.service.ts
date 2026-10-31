@@ -1,6 +1,5 @@
 import { syncCatalog } from '@/services/catalog-sync.service'
 import { branchSellableMapForStyle } from '@/services/stock-api.service'
-import { callerSeesCosts } from '@/services/mock-ledger'
 import { isRetired, readDb } from '@/mocks/store'
 import type { SaleModelOption, VariantOption } from '@/types'
 
@@ -41,7 +40,6 @@ export async function listSaleVariants(branchId: string, productId: string): Pro
   const product = db.products.find((candidate) => candidate.id === productId)
   if (!product || product.archived) return []
 
-  const seesCost = callerSeesCosts()
   return db.variants
     .filter((variant) => variant.productId === productId && !isRetired(db, variant))
     .map((variant) => ({
@@ -53,7 +51,6 @@ export async function listSaleVariants(branchId: string, productId: string): Pro
       productCode: product.code,
       size: variant.size,
       color: variant.color,
-      costPrice: seesCost ? product.costPrice : 0,
       sellPrice: variant.sellPrice,
       available:
         sellable.bySkuId.get(variant.id) ??

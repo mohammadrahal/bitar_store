@@ -215,10 +215,13 @@ details.optional[open] summary { margin-bottom: 16px; }
 .assignment-list { list-style: none; margin: 8px 0 0; padding: 0; border: 1px solid hsl(var(--border)); border-radius: var(--radius); }
 .assignment-list > li { padding: 10px 14px; border-bottom: 1px solid hsl(var(--border)); }
 .assignment-list > li:last-child { border-bottom: 0; }
-.assignment-row { display: flex; align-items: center; gap: 10px; font-size: var(--fs-sm); }
+.assignment-row { display: flex; align-items: center; justify-content: flex-start; gap: 12px; font-size: var(--fs-sm); }
+.assignment-row input { width: 18px; height: 18px; flex: none; accent-color: hsl(var(--accent)); }
+.assignment-row > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .assignment-row .muted { color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); }
-.assignment-access { display: flex; flex-wrap: wrap; gap: 16px; margin: 8px 0 0 26px; font-size: var(--fs-xs); color: hsl(var(--muted-foreground)); }
+.assignment-access { display: flex; flex-wrap: wrap; gap: 16px; margin: 8px 0 0 30px; font-size: var(--fs-xs); color: hsl(var(--muted-foreground)); }
 .assignment-access label { display: flex; align-items: center; gap: 6px; }
+.assignment-access input { width: 16px; height: 16px; flex: none; accent-color: hsl(var(--accent)); }
 
 /* ---------- Till: per-line discount and payment ---------- */
 .sale-line-block { display: block; padding: 12px 0; }

@@ -14,10 +14,9 @@ import type { Balances } from '@/types'
  * yet and say so rather than showing a zero that would read as a fact.
  */
 export function BalanceTiles({ totals }: { totals: Balances }) {
-  const { can, canAny } = usePermission()
+  const { can } = usePermission()
   const pending = 'Not available yet'
   const stock = can('stock.view')
-  const stockControl = canAny(['counts.enter', 'counts.apply', 'holds.manage', 'stock.dispose'])
   const inventory = stock ? inventoryHref() : undefined
   return (
     <div className="balance-grid">
@@ -40,7 +39,6 @@ export function BalanceTiles({ totals }: { totals: Balances }) {
         value={balanceText(totals.onHold, formatNumber)}
         detail={totals.onHold === null ? pending : 'Kept out of sale'}
         icon={Archive}
-        href={stockControl ? '/stock-control' : undefined}
       />
       <StatCard
         label="Available"

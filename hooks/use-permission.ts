@@ -5,7 +5,6 @@ import {
   can,
   canAccessLocation,
   canAny,
-  canViewCosts,
   isLocationScoped,
   isSuperAdmin,
   isViewOnlyAt,
@@ -36,7 +35,6 @@ export function usePermission() {
       canAny: (rule: PermissionRule, locationId = activeLocationId ?? undefined) => canAny(user, rule, locationId),
       /** Ignores the active location: "do they hold this key anywhere?" */
       canAnywhere: (permission: Permission) => can(user, permission),
-      canViewCosts: canViewCosts(user),
       canAccessLocation: (locationId: string) => canAccessLocation(user, locationId),
       locationAccess: (locationId: string) => locationAccess(user, locationId),
       isViewOnlyAt: (locationId: string) => isViewOnlyAt(user, locationId),

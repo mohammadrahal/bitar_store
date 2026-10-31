@@ -1,14 +1,18 @@
 # Bitar — Multi-Branch Inventory Dashboard (Frontend)
 
-Next.js dashboard for the Bitar fashion store: branches, users, products, stock,
-invoices and sales across several shops.
+Next.js dashboard for the Bitar fashion store: branches, staff, catalog, stock
+and till sales across several shops.
 
-- **Users, branches and sign-in** talk to the real Bitar backend.
-- **Products, stock, invoices and sales analytics** still run on mock data
-  in the browser, because the backend has no endpoints for them yet.
+Every figure on screen comes from the Bitar backend. The browser keeps **no
+business data of its own** — the only thing stored locally is a mirror of the
+branch and catalog records the API returned, so a picker or a table can name a
+SKU without a request per keystroke.
 
-The backend contract is described in [`AGENTS.md`](./AGENTS.md). This file
-describes how the frontend uses it.
+> **Every URL and endpoint path in this file is an example.** The real base URL
+> for your environment belongs in `.env` (never in the repo or in a component),
+> and the real routes are whatever your backend documents. Paths like
+> `POST /auth/login` below stand for "the backend's sign-in route" and are only
+> there to show the shape of a call.
 
 ---
 
@@ -17,34 +21,40 @@ describes how the frontend uses it.
 ### Requirements
 
 - Node.js 20+
-- The Bitar backend running locally or deployed
+- A running Bitar backend you can reach from the browser
 
 ### Environment
 
-Create or edit `.env` in the project root:
+Copy the example file and fill in your own backend URL:
+
+```bash
+cp .env.example .env
+```
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:5000
+# .env — example values, replace with your own
+NEXT_PUBLIC_API_URL=https://api.example.com
 ```
 
 | Variable | Purpose | Default if unset |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | Base URL of the Bitar backend, no trailing slash | `http://localhost:3000` |
+| `NEXT_PUBLIC_API_URL` | Base URL of the backend, no trailing slash | `http://localhost:3000` |
 
-Use the deployed backend URL in production. Never hard-code it in components.
+`NEXT_PUBLIC_` variables are compiled into the client bundle, so treat the URL
+as public and keep secrets out of this file. Read it only through
+`getApiBaseUrl()` in `lib/api/client.ts`.
 
 ### Backend CORS
 
-The backend only accepts browser requests from origins listed in its
-`CORS_ORIGIN` variable (default `http://localhost:3001`). The Next dev server
-runs on `http://localhost:3000`, so set this **on the backend**:
+The backend must allow this app's origin. In its own environment, for example:
 
 ```env
+# example, on the backend
 CORS_ORIGIN=http://localhost:3000
 ```
 
-Multiple origins are comma-separated, exact, with scheme and port and no
-trailing slash.
+Multiple origins are comma-separated, exact, with scheme and port, no trailing
+slash.
 
 ### Run
 
@@ -57,9 +67,8 @@ npm run start   # serve the production build
 
 ### First sign-in
 
-There is no public registration. An administrator account must already exist
-on the backend. Sign in with it at `/login`, then create other accounts from
-**Users**.
+There is no public registration. An account must already exist on the backend;
+sign in with it at `/login`, then create the rest from **Users**.
 
 ---
 
@@ -68,143 +77,139 @@ on the backend. Sign in with it at `/login`, then create other accounts from
 | Concern | Library |
 |---|---|
 | Framework | Next.js (App Router), React 19, TypeScript strict |
-| Styling | Tailwind CSS v4, shadcn/ui tokens in `app/globals.css` |
-| Server-like data | TanStack Query |
+| Styling | Tailwind CSS v4 plus the tokens in `app/globals.css` |
+| Server data | TanStack Query (30s stale time, no retry on 4xx) |
 | Client/UI state | Zustand |
 | Forms and validation | react-hook-form + zod |
+| Motion | `motion/react` — one entrance config in `components/motion/` |
 | Toasts | sonner |
 | Icons | lucide-react |
 | Charts | recharts |
+
+Brand: Playfair Display for titles, Inter for everything else, tabular figures
+in tables and stat cards.
 
 ---
 
 ## 3. Architecture
 
-Data always flows in one direction. Components never call `fetch` or touch the
-mock store directly.
+Data flows one way. A component never calls `fetch` and never reads the store.
 
 ```
-Component ──► hook (TanStack Query) ──► service ──► API client ──► Bitar backend
-                                                └─► mock store (localStorage)
+Component ──► hook (TanStack Query) ──► service ──► API client ──► backend
+                                            └─► catalog mirror (localStorage)
 ```
 
 | Layer | Folder | Responsibility |
 |---|---|---|
-| Pages | `app/` | Routes. Server components that render a client view. |
-| Components | `components/` | UI only. Read data through hooks, check access through `<Can>` / `usePermission()`. |
-| Hooks | `hooks/` | `useQuery` / `useMutation` wrappers. Mutations invalidate their query keys and show toasts. |
-| Services | `services/` | Business logic. The only layer that decides between the real API and the mock store. |
-| API client | `lib/api/` | Typed HTTP calls to the backend. Adds the bearer token, turns failures into `ApiError`. |
-| Mock store | `mocks/store.ts` | In-memory data persisted to localStorage for features with no backend yet. |
-| Schemas | `schemas/` | zod schemas: the single source of form validation. |
-| Stores | `store/` | Zustand: session (`user-store.ts`) and UI preferences (`ui-store.ts`). |
-| Query keys | `lib/query-keys.ts` | Every TanStack Query key in one place. |
-| Permissions | `lib/permissions.ts` | `can(role, action)` and every role rule. |
+| Pages | `app/` | Routes. Server components that render one client view. |
+| Components | `components/` | UI only. Data through hooks, access through `<Can>` / `usePermission()`. |
+| Hooks | `hooks/` | `useQuery` / `useMutation`. Mutations invalidate their keys and toast. |
+| Services | `services/` | The only layer that talks to the API client. |
+| API client | `lib/api/` | Typed calls. Adds the bearer token, turns failures into `ApiError`. |
+| Catalog mirror | `mocks/store.ts` | Branches, styles and SKUs as returned by the API, for naming and pickers. |
+| Schemas | `schemas/` | zod: the single source of form validation. |
+| Stores | `store/` | Zustand: session (`user-store.ts`), UI preferences (`ui-store.ts`). |
+| Query keys | `lib/query-keys.ts` | Every query key in one place. |
+| Permissions | `lib/permissions.ts` | `can(user, permission, locationId?)` and every rule. |
 
 ### Folder map
 
 ```
 app/
-  login/                    sign-in page
-  (dashboard)/              signed-in area (sidebar + top bar)
-    dashboard/              cross-branch overview (admin)
-    branches/ [id]/         branch list and single branch page
-    products/               catalog
-    invoices/ [id]/         documents (sales, purchases, returns, adjustments)
-    sales/b2b, sales/b2c/   sales channels
-    users/                  staff accounts (admin)
-components/                 auth, branches, dashboard, invoices, products,
-                            sales, shared, stock, users, ui
-hooks/                      use-auth, use-users, use-branches, use-products, ...
-services/                   auth, session, users, branches, products, stock, ...
-lib/api/                    backend client (see section 5)
-mocks/store.ts              mock data for unbuilt backend features
-schemas/                    zod schemas
-store/                      Zustand stores
-types/index.ts              shared domain types
-providers/                  QueryProvider (+ 401 handling), AppProviders
+  login/                   sign-in
+  (dashboard)/             signed-in area (sidebar + top bar)
+    dashboard/             network overview (owner roles)
+    branches/ [id]/        branch list and one branch, addressed by store code
+    inventory/ [variantId] stock by variant, and one variant across locations
+    products/ new/ [id]/   catalog: models, variants, prices, barcodes
+    sales/new/ b2c/ [id]/  till, today's sales, one sale
+    opening-stock/         first units at a location
+    users/                 staff accounts
+    profile/               your own account
+components/                auth, branches, dashboard, inventory, motion,
+                           products, profile, sales, shared, stock, users, ui
+hooks/                     use-auth, use-branches, use-products, use-stock, ...
+services/                  auth, session, users, branches, products, stock,
+                           inventory, sales, opening-stock, profile, ...
+lib/api/                   backend client (section 5)
+mocks/store.ts             catalog mirror
+schemas/                   zod schemas
+store/                     Zustand stores
+types/                     shared domain types
+providers/                 QueryProvider (+ 401 handling), AppProviders
 ```
 
 ---
 
 ## 4. Authentication and session
 
-### Sign-in flow
+### Sign-in
 
-1. The user submits email and password on `/login` (`components/auth/login-form.tsx`).
-2. `services/auth.service.ts` lowercases the email and calls `POST /auth/login`,
-   which returns `{ token, user }`.
-3. It then calls `GET /auth/me` with the token (`services/session.service.ts`)
-   and builds the session `User`:
+1. Email and password are submitted on `/login`.
+2. `services/auth.service.ts` lowercases the email and posts them to the
+   backend's sign-in route (example: `POST /auth/login`), which answers with a
+   token and the user.
+3. `services/session.service.ts` then reads the session route (example:
+   `GET /auth/me`) and builds the app's `User`:
 
    ```ts
    interface User {
      id: string
-     name: string          // fullName
+     name: string            // fullName, tidied for display
      email: string
-     role: 'admin' | 'manager' | 'employee'
-     branchId: string | null // admins: null; others: first of branchIds
-     branchIds: string[]     // every branch this user may see
+     role: 'super_admin' | 'manager' | 'employee'
+     branchId: string | null // employees: their location; owner roles: null
+     branchIds: string[]     // every location this user may see
+     locations: { locationId: string; access: 'full' | 'view_only' }[]
      permissions: string[]   // permission keys from the backend
+     grants: Record<string, string[]>
      canViewCosts: boolean
    }
    ```
 
-4. The token and `User` are saved in the Zustand `user-store`, persisted to
-   **sessionStorage** (`bitar-fashion:session:v4`). The session ends when the
-   tab closes.
-5. `LoginScreen` redirects to the page that was originally requested, or to
-   the role's home page.
+4. Token and user go into the Zustand session store, persisted to
+   **sessionStorage** (`bitar-fashion:session:v4`), so the session ends with the
+   tab.
+5. The login screen sends the user to the page they asked for, or to their home
+   page.
 
-Deactivated accounts (`isActive: false`) are refused at sign-in.
+Deactivated accounts are refused at sign-in.
 
 ### Restoring a session
 
-On every page load `components/shared/hydration-gate.tsx` rehydrates the store.
-When a token is present it calls `GET /auth/me` again, so role and branch
-changes made by an admin are picked up immediately.
+`components/shared/hydration-gate.tsx` rehydrates the stores on every load and
+re-reads the session route when a token is present, so a role or location change
+is picked up at once.
 
-- `401` → the session is cleared and the user goes to `/login`.
-- Network error → the cached session is kept so a short outage doesn't sign
-  everyone out.
+- `401` → session cleared, back to `/login`.
+- Network error → the cached session is kept, so a blip doesn't sign everyone out.
 
 ### Authenticated requests
-
-Every protected request sends:
 
 ```http
 Authorization: Bearer <token>
 ```
 
-`Content-Type: application/json` is only added when a body is sent. Tokens
-never go in URLs or logs.
+`Content-Type: application/json` is added only when there is a body. Tokens
+never appear in URLs or logs. Writes that must not repeat (a sale, an opening
+count) also send an `Idempotency-Key`.
 
-### Expired or invalid tokens (401)
+### 401 handling
 
-`providers/query-provider.tsx` registers a global handler via
-`onUnauthorized()` in `lib/api/client.ts`. When any protected call returns
-`401`, it:
-
-1. clears every cached query,
-2. signs the user out,
-3. shows "Your session has expired. Please sign in again.",
-4. lets `AuthGate` redirect to `/login?next=<current page>`.
-
-Token lifetime is set by the backend (8 hours by default).
-
-### Sign-out
-
-There is no logout endpoint. Signing out clears the branch filter, the query
-cache and the stored token (`hooks/use-auth.ts`).
+`providers/query-provider.tsx` registers `onUnauthorized()` from
+`lib/api/client.ts`. On any protected `401` it clears the cache, signs out,
+explains that the session expired, and lets `AuthGate` redirect to
+`/login?next=<page>`.
 
 ### Route protection
 
 | Component | Job |
 |---|---|
 | `AuthGate` | Sends signed-out visitors to `/login?next=…` |
-| `BranchGuard` | Uses `redirectPathFor()` to keep each role on pages it may open |
+| `BranchGuard` | `redirectPathFor()` keeps each role on pages it may open, and resolves a branch URL's store code |
 
-Treat these as UX only. The backend's `401` / `403` responses are authoritative.
+Both are UX only. The backend's `401` / `403` are what count.
 
 ---
 
@@ -212,208 +217,173 @@ Treat these as UX only. The backend's `401` / `403` responses are authoritative.
 
 | File | Contents |
 |---|---|
-| `client.ts` | `send()` low-level fetch, `createRequest(token)`, `onUnauthorized()`, `getApiBaseUrl()` |
-| `auth.api.ts` | `loginWithApi()`, `fetchMe()`, `fetchHealth()` (public / token-based) |
-| `users.api.ts` | User endpoints |
-| `branches.api.ts` | Branch endpoints |
-| `sales.api.ts` | Sales analytics (backend route not built yet) |
-| `create-api.ts` | `createApi(token)` — combines all of the above for one token |
-| `get-api-client.ts` | `getApiClient()` — client for the signed-in session; throws `ApiError(401)` if none |
-| `map-branch.ts` | Converts `ApiBranch` to the UI `Branch` type |
+| `client.ts` | `send()`, `createRequest(token)`, `onUnauthorized()`, `getApiBaseUrl()` |
+| `auth.api.ts` | Sign-in, session and health calls |
+| `users.api.ts` | Accounts, passwords, branch access |
+| `branches.api.ts` | Locations, including the `branch` / `warehouse` kind |
+| `catalog.api.ts` | Styles, SKUs, prices, price history, barcodes, code lookup |
+| `stock.api.ts` | Stock list, opening stock, overview, movements |
+| `sales.api.ts` | Create and read till sales |
+| `reorder-levels.api.ts` | Minimum / target per SKU, replenishment suggestions |
+| `reports.api.ts` | Sales summary, top SKUs, audit events |
+| `create-api.ts` | `createApi(token)` — everything above for one token |
+| `get-api-client.ts` | `getApiClient()` for the signed-in session |
+| `map-*.ts` | API payloads to UI types |
 | `api-error.ts` | `ApiError { status, message }` |
-| `types.ts` | Request/response types matching `AGENTS.md` |
+| `types.ts` | Request/response types |
 | `index.ts` | Public exports — import from `@/lib/api` |
 
-### Endpoints used
+### Example of a call
 
-| Method | Path | Used by | Notes |
-|---|---|---|---|
-| `GET` | `/health` | `fetchHealth()` | Public |
-| `POST` | `/auth/login` | `auth.service.login` | Public |
-| `GET` | `/auth/me` | `session.service.bootstrapSession` | After login and on reload |
-| `GET` | `/branches` | `branches.service` | Admins get all; others get assigned active branches |
-| `POST` | `/branches` | `branches.service.createBranch` | Admin |
-| `GET` | `/users` | `users.service.listUsers` | Admin |
-| `POST` | `/users` | `users.service.createUserWithBranch` | Admin; **no password** |
-| `PATCH` | `/users/:id` | `users.service.updateUserWithBranch`, `setUserActive` | Admin; **no password** |
-| `PUT` | `/users/:id/password` | create and edit user | Admin |
-| `PUT` | `/users/:id/branches/:branchId` | branch assignment | Admin |
-| `DELETE` | `/users/:id/branches/:branchId` | branch reassignment | Admin |
-| `DELETE` | `/users/:id` | `users.service.deleteUser` | Admin |
+Shapes, not routes. Replace the path and fields with your backend's own.
+
+```ts
+// services/example.service.ts
+const sale = await getApiClient().createSale(
+  {
+    branchId,
+    channel: 'in_store',
+    lines: [{ skuId, quantity: 2 }],
+    payments: [{ method: 'cash', amount: '25.00', tendered: '30.00' }],
+  },
+  idempotencyKey,
+)
+```
+
+```http
+POST /example/sales HTTP/1.1
+Authorization: Bearer <token>
+Idempotency-Key: <uuid>
+Content-Type: application/json
+```
 
 ### Errors
 
-Every failure becomes an `ApiError` whose `message` is the backend's
-`{ "message": "..." }` text, safe to show to the user. A network failure is
-`ApiError(0, 'Could not reach the server…')`.
+Every failure becomes an `ApiError` carrying the backend's own message, safe to
+show. A network failure is `ApiError(0, 'Could not reach the server…')`.
 
 | Status | Frontend behaviour |
 |---|---|
-| `0` | Network error message; queries retry once |
-| `400` | Message shown next to the form / in a toast |
-| `401` | Global sign-out (protected calls) or login error (sign-in) |
-| `403` | Error state with the backend message |
-| `404` | Not found message |
-| `409` | Conflict shown inline, e.g. duplicate branch code or email |
+| `0` | Network message; the query retries once |
+| `400` | Message beside the form or in a toast |
+| `401` | Global sign-out, or a login error on the sign-in form |
+| `403` | Error state with the backend's message |
+| `404` | Not-found message |
+| `409` | Conflict inline — duplicate code, repeated idempotency key, insufficient stock |
 | `5xx` | Generic error with "Try again" |
 
-Queries never retry on 4xx responses, since the answer won't change.
+### Adding an endpoint
 
-### Adding a new endpoint
-
-1. Add request/response types to `lib/api/types.ts`.
-2. Add the call to the matching `*.api.ts` (or a new one merged in `create-api.ts`).
-3. Call it from a function in `services/`.
-4. Expose it through a hook in `hooks/` with a key from `lib/query-keys.ts`.
-5. Components use the hook — nothing else changes.
+1. Types in `lib/api/types.ts`.
+2. The call in the matching `*.api.ts` (new files are merged in `create-api.ts`).
+3. A function in `services/`.
+4. A hook in `hooks/` with a key from `lib/query-keys.ts`.
+5. Components use the hook; nothing else changes.
 
 ---
 
 ## 6. Roles and permissions
 
-All rules live in `lib/permissions.ts`. Components never compare roles
-directly; they use:
+Rules live in `lib/permissions.ts` and the key list in `lib/permission-keys.ts`.
+Components never compare roles:
 
 ```tsx
-<Can action="products:read-cost">…</Can>
+<Can permission="locations.view_all">…</Can>
 
-const { can, canAccessBranch, branchScoped } = usePermission()
+const { can, canAny, canAccessLocation, locationScoped } = usePermission()
 ```
 
-| Role | Scope | Highlights |
-|---|---|---|
-| `admin` | All branches, including inactive | Everything: users, branches, voiding documents |
-| `manager` | Own branch(es) | Edit products, stock, invoices, purchases, B2B and B2C sales |
-| `employee` | Own branch(es) | Read products, add/edit catalog entries, raise and issue B2C sales |
+| Tier | Who holds it |
+|---|---|
+| `BASELINE` | Anyone signed in (`catalog.view`) |
+| `EMPLOYEE` | Granted per person: till keys, catalog keys, `stock.view`, cash drawer, branch reports |
+| `MANAGER` | Every manager and super admin: `locations.view_all`, `users.manage`, `discounts.apply`, `opening_stock.post`, … |
+| `SUPER_ADMIN` | `settings.manage`, `users.deactivate`, `users.role.change` |
 
-Two rules come from the backend, not the role table:
-
-- **Cost visibility** (`products:read-cost`, `invoices:read-cost`) follows
-  `canViewCosts` from `/auth/me` (`canUser()`).
-- **Branch access** follows `branchIds` from `/auth/me` (`canAccessBranch()`).
+Catalog keys are held once for the business; everything else is held at a
+location. An employee's assignments, access level and keys are kept in this
+browser (`lib/user-access.ts`) because the backend has no endpoint for them yet
+— a signed-in user's own reach always comes from the session route.
 
 ### Landing pages
 
 | User | Home |
 |---|---|
-| Admin | `/dashboard` |
-| Manager / employee with a branch | `/branches/<their branch>` |
-| Manager / employee with no branch yet | `/products` (a banner explains the missing branch) |
+| Super admin / manager | `/dashboard` |
+| Employee with a location | `/branches/<store code>` |
+| Employee without one | `/products`, with a banner explaining it |
 
 ---
 
-## 7. Features
+## 7. Screens
 
-### Users (`/users`, admin only)
+| Screen | What it does | Backend |
+|---|---|---|
+| `/dashboard` | Network stat cards and today's takings, plus the sales charts | stock + sales reads |
+| `/branches`, `/branches/<code>` | Locations, create a branch or warehouse, one branch's figures and stock | branch + stock reads |
+| `/inventory`, `/inventory/<sku>` | Stock by variant with the five balances; one variant across locations | stock reads |
+| `/products`, `/products/new`, `/products/<id>` | Models, colours and sizes, per-SKU prices and barcodes, optional opening count on create | catalog + opening stock |
+| `/sales/new` | The till: pick a model, size and colour, discount a line, take cash or Whish | sale create |
+| `/sales/b2c`, `/sales/<id>` | Today's sales and one sale | sale reads |
+| `/opening-stock` | First units at a location, SKU by SKU | stock movements + opening stock |
+| `/users` | Accounts, roles, location access and permission keys | user endpoints (keys stay local) |
+| `/profile` | Your own name and password | user endpoints |
 
-- **Create:** full name, email, password, role, branch (required for managers
-  and employees). Runs `POST /users` → `PUT /users/:id/password` → `PUT
-  /users/:id/branches/:branchId`. If a later step fails, the list is
-  refreshed so the partly created account is visible and can be fixed.
-- **Edit:** name, email, optional new password, role, branch, active. Changing
-  the branch revokes the old grant and adds the new one.
-- **Own account:** admins can't change their own role, branch or active
-  status, or delete themselves.
-- **Deactivate:** the Active toggle (with confirmation). The account stays and
-  can be reactivated.
-- **Delete:** permanent, with confirmation.
+Notes:
 
-> The API has no endpoint that lists a user's branches. The branch chosen in
-> the admin form is remembered in that browser's localStorage
-> (`lib/user-branch-map.ts`) to prefill the edit form and to know which grant
-> to revoke. A signed-in user's own access always comes from `/auth/me`.
-
-### Branches (`/branches`)
-
-- **List** from `GET /branches`.
-- **Create** with code and name (admin).
-- **Edit, delete, activate/deactivate** are wired in the UI but switched off
-  with `BRANCH_WRITES` in `services/branches.service.ts`, because the backend
-  has no `PATCH` / `DELETE /branches/:id` yet. Flip the flags when it does.
-
-### Products, stock, invoices, sales — mock data
-
-These services read and write `mocks/store.ts`, persisted to localStorage, with
-a simulated 300 ms delay so loading states behave realistically. Branches from
-the API are mirrored into the mock store so stock and documents can reference
-real branch ids. When backend endpoints arrive, only the matching file in
-`services/` should change.
+- **Stock only moves through the backend.** Units arrive with an opening count
+  and leave with a till sale; the app has no local ledger.
+- **Opening stock is per SKU, not per location.** A SKU that has never moved at
+  a location can be opened there, which is how a model added later gets its
+  first units at a location opened months ago.
+- **A branch URL carries its store code** (`/branches/hamra`). An id still
+  resolves, and the page rewrites the address.
 
 ---
 
-## 8. Validation rules
+## 8. Validation
 
-The zod schemas in `schemas/` match the backend's rules, so most errors are
-caught before a request is sent.
+zod schemas in `schemas/` mirror the backend's rules, so most errors never reach
+a request.
 
 | Field | Rule | Schema |
 |---|---|---|
-| Email | Trimmed, lowercased, valid email | `user.schema.ts`, `auth.schema.ts` |
+| Email | Trimmed, lowercased, valid | `user.schema.ts`, `auth.schema.ts` |
 | Full name | 2–100 characters | `user.schema.ts` |
-| Password | At least 8 characters, at most 72 UTF-8 bytes | `user.schema.ts` |
-| Role | `admin`, `manager` or `employee` | `user.schema.ts` |
-| Branch code | Trimmed, 1–20 letters/digits/`-`/`_`, uppercased | `branch.schema.ts` |
+| Password | 8+ characters, at most 72 UTF-8 bytes | `user.schema.ts`, `profile.schema.ts` |
+| Role | `super_admin`, `manager`, `employee` | `user.schema.ts` |
+| Branch code | 1–20 letters/digits/`-`/`_`, uppercased | `branch.schema.ts` |
 | Branch name | 1–120 characters | `branch.schema.ts` |
+| Model name / category | 2–120 / 2–60 characters | `product.schema.ts` |
+| Prices | 0 or more, at most 1,000,000 | `product.schema.ts` |
+| Opening quantity | Whole units, 0 or more | `product.schema.ts` |
 
 ---
 
 ## 9. Security notes
 
-- The bearer token lives in sessionStorage. Any cross-site scripting bug could
-  read it, so never render untrusted HTML.
-- Passwords are never stored in the browser and never sent in `POST` /
-  `PATCH /users`.
-- `X-User-Id` is a backend development header and is **not** used by this app.
-- On startup the app deletes data left by older builds: previous session keys
-  and the old `bitar:dev-credentials:v1` store that held passwords.
+- The bearer token lives in sessionStorage, so never render untrusted HTML.
+- Passwords go only to the password route, never to a create or update call.
+- `.env` holds the backend URL. Keep the real one out of commits — `.env.example`
+  is the file to edit in the repo.
+- On startup the app clears data left by older builds (previous session and
+  mirror keys).
 
 ---
 
-## 10. Change log — backend integration (Oct 2026)
+## 10. Known gaps
 
-Moved the app from the development identity header to the token-based API in
-`AGENTS.md`.
+The backend has no routes for these, so the screens that used a local ledger
+were removed rather than left pretending:
 
-**Added**
-- `lib/api/auth.api.ts`: `POST /auth/login`, `GET /auth/me`, `GET /health`.
-- Bearer-token client with a global `401` handler (`lib/api/client.ts`,
-  `providers/query-provider.tsx`).
-- `PUT /users/:id/password` and `DELETE /users/:id` in `lib/api/users.api.ts`.
-- Delete-user action with confirmation (`components/users/users-view.tsx`).
-- `canUser()` in `lib/permissions.ts` for backend-driven cost visibility.
-- `email`, `branchIds`, `permissions`, `canViewCosts` on the session `User`.
-
-**Changed**
-- Session store holds `token` + `user` instead of a user id (`store/user-store.ts`).
-- Session bootstrap uses `GET /auth/me` instead of listing users and guessing
-  the branch (`services/session.service.ts`).
-- Saved sessions are re-validated on every page load (`hydration-gate.tsx`).
-- User create/edit sends passwords only to `PUT /users/:id/password`.
-- Admins can't change their own role, branch or active status.
-- Branch access checks use `branchIds`.
-- Branchless managers/employees land on `/products` instead of `/branches/null`.
-- Queries don't retry 4xx errors; network failures show a clear message.
-- Schemas: lowercase email, uppercase branch code, 72-byte password limit.
-- The header role switcher is now a "signed in as" badge (tokens can't
-  impersonate other users).
-
-**Removed**
-- `X-User-Id` header.
-- `/register` page, form, schema, service and hook (`POST /auth/register`
-  doesn't exist).
-- `lib/dev-credentials.ts` and `components/users/dev-saved-password.tsx`,
-  which stored passwords in localStorage.
-- Unused sessionStorage helpers in `lib/session-storage.ts`.
-
----
-
-## 11. Known gaps
-
-| Gap | Where to change when the backend adds it |
+| Gap | What it would unlock |
 |---|---|
-| Edit / delete / toggle branches | Flip `BRANCH_WRITES` in `services/branches.service.ts` |
-| Products and variants | `services/products.service.ts` |
-| Stock levels | `services/stock.service.ts` |
-| Invoices | `services/invoices.service.ts` |
-| Sales analytics | `services/analytics.service.ts` → `lib/api/sales.api.ts` |
-| Listing a user's branches | Replace `lib/user-branch-map.ts` in `services/users.service.ts` |
+| Goods receipt / adjustment | Receiving, supplier costs, stock corrections |
+| Transfers between locations | Moving stock, in-transit balances |
+| Documents (purchase, returns, adjustments) | An invoice ledger and B2B sales |
+| Counts and holds | Physical counts, non-sellable stock |
+| Replenishment requests | A branch asking the warehouse for stock |
+| Discount requests | An employee asking for money off |
+| Reorder levels in the UI | Low-stock thresholds and suggestions (client calls exist in `lib/api/reorder-levels.api.ts`) |
+| Reports in the UI | Sales summary and top SKUs (client calls exist in `lib/api/reports.api.ts`) |
+| A user's locations and keys | Replaces `lib/user-access.ts` |

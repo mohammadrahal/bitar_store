@@ -1,10 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowDownLeft, ArrowUpRight, PackageSearch } from 'lucide-react'
-import { InvoiceForm, type InvoicePrefill } from '@/components/invoices/invoice-form'
-import { Can } from '@/components/shared/can'
-import { ThresholdCell } from '@/components/stock/threshold-cell'
+import { PackageSearch } from 'lucide-react'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { Pagination } from '@/components/shared/pagination'
@@ -13,33 +10,13 @@ import { Skeleton } from '@/components/shared/skeleton'
 import { StockStatusPill } from '@/components/shared/status-pill'
 import { useBranchStockRows } from '@/hooks/use-stock'
 import { formatPrice } from '@/lib/format'
-import type { BranchStockRow, InvoiceKind } from '@/types'
 
 const PAGE_SIZE = 10
 
-/** Everything one branch holds: quantity moved only by documents, threshold set here. */
+/** Everything one branch holds, from `GET /stock`. Sales move these figures. */
 export function BranchStockPanel({ branchId }: { branchId: string }) {
   const { data: rows, isPending, isError, error, refetch } = useBranchStockRows(branchId)
   const [page, setPage] = useState(1)
-  const [correcting, setCorrecting] = useState<InvoicePrefill | null>(null)
-
-  /* An adjustment is the only way to move stock by hand, so the row opens one
-     already pointed at this variant instead of offering an editable figure. */
-  const correct = (row: BranchStockRow, kind: InvoiceKind) =>
-    setCorrecting({
-      kind,
-      variant: {
-        variantId: row.variantId,
-        sku: row.sku,
-        barcode: row.barcode,
-        productId: row.productId,
-        productName: row.productName,
-        size: row.size,
-        color: row.color,
-        costPrice: row.costPrice,
-        sellPrice: row.sellPrice,
-      },
-    })
 
   if (isPending) {
     return (
@@ -66,16 +43,13 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
   const visible = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   return (
-    <Panel
-      title="Stock levels"
-      description="On hand moves only when a document is issued. The threshold is yours to set."
-    >
+    <Panel title="Stock levels" description="What the server holds for this location, emptiest first.">
       {rows.length === 0 ? (
         <div className="panel-body">
           <EmptyState
             icon={PackageSearch}
             title="Nothing stocked here yet"
-            description="Add a product, then raise a purchase or an adjustment to bring units in."
+            description="Post an opening count for this location to bring its first units in."
           />
         </div>
       ) : (
@@ -95,13 +69,7 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
                   <th scope="col" className="num">
                     Available
                   </th>
-                  <th scope="col" className="num">
-                    Threshold
-                  </th>
                   <th scope="col">Status</th>
-                  <th scope="col">
-                    <span className="sr-only">Correct stock</span>
-                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -115,41 +83,15 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
                         {row.sku} · {row.barcode || row.category}
                       </small>
                     </td>
-                    <td className="num tabular" data-label="Price">{formatPrice(row.sellPrice)}</td>
+                    <td className="num tabular" data-label="Price">
+                      {formatPrice(row.sellPrice)}
+                    </td>
                     <td className="num tabular">{row.quantity}</td>
                     <td className="num tabular">
                       <strong>{row.available}</strong>
                     </td>
-                    <td className="num">
-                      <ThresholdCell variantId={row.variantId} branchId={branchId} value={row.lowStockAt} />
-                    </td>
                     <td>
                       <StockStatusPill status={row.status} />
-                    </td>
-                    <td>
-                      <Can permission="documents.manage">
-                        <div className="row-actions">
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            onClick={() => correct(row, 'adjustment_in')}
-                            aria-label={`Add stock of ${row.sku}`}
-                            title="Stock in"
-                          >
-                            <ArrowDownLeft size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            onClick={() => correct(row, 'adjustment_out')}
-                            disabled={row.quantity === 0}
-                            aria-label={`Remove stock of ${row.sku}`}
-                            title={row.quantity === 0 ? 'Nothing on hand to remove' : 'Stock out'}
-                          >
-                            <ArrowUpRight size={16} />
-                          </button>
-                        </div>
-                      </Can>
                     </td>
                   </tr>
                 ))}
@@ -164,14 +106,6 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
             onPage={setPage}
           />
         </>
-      )}
-
-      {correcting && (
-        <InvoiceForm
-          prefill={correcting}
-          defaultBranchId={branchId}
-          onClose={() => setCorrecting(null)}
-        />
       )}
     </Panel>
   )

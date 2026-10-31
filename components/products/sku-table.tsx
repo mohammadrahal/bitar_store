@@ -3,9 +3,11 @@
 import Link from 'next/link'
 import { Barcode, CircleOff, RotateCcw, Tag } from 'lucide-react'
 import { Can } from '@/components/shared/can'
+import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useSetVariantActive } from '@/hooks/use-skus'
+import { useVariantUnits } from '@/hooks/use-stock'
 import { formatBarcode } from '@/lib/barcode'
-import { formatPrice } from '@/lib/format'
+import { formatNumber, formatPrice } from '@/lib/format'
 import type { ProductDetail, Variant } from '@/types'
 
 /** One row per SKU: its own price, barcodes and on-sale status. */
@@ -19,6 +21,8 @@ export function SkuTable({
   onBarcodes: (variant: Variant) => void
 }) {
   const setActive = useSetVariantActive()
+  const scope = useBranchScope()
+  const { data: units } = useVariantUnits(product.id, scope)
   const editable = !product.archived
 
   return (
@@ -31,6 +35,7 @@ export function SkuTable({
             <th scope="col">SKU</th>
             <th scope="col">Barcodes</th>
             <th scope="col" className="num">Price</th>
+            <th scope="col" className="num">Stock</th>
             <th scope="col">Status</th>
             <th scope="col">
               <span className="sr-only">Actions</span>
@@ -54,6 +59,13 @@ export function SkuTable({
                   {barcodes.length > 1 && <small> +{barcodes.length - 1}</small>}
                 </td>
                 <td className="num tabular" data-label="Price">{formatPrice(variant.sellPrice)}</td>
+                <td className="num tabular" data-label="Stock">
+                  {units === undefined ? (
+                    <span className="muted">…</span>
+                  ) : (
+                    formatNumber(units[variant.id]?.available ?? 0)
+                  )}
+                </td>
                 <td data-label="Status">
                   <span className={`pill ${variant.archived ? 'pill-archived' : 'pill-healthy'}`}>
                     {variant.archived ? 'Inactive' : 'On sale'}

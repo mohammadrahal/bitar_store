@@ -6,6 +6,7 @@ import { SearchInput } from '@/components/shared/search-input'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useSaleModels, useSaleVariants } from '@/hooks/use-sale-picker'
 import { formatPrice } from '@/lib/format'
+import { lineTotal } from '@/lib/money'
 import { compareSizes } from '@/lib/sizes'
 import type { VariantOption } from '@/types'
 
@@ -50,6 +51,8 @@ export function SaleItemCard({
   const leftOf = (option: VariantOption) => Math.max(0, (option.available ?? 0) - (inCart[option.variantId] ?? 0))
   const chosen = options.find((option) => option.color === color && option.size === size)
   const left = chosen ? leftOf(chosen) : 0
+  const qty = chosen ? Math.min(quantity, left) : 0
+  const previewTotal = chosen ? lineTotal({ quantity: qty, unitPrice: chosen.sellPrice }) : 0
 
   const pickModel = (id: string) => {
     setProductId(id)
@@ -179,14 +182,23 @@ export function SaleItemCard({
                 {chosen.color} / {chosen.size} · {chosen.sku}
               </small>
             </span>
-            <span className="sale-price">{formatPrice(chosen.sellPrice)}</span>
+            <span>
+              <span className="sale-price" aria-live="polite">
+                {formatPrice(previewTotal)}
+              </span>
+              {qty > 1 && (
+                <small className="tabular">
+                  {qty} × {formatPrice(chosen.sellPrice)}
+                </small>
+              )}
+            </span>
           </div>
-          <QtyStepper value={Math.min(quantity, left)} max={left} onChange={setQuantity} label="Quantity" />
+          <QtyStepper value={qty} max={left} onChange={setQuantity} label="Quantity" />
           <button
             type="button"
             className="btn btn-dashed"
             onClick={() => {
-              onAdd(chosen, Math.min(quantity, left))
+              onAdd(chosen, qty)
               setSize(null)
               setQuantity(1)
             }}

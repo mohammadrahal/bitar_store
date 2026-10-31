@@ -2,7 +2,6 @@ import type { InventoryRow, InventoryStatus } from '@/types'
 
 const TONES: Record<InventoryStatus, string> = {
   in_stock: 'pill-healthy',
-  low: 'pill-low',
   out: 'pill-out',
   on_hold: 'pill-hold',
   in_transit: 'pill-transit',
@@ -13,8 +12,6 @@ function labelFor(row: Pick<InventoryRow, 'status' | 'nonSellable' | 'inTransit'
   switch (row.status) {
     case 'in_stock':
       return 'In stock'
-    case 'low':
-      return 'Low stock'
     case 'out':
       return 'Out of stock'
     case 'on_hold':

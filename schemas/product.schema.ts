@@ -5,22 +5,15 @@ const priceField = z
   .min(0, 'Must be 0 or more')
   .max(1_000_000, 'That price looks too high')
 
-const optionalText = (max: number) => z.string().trim().max(max, 'Too long')
-
 const detailsShape = {
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(120, 'Name is too long'),
   category: z.string().trim().min(2, 'Category must be at least 2 characters').max(60, 'Category is too long'),
   sellPrice: priceField,
-  season: optionalText(40),
-  brand: optionalText(40),
-  material: optionalText(80),
-  description: optionalText(500),
 }
 
 /**
- * Editing a model changes its details only; variants are added separately and
- * never renamed. Cost is not here: it belongs to each supplier receipt line,
- * not to the model (BL-06).
+ * Editing a model changes its name, category and price; variants are added
+ * separately and never renamed. There is no cost: the API has none.
  */
 export const productDetailsSchema = z.object(detailsShape)
 
@@ -41,10 +34,21 @@ export const newProductSchema = z
     excluded: z.array(z.string()),
     /** Per-variant sell prices keyed by `color|size`. Blank uses the default sell price. */
     prices: z.record(z.string(), priceField),
+    /** Where the first units are counted in. Blank places nothing. */
+    openingBranchId: z.string(),
+    /** Units per `color|size`, posted as opening stock once the SKUs exist. */
+    openingQuantities: z.record(z.string(), z.number().int('Whole units only').min(0, 'Must be 0 or more')),
   })
   .refine((values) => combinationsOf(values).length > 0, {
     message: 'Keep at least one color and size combination',
     path: ['excluded'],
+  })
+  .superRefine((values, ctx) => {
+    /* Counted units have to belong somewhere. */
+    const counted = Object.values(values.openingQuantities).some((quantity) => quantity > 0)
+    if (counted && !values.openingBranchId) {
+      ctx.addIssue({ code: 'custom', message: 'Say where these units are', path: ['openingBranchId'] })
+    }
   })
 
 export type ProductDetailsFormValues = z.infer<typeof productDetailsSchema>
@@ -65,24 +69,16 @@ export function combinationsOf(values: {
 
 export const emptyNewProductValues: NewProductFormValues = {
   code: '',
+  openingBranchId: '',
+  openingQuantities: {},
   name: '',
   category: '',
   sellPrice: 0,
-  season: '',
-  brand: '',
-  material: '',
-  description: '',
   colors: [],
   sizeSystem: 'letter',
   sizes: [],
   excluded: [],
   prices: {},
-}
-
-/** Blank optional fields are left off rather than saved as empty strings. */
-export function detailsFrom(values: Pick<ProductDetailsFormValues, 'season' | 'brand' | 'material' | 'description'>) {
-  const entries = Object.entries(values).filter(([, value]) => value.trim() !== '')
-  return entries.length ? Object.fromEntries(entries) : undefined
 }
 
 /** A new price for one SKU. */
@@ -100,7 +96,15 @@ export const barcodeSchema = z.object({
 })
 export type BarcodeFormValues = z.infer<typeof barcodeSchema>
 
+/** A colour is typed in on the model; the API stores it as a plain string. */
 export const colorSchema = z.object({
   name: z.string().trim().min(2, 'At least 2 characters').max(24, 'Too long'),
-  hex: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Pick a color'),
 })
+
+/** A size typed in by hand, for models the letter/numeric lists do not cover. */
+export const sizeNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter a size')
+  .max(16, 'Too long')
+  .regex(/^[A-Za-z0-9][A-Za-z0-9 ./-]*$/, 'Letters, digits and . / - only')

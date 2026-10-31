@@ -7,6 +7,7 @@ export function mapApiBranch(branch: ApiBranch): Branch {
     name: branch.name,
     code: branch.code,
     location: branch.code,
+    kind: branch.kind ?? 'branch',
     isActive: branch.isActive,
     createdAt: branch.createdAt,
   }

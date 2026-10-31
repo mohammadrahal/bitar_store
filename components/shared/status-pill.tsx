@@ -1,14 +1,18 @@
 import type { StockStatus } from '@/types'
 
 const stockStatusLabel: Record<StockStatus, string> = {
-  healthy: 'Healthy',
-  low: 'Low stock',
+  healthy: 'In stock',
   out: 'Out of stock',
+}
+
+const stockStatusTone: Record<StockStatus, string> = {
+  healthy: 'pill-healthy',
+  out: 'pill-out',
 }
 
 export function StockStatusPill({ status }: { status: StockStatus }) {
   return (
-    <span className={`pill pill-${status}`}>
+    <span className={`pill ${stockStatusTone[status]}`}>
       <span className="pill-dot" aria-hidden="true" />
       {stockStatusLabel[status]}
     </span>

@@ -1,6 +1,6 @@
 import { getApiClient } from '@/lib/api'
 import type { ApiUser } from '@/lib/api'
-import { DEFAULT_EMPLOYEE_PERMISSIONS, PLATFORM_SCOPE } from '@/lib/permission-keys'
+import { DEFAULT_EMPLOYEE_PERMISSIONS, PLATFORM_SCOPE, splitByScope } from '@/lib/permission-keys'
 import {
   assignmentsFor,
   clearUserAccess,
@@ -60,9 +60,15 @@ async function syncLocations(userId: string, role: Role, locations: LocationAssi
   }
 
   const kept = getUserAccess(userId).grants
-  const grants: StoredUserAccess['grants'] = { [PLATFORM_SCOPE]: kept[PLATFORM_SCOPE] ?? [] }
+  /* A catalog key is held for the business, not at a location, and `can()` only
+     reads those from the `*` bucket — so the defaults have to be split the same
+     way or a key like `catalog.create` would be stored where nothing looks. */
+  const defaults = splitByScope(DEFAULT_EMPLOYEE_PERMISSIONS)
+  const grants: StoredUserAccess['grants'] = {
+    [PLATFORM_SCOPE]: kept[PLATFORM_SCOPE] ?? [...defaults.platform],
+  }
   for (const entry of wanted) {
-    grants[entry.locationId] = kept[entry.locationId] ?? [...DEFAULT_EMPLOYEE_PERMISSIONS]
+    grants[entry.locationId] = kept[entry.locationId] ?? [...defaults.perLocation]
   }
   setUserAccess(userId, { locations: wanted, grants })
 }

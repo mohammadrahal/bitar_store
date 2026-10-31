@@ -1,15 +1,18 @@
 import { mapApiBranch } from '@/lib/api/map-branch'
+import { matchesBranchSlug } from '@/lib/branch-slug'
 import { can } from '@/lib/permissions'
 import { mirrorBranches } from '@/mocks/mirror'
 import { useUserStore } from '@/store/user-store'
 import { getApiClient } from '@/lib/api'
 import type { CreateBranchInput, UpdateBranchInput } from '@/lib/api/types'
-import { ALL_BRANCHES, type Branch, type BranchScope } from '@/types'
+import { ALL_BRANCHES, type Branch, type BranchKind, type BranchScope } from '@/types'
 import { getBranchStockUnits } from '@/services/stock.service'
 
 export interface BranchInput {
   code: string
   name: string
+  /** Set once, on creation: the API has no way to change it afterwards. */
+  kind?: BranchKind
 }
 
 /**
@@ -37,9 +40,10 @@ export async function listBranches(scope: BranchScope = ALL_BRANCHES): Promise<B
   return fetchScopedBranches(scope)
 }
 
-export async function getBranch(branchId: string): Promise<Branch> {
+/** `segment` is what the URL carries: the store code, or an id from an older link. */
+export async function getBranch(segment: string): Promise<Branch> {
   const branches = await fetchScopedBranches(ALL_BRANCHES)
-  const branch = branches.find((candidate) => candidate.id === branchId)
+  const branch = branches.find((candidate) => matchesBranchSlug(candidate, segment))
   if (!branch) throw new Error('Branch not found')
   return branch
 }
@@ -48,6 +52,8 @@ function normalizeCreate(input: BranchInput): CreateBranchInput {
   return {
     code: input.code.trim(),
     name: input.name.trim(),
+    /* The server defaults to `branch`, so only a warehouse has to be said. */
+    kind: input.kind ?? 'branch',
   }
 }
 

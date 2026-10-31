@@ -1,11 +1,26 @@
 'use client'
 
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
+import { Field } from '@/components/shared/field'
 import { SIZE_SYSTEMS } from '@/lib/sizes'
+import { sizeNameSchema } from '@/schemas/product.schema'
 import type { SizeSystem } from '@/types'
 
 const SYSTEMS = Object.entries(SIZE_SYSTEMS) as [SizeSystem, { label: string; sizes: string[] }][]
 
-/** One size system per model; switching systems clears the picked sizes. */
+function extrasOf(presets: string[], ...lists: string[][]) {
+  const known = new Set(presets)
+  const extras: string[] = []
+  for (const list of lists) {
+    for (const size of list) {
+      if (!known.has(size) && !extras.includes(size)) extras.push(size)
+    }
+  }
+  return extras
+}
+
+/** Letter, numeric and one-size are views of the same list. Switching does not drop what is already picked. */
 export function SizePicker({
   system,
   sizes,
@@ -21,10 +36,34 @@ export function SizePicker({
   lockSystem?: boolean
   locked?: string[]
 }) {
-  const options = SIZE_SYSTEMS[system].sizes
+  const presets = SIZE_SYSTEMS[system].sizes
+  const extras = extrasOf(presets, sizes, locked)
+  const shown = [...presets, ...extras]
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
   const toggle = (size: string) => {
-    const next = sizes.includes(size) ? sizes.filter((entry) => entry !== size) : [...sizes, size]
-    onChange(options.filter((option) => next.includes(option)))
+    if (locked.includes(size)) return
+    onChange(sizes.includes(size) ? sizes.filter((entry) => entry !== size) : [...sizes, size])
+  }
+
+  const addCustom = () => {
+    const parsed = sizeNameSchema.safeParse(draft)
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Check the size')
+      return
+    }
+    const name = parsed.data
+    const listed = [...presets, ...sizes, ...locked]
+    if (listed.some((entry) => entry.toLowerCase() === name.toLowerCase())) {
+      setError('That size is already listed')
+      return
+    }
+    setError(null)
+    setDraft('')
+    setAdding(false)
+    onChange([...sizes, name])
   }
 
   return (
@@ -41,7 +80,9 @@ export function SizePicker({
               onClick={() => {
                 if (key === system) return
                 onSystemChange(key)
-                onChange(key === 'one' ? SIZE_SYSTEMS.one.sizes : [])
+                setAdding(false)
+                setDraft('')
+                setError(null)
               }}
             >
               {entry.label}
@@ -50,7 +91,7 @@ export function SizePicker({
         </div>
       )}
       <div className="chip-row" role="group" aria-label="Sizes">
-        {options.map((size) => {
+        {shown.map((size) => {
           const isLocked = locked.includes(size)
           return (
             <button
@@ -65,7 +106,44 @@ export function SizePicker({
             </button>
           )
         })}
+        <button
+          type="button"
+          className="chip chip-lg"
+          aria-pressed={adding}
+          aria-expanded={adding}
+          aria-controls="custom-size-add"
+          onClick={() => {
+            setAdding((open) => !open)
+            setError(null)
+          }}
+        >
+          <Plus size={16} aria-hidden="true" />
+          Custom
+        </button>
       </div>
+      {adding && (
+        <div className="inline-add" id="custom-size-add">
+          <Field label="Custom size" error={error ?? undefined}>
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  addCustom()
+                }
+              }}
+              autoComplete="off"
+              placeholder="XXL"
+              autoFocus
+            />
+          </Field>
+          <button type="button" className="btn btn-secondary" onClick={addCustom}>
+            <Plus size={16} aria-hidden="true" />
+            Add
+          </button>
+        </div>
+      )}
     </>
   )
 }

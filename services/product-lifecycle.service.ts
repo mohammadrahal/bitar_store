@@ -1,5 +1,4 @@
 import { getApiClient } from '@/lib/api'
-import { lineInTransit } from '@/lib/transfers'
 import { readDb } from '@/mocks/store'
 import { getProduct } from '@/services/products.service'
 import { branchStockItems } from '@/services/stock-api.service'
@@ -8,18 +7,15 @@ import type { ProductWithVariants } from '@/types'
 interface Holdings {
   onHand: number
   nonSellable: number
-  reserved: number
   inTransit: number
 }
 
 /**
- * What the given SKUs still hold, at every location. On hand, non-sellable and
- * in transit come from `GET /stock`, which is the server's own picture;
- * reservations and transfer legs are still local, so they are added on top.
+ * What the given SKUs still hold, at every location, from `GET /stock`.
  */
 async function holdingsOf(variantIds: Set<string>): Promise<Holdings> {
   const db = readDb()
-  const totals: Holdings = { onHand: 0, nonSellable: 0, reserved: 0, inTransit: 0 }
+  const totals: Holdings = { onHand: 0, nonSellable: 0, inTransit: 0 }
 
   for (const branch of db.branches) {
     const items = await branchStockItems(branch.id)
@@ -31,14 +27,6 @@ async function holdingsOf(variantIds: Set<string>): Promise<Holdings> {
     }
   }
 
-  for (const level of db.stock) {
-    if (variantIds.has(level.variantId)) totals.reserved += level.reserved
-  }
-  for (const transfer of db.transfers) {
-    for (const line of transfer.lines) {
-      if (variantIds.has(line.variantId)) totals.inTransit += lineInTransit(line)
-    }
-  }
   return totals
 }
 
@@ -49,7 +37,6 @@ async function archiveBlocker(variantIds: Set<string>): Promise<string | null> {
   const reasons = [
     totals.onHand > 0 && `${totals.onHand} on hand`,
     totals.nonSellable > 0 && `${totals.nonSellable} non-sellable`,
-    totals.reserved > 0 && `${totals.reserved} reserved`,
     totals.inTransit > 0 && `${totals.inTransit} in transit`,
   ].filter(Boolean)
   if (reasons.length === 0) return null

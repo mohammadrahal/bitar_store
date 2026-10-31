@@ -18,6 +18,7 @@ export function StatCard({
   highlight,
   icon: Icon,
   href,
+  onClick,
 }: {
   label: string
   value: string
@@ -27,6 +28,8 @@ export function StatCard({
   icon: LucideIcon
   /** When set, the whole card navigates to this route. */
   href?: string
+  /** Opens a panel instead of navigating. Wins over `href`. */
+  onClick?: () => void
 }) {
   const className = `stat-card ${highlight ? 'highlight' : ''}`
   const body = (
@@ -39,6 +42,16 @@ export function StatCard({
       <span className={`stat-detail ${alert ? 'detail-alert' : ''}`}>{detail}</span>
     </>
   )
+
+  if (onClick) {
+    return (
+      <motion.div className="stat-card-host" variants={staggerItem}>
+        <button type="button" className={className} onClick={onClick} aria-label={`${label}, ${value}. ${detail}`}>
+          {body}
+        </button>
+      </motion.div>
+    )
+  }
 
   if (href) {
     return (
@@ -90,16 +103,11 @@ export function NetworkStatCards({ stats }: { stats: InventoryStats }) {
         href={can('stock.view') ? inventoryHref() : undefined}
       />
       <StatCard
-        label="Low stock"
-        value={formatNumber(stats.lowStockCount)}
-        detail={
-          stats.outOfStockCount > 0
-            ? `${countOf(stats.outOfStockCount, 'variant')} out of stock`
-            : 'Nothing out of stock'
-        }
-        alert={stats.lowStockCount > 0 || stats.outOfStockCount > 0}
-        icon={AlertTriangle}
-        href={can('stock.view') ? inventoryHref('low') : undefined}
+        label="Variants in stock"
+        value={formatNumber(stats.inStockVariantCount)}
+        detail={`of ${countOf(stats.variantCount, 'variant')} the catalog carries`}
+        icon={Layers}
+        href={can('stock.view') ? inventoryHref() : undefined}
       />
     </StaggerList>
   )
@@ -109,7 +117,7 @@ export function NetworkStatCards({ stats }: { stats: InventoryStats }) {
 export function BranchStatCards({ stats }: { stats: InventoryStats }) {
   const { can } = usePermission()
   const stock = can('stock.view') ? inventoryHref() : undefined
-  const low = can('stock.view') ? inventoryHref('low') : undefined
+  const empty = can('stock.view') ? inventoryHref('out') : undefined
   return (
     <StaggerList className="stats-grid">
       <StatCard
@@ -127,20 +135,19 @@ export function BranchStatCards({ stats }: { stats: InventoryStats }) {
         href="/products"
       />
       <StatCard
-        label="Low stock"
-        value={formatNumber(stats.lowStockCount)}
-        detail="At or below the threshold"
-        alert={stats.lowStockCount > 0}
-        icon={AlertTriangle}
-        href={low}
+        label="Catalog"
+        value={formatNumber(stats.productCount)}
+        detail={`${countOf(stats.variantCount, 'variant')} across the catalog`}
+        icon={Package}
+        href="/products"
       />
       <StatCard
-        label="Out of stock"
-        value={formatNumber(stats.outOfStockCount)}
-        detail={stats.outOfStockCount > 0 ? 'Needs restocking' : 'All variants stocked'}
-        alert={stats.outOfStockCount > 0}
-        icon={Package}
-        href={low}
+        label="Out of stock here"
+        value={formatNumber(Math.max(0, stats.variantCount - stats.inStockVariantCount))}
+        detail="Carried variants with nothing on hand"
+        alert={stats.variantCount > stats.inStockVariantCount}
+        icon={Boxes}
+        href={empty}
       />
     </StaggerList>
   )

@@ -1,4 +1,4 @@
-import { fromCents, toCents } from '@/lib/invoice-totals'
+import { fromCents, toCents } from '@/lib/money'
 
 export type PaymentMode = 'cash' | 'whish' | 'split'
 
@@ -62,4 +62,36 @@ export function paymentsFor(draft: PaymentDraft, total: number) {
     payments.push({ method: 'whish', amount: whish, reference: draft.whishReference.trim() })
   }
   return payments
+}
+
+/**
+ * Cash received follows the sale total until the cashier types a larger bill.
+ * The same draft is returned when nothing has to change, so the till can call
+ * this from an effect without looping.
+ */
+export function syncTendered(draft: PaymentDraft, total: number): PaymentDraft {
+  const { cash } = amountsOf(draft, total)
+  if (toCents(draft.tendered) >= toCents(cash)) return draft
+  return { ...draft, tendered: cash }
+}
+
+/** A sale's payments as `GET /sales` returns them. */
+interface SalePayment {
+  method: string
+  amount: string | number
+}
+
+/** Cents taken by one method across a sale's payments. */
+export function paymentCents(payments: readonly SalePayment[], method: 'cash' | 'whish'): number {
+  return payments
+    .filter((payment) => payment.method === method)
+    .reduce((sum, payment) => sum + toCents(Number(payment.amount) || 0), 0)
+}
+
+/** How a sale was paid: one method, or both. */
+export function salePaymentKind(payments: readonly SalePayment[]): 'cash' | 'whish' | 'split' {
+  const cash = paymentCents(payments, 'cash')
+  const whish = paymentCents(payments, 'whish')
+  if (cash > 0 && whish > 0) return 'split'
+  return whish > 0 ? 'whish' : 'cash'
 }

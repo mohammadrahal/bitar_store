@@ -7,6 +7,7 @@ import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
 import { useSetWarehouse, useWarehouseId } from '@/hooks/use-inventory'
+import { branchHref } from '@/lib/branch-slug'
 import { BRANCH_WRITES } from '@/services/branches.service'
 import type { Branch } from '@/types'
 
@@ -63,7 +64,7 @@ export function BranchTable({
           {branches.map((branch, index) => (
             <MotionTr key={branch.id} index={index}>
               <td>
-                <Link href={`/branches/${branch.id}`} className="link-cell">
+                <Link href={branchHref(branch)} className="link-cell">
                   {branch.name}
                 </Link>
               </td>
@@ -71,12 +72,14 @@ export function BranchTable({
               <td>
                 <span className="row-actions">
                   <ActiveStatusPill isActive={branch.isActive} />
-                  {branch.id === warehouseId && <span className="pill pill-accent">Warehouse</span>}
+                  {(branch.kind === 'warehouse' || branch.id === warehouseId) && (
+                    <span className="pill pill-accent">Warehouse</span>
+                  )}
                 </span>
               </td>
               <td>
                 <div className="row-actions">
-                  {branch.id !== warehouseId && (
+                  {branch.kind !== 'warehouse' && branch.id !== warehouseId && (
                     <Can permission="settings.manage">
                       <button
                         type="button"

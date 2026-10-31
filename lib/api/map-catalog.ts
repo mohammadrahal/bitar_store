@@ -37,17 +37,15 @@ export function mapApiSku(sku: ApiSku, styleCode: string, barcode = ''): Variant
 }
 
 /** Cost and the extra details are not on the API, so they come from what this device already knows. */
-export function mapApiStyle(style: ApiStyle, variants: Variant[], local?: Pick<Product, 'costPrice' | 'details'>): Product {
+export function mapApiStyle(style: ApiStyle, variants: Variant[]): Product {
   const prices = variants.filter((variant) => !variant.archived).map((variant) => variant.sellPrice)
   return {
     id: style.id,
     code: style.code,
     name: style.name,
     category: style.category?.trim() || UNCATEGORIZED,
-    costPrice: local?.costPrice ?? 0,
     sellPrice: prices.length ? Math.min(...prices) : 0,
     archived: !style.isActive,
-    details: local?.details,
     createdAt: style.createdAt,
   }
 }

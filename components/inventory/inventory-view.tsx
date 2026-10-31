@@ -28,7 +28,7 @@ const PAGE_SIZE = 12
 
 const FILTERS: ChipOption<InventoryFilter>[] = [
   { value: 'all', label: 'All' },
-  { value: 'low', label: 'Low stock' },
+  { value: 'out', label: 'Out of stock' },
   { value: 'on_hold', label: 'Non-sellable' },
   { value: 'in_transit', label: 'In transit' },
   { value: 'archived', label: 'Archived' },
@@ -103,12 +103,6 @@ export function InventoryView() {
               <Download size={16} aria-hidden="true" />
               Export CSV
             </button>
-            <Can permission="movements.request">
-              <Link href="/transfers/new" className="btn btn-primary">
-                <ArrowLeftRight size={16} aria-hidden="true" />
-                New transfer
-              </Link>
-            </Can>
           </>
         }
       />

@@ -2,17 +2,12 @@ import { ApiError, getApiClient } from '@/lib/api'
 import { mapApiSku } from '@/lib/api/map-catalog'
 import { mirrorCatalog } from '@/mocks/mirror'
 import { isRetired, readDb, type MockDb } from '@/mocks/store'
-import { callerSeesCosts } from '@/services/mock-ledger'
-import { latestConfirmedCosts } from '@/services/receipts.service'
 import type { VariantOption } from '@/types'
 
 /** Something a scanner could have produced: one token, no spaces. */
 const SCANNABLE = /^[\x21-\x7E]{4,64}$/
 
 function optionsFrom(db: MockDb, term: string): VariantOption[] {
-  const seesCost = callerSeesCosts()
-  /* Cost lives on the supplier receipt line, not on the model (BL-06). */
-  const costs = seesCost ? latestConfirmedCosts() : null
   return db.variants.flatMap<VariantOption>((variant) => {
     const product = db.products.find((candidate) => candidate.id === variant.productId)
     if (!product || isRetired(db, variant)) return []
@@ -27,7 +22,6 @@ function optionsFrom(db: MockDb, term: string): VariantOption[] {
         productName: product.name,
         size: variant.size,
         color: variant.color,
-        costPrice: costs?.get(variant.id) ?? 0,
         sellPrice: variant.sellPrice,
       },
     ]
@@ -68,7 +62,10 @@ export async function searchVariants(search: string, limit = 10, branchId?: stri
     options = optionsFrom(readDb(), term)
   }
   if (sellable) {
-    options = options.map((option) => ({ ...option, available: sellable!.get(option.variantId) ?? 0 }))
+    options = options.map((option) => ({
+      ...option,
+      available: sellable!.get(option.variantId) ?? sellable!.get(option.sku) ?? 0,
+    }))
   }
   options.sort((a, b) => a.productName.localeCompare(b.productName) || a.sku.localeCompare(b.sku))
   return options.slice(0, limit)

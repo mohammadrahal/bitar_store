@@ -1,7 +1,7 @@
-import { SalesChannelView } from '@/components/sales/sales-channel-view'
+import { RetailSalesView } from '@/components/sales/retail-sales-view'
 
-export const metadata = { title: 'B2C sales' }
+export const metadata = { title: 'Sales' }
 
-export default function B2CSalesPage() {
-  return <SalesChannelView channel="b2c" />
+export default function RetailSalesPage() {
+  return <RetailSalesView />
 }

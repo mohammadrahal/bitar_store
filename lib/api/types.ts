@@ -25,10 +25,15 @@ export interface MeResponse {
   canViewCosts: boolean
 }
 
+/** A selling location or the warehouse stock is replenished from. */
+export type ApiBranchKind = 'branch' | 'warehouse'
+
 export interface ApiBranch {
   id: string
   code: string
   name: string
+  /** Absent on a server that predates the field; treat that as a branch. */
+  kind?: ApiBranchKind
   isActive: boolean
   createdAt: string
 }
@@ -50,6 +55,8 @@ export interface UpdateUserInput {
 export interface CreateBranchInput {
   code: string
   name: string
+  /** Defaults to `branch` on the server. */
+  kind?: ApiBranchKind
 }
 
 /** PATCH /branches/:id */
@@ -175,6 +182,73 @@ export interface OpeningStockInput {
 export interface OpeningStockResult {
   batchId: string
   lines: number
+}
+
+/** `GET /stock/overview` (admin): the same filters as the stock list, less the branch. */
+export interface StockOverviewParams {
+  search?: string
+  styleId?: string
+  activeOnly?: boolean
+  limit?: number
+  offset?: number
+}
+
+export interface StockMovementParams {
+  branchId?: string
+  skuId?: string
+  type?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+}
+
+/** The minimum and target a branch keeps per SKU (`GET /reorder-levels`). */
+export interface ApiReorderLevel {
+  id: string
+  branchId: string
+  skuId: string
+  minQuantity: number
+  targetQuantity: number
+}
+
+export interface ReorderLevelListParams {
+  branchId: string
+  search?: string
+  limit?: number
+  offset?: number
+}
+
+export interface ReorderLevelInput {
+  branchId: string
+  skuId: string
+  minQuantity: number
+  targetQuantity: number
+}
+
+export interface ReorderLevelByStyleInput {
+  branchId: string
+  styleId: string
+  minQuantity: number
+  targetQuantity: number
+}
+
+/** `GET /reports/*`: a closed date range at one branch. */
+export interface ReportRangeParams {
+  branchId?: string
+  from?: string
+  to?: string
+}
+
+export interface AuditEventParams {
+  entityType?: string
+  entityId?: string
+  actorId?: string
+  branchId?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
 }
 
 export type ApiSaleChannel = 'in_store' | 'social_media'

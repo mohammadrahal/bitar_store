@@ -37,7 +37,7 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
   } = useForm<BranchCreateFormValues | BranchEditFormValues>({
     resolver: zodResolver(isEdit ? branchEditSchema : branchCreateSchema),
     defaultValues: branch
-      ? { code: branch.code ?? '', name: branch.name, isActive: branch.isActive }
+      ? { code: branch.code ?? '', name: branch.name, isActive: branch.isActive, kind: branch.kind }
       : emptyBranchCreateValues,
   })
 
@@ -81,7 +81,7 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
       )
       return
     }
-    create.mutate(values, {
+    create.mutate(values as BranchCreateFormValues, {
       onSuccess: onClose,
       /* Another admin may have taken the code since the list was fetched. */
       onError: (error) => {
@@ -115,6 +115,30 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
       }
     >
       <div className="form-grid">
+        {!isEdit && (
+          <Controller
+            control={control}
+            name="kind"
+            render={({ field }) => (
+              <Field label="Kind" hint="A warehouse holds stock for the branches. It cannot be changed later." className="full">
+                <div className="segmented" role="radiogroup" aria-label="Kind">
+                  {(['branch', 'warehouse'] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      role="radio"
+                      aria-checked={field.value === option}
+                      className={field.value === option ? 'active' : ''}
+                      onClick={() => field.onChange(option)}
+                    >
+                      {option === 'branch' ? 'Branch' : 'Warehouse'}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            )}
+          />
+        )}
         <Field
           label="Display name"
           error={nameTaken ? `A branch is already called “${name.trim()}”.` : errors.name?.message}

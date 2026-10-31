@@ -13,10 +13,9 @@ import { SearchInput } from '@/components/shared/search-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
-import { useOpeningPost, usePostOpeningStock } from '@/hooks/use-opening-stock'
+import { useOpeningState, usePostOpeningStock } from '@/hooks/use-opening-stock'
 import { usePermission } from '@/hooks/use-permission'
 import { useStockPicker } from '@/hooks/use-inventory'
-import { formatDocumentDate } from '@/lib/format'
 
 const LIMIT = 60
 const SEARCH_DEBOUNCE_MS = 250
@@ -38,7 +37,7 @@ export function OpeningStockView() {
   const [counted, setCounted] = useState<Record<string, number>>({})
 
   const variants = useStockPicker(branchId, term, LIMIT)
-  const post = useOpeningPost(branchId)
+  const opening = useOpeningState(branchId)
   const submit = usePostOpeningStock()
 
   useEffect(() => {
@@ -47,14 +46,17 @@ export function OpeningStockView() {
 
   const lines = Object.values(counted).filter((quantity) => quantity > 0).length
   const units = Object.values(counted).reduce((sum, quantity) => sum + quantity, 0)
-  const alreadyPosted = Boolean(post.data)
+  /* A SKU already in play at this location cannot be opened again, so the sheet
+     leaves it out: what is left is whatever the catalog gained since. */
+  const moved = new Set(opening.data?.movedSkuIds ?? [])
+  const openable = (variants.data ?? []).filter((option) => !moved.has(option.variantId))
 
   return (
     <>
       <PageHeader
         eyebrow="Stock"
         title="Opening stock"
-        description="Count what is physically at a location and post it once. After that, differences are settled by a physical count or a supplier receipt."
+        description="Count what is physically at a location and post it. A SKU is opened once; after that its differences are settled by a physical count."
       />
 
       {!locationScoped && (
@@ -77,14 +79,6 @@ export function OpeningStockView() {
           title="Pick a location"
           description="Opening quantities belong to one location, so choose where you are counting."
         />
-      ) : alreadyPosted ? (
-        <EmptyState
-          icon={ClipboardList}
-          title="Opening stock is already posted here"
-          description={`Posted by ${post.data?.postedBy} on ${formatDocumentDate(post.data?.postedAt ?? '')} with ${
-            post.data?.lines ?? 0
-          } lines. A location is opened once — use a physical count to correct it, or a supplier receipt to add more.`}
-        />
       ) : (
         <Panel
           title="Counted quantities"
@@ -102,7 +96,11 @@ export function OpeningStockView() {
             />
           }
         >
-          {variants.isPending ? (
+          <p className="panel-body muted">
+            Only SKUs that have never moved at this location can be opened, so anything already in play is left off
+            the sheet.
+          </p>
+          {variants.isPending || opening.isPending ? (
             <div className="panel-body">
               <Skeleton rows={4} stats={0} />
             </div>
@@ -114,12 +112,12 @@ export function OpeningStockView() {
                 onRetry={() => void variants.refetch()}
               />
             </div>
-          ) : variants.data.length === 0 ? (
+          ) : openable.length === 0 ? (
             <div className="panel-body">
               <EmptyState
                 icon={ClipboardList}
-                title="No variants match"
-                description="Add models to the catalog first, or clear the search."
+                title="Nothing left to open here"
+                description="Every SKU in this search has already moved at this location, or the catalog has none yet."
               />
             </div>
           ) : (
@@ -135,7 +133,7 @@ export function OpeningStockView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {variants.data.map((option) => (
+                    {openable.map((option) => (
                       <tr key={option.variantId}>
                         <td className="card-title" data-label="Variant">
                           {option.productName} — {option.color} / {option.size}

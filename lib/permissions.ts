@@ -1,4 +1,4 @@
-import { isEnabled } from '@/lib/features'
+import { isBranchId } from '@/lib/branch-slug'
 import {
   BASELINE_PERMISSIONS,
   MANAGER_PERMISSIONS,
@@ -50,9 +50,6 @@ export function can(user: User, permission: Permission, locationId?: string): bo
 
   if (holds(SUPER_ADMIN_PERMISSIONS, permission) || holds(MANAGER_PERMISSIONS, permission)) return false
 
-  /* The API answers cost visibility with a flag of its own rather than a key. */
-  if (permission === 'costs.view' && user.canViewCosts) return true
-
   if (isPlatformPermission(permission)) {
     return user.permissions.includes(permission) || (user.grants[PLATFORM_SCOPE] ?? []).includes(permission)
   }
@@ -64,11 +61,6 @@ export function can(user: User, permission: Permission, locationId?: string): bo
 export function canAny(user: User, rule: PermissionRule, locationId?: string): boolean {
   const list = Array.isArray(rule) ? rule : [rule]
   return list.some((permission) => can(user, permission, locationId))
-}
-
-/** Cost and margin: both owner roles, and an employee granted `costs.view`. */
-export function canViewCosts(user: User): boolean {
-  return can(user, 'costs.view')
 }
 
 export function isSuperAdmin(user: User): boolean {
@@ -103,27 +95,17 @@ export function homePathFor(user: User): string {
 
 /** Routes behind a feature flag: hidden entirely while the flag is off. */
 const FLAGGED_ROUTES: [prefix: string, flag: 'b2bSales' | 'replenishmentSuggestions'][] = [
-  ['/sales/b2b', 'b2bSales'],
 ]
 
 /** Path prefixes and what each one needs. Longest prefix is checked first. */
 const ROUTE_PERMISSIONS: [prefix: string, rule: PermissionRule][] = [
   ['/products/new', 'catalog.create'],
   ['/sales/new', 'sales.create'],
-  ['/sales/b2b', 'documents.manage'],
   ['/sales/b2c', ['sales.view_own', 'sales.view_branch']],
   ['/sales/', ['sales.view_own', 'sales.view_branch']],
-  ['/transfers/new', 'movements.request'],
-  ['/transfers', 'stock.view'],
   ['/inventory', 'stock.view'],
-  ['/stock-control', ['counts.enter', 'counts.apply', 'holds.manage', 'stock.dispose']],
-  ['/replenishment', ['movements.request', 'replenishment.review']],
-  ['/receiving', ['receipts.enter', 'receipts.confirm', 'suppliers.manage']],
-  ['/opening-stock', ['counts.enter', 'opening_stock.post']],
+  ['/opening-stock', 'opening_stock.post'],
   ['/users', 'users.manage'],
-  // A document's own location is only known once it loads, so /invoices/:id is
-  // checked by the detail view rather than here.
-  ['/invoices', 'documents.manage'],
 ]
 
 /**
@@ -137,14 +119,14 @@ export function redirectPathFor(user: User, pathname: string): string | null {
   if (pathname === '/dashboard' && !can(user, 'locations.view_all')) return home
   if (pathname === '/branches' && !can(user, 'locations.view_all')) return home
 
-  const flagged = FLAGGED_ROUTES.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
-  if (flagged && !isEnabled(flagged[1])) return home
-
   const rule = ROUTE_PERMISSIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
   if (rule && !canAny(user, rule[1])) return home
 
+  /* A branch page is addressed by its store code, which only the branch list
+     can resolve, so the check here covers the id form and BranchGuard does the
+     rest once the list has loaded. */
   const locationMatch = /^\/branches\/([^/]+)/.exec(pathname)
-  if (locationMatch && !canAccessLocation(user, locationMatch[1])) return home
+  if (locationMatch && isBranchId(locationMatch[1]) && !canAccessLocation(user, locationMatch[1])) return home
 
   return null
 }

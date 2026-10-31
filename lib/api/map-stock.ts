@@ -1,12 +1,10 @@
 import { mapApiSku } from '@/lib/api/map-catalog'
 import type { ApiSkuWithStyle, ApiStockItem } from '@/lib/api/types'
-import { DEFAULT_LOW_STOCK_AT } from '@/mocks/store'
 import { readDb } from '@/mocks/store'
 import type { BranchStockRow, StockStatus } from '@/types'
 
-function statusOf(available: number, lowStockAt: number): StockStatus {
-  if (available === 0) return 'out'
-  return available <= lowStockAt ? 'low' : 'healthy'
+function statusOf(available: number): StockStatus {
+  return available === 0 ? 'out' : 'healthy'
 }
 
 /** Whole-number bucket counts from the API (handles numeric strings). */
@@ -32,6 +30,36 @@ export function normalizeStockItem(raw: unknown): ApiStockItem | null {
   }
 }
 
+/**
+ * `GET /stock/movements` rows, reduced to the SKU ids they name. The payload
+ * is not in the API document yet, so every shape the server might use for the
+ * id is accepted; `rows` is the page size, which is what paging reads.
+ */
+export function parseMovementSkuIds(payload: unknown): { rows: number; skuIds: string[] } {
+  const list = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === 'object' && Array.isArray((payload as { items?: unknown }).items)
+      ? (payload as { items: unknown[] }).items
+      : []
+
+  const skuIds: string[] = []
+  for (const entry of list) {
+    if (!entry || typeof entry !== 'object') continue
+    const row = entry as Record<string, unknown>
+    const nested = row.sku && typeof row.sku === 'object' ? (row.sku as Record<string, unknown>) : undefined
+    const id =
+      typeof row.skuId === 'string'
+        ? row.skuId
+        : typeof row.sku_id === 'string'
+          ? row.sku_id
+          : typeof nested?.id === 'string'
+            ? nested.id
+            : null
+    if (id) skuIds.push(id)
+  }
+  return { rows: list.length, skuIds }
+}
+
 /** `GET /stock` is an array; tolerate a wrapped payload if the server sends one. */
 export function parseStockList(payload: unknown): ApiStockItem[] {
   const rows = Array.isArray(payload)
@@ -47,10 +75,8 @@ export function toBranchStockRow(item: ApiStockItem): BranchStockRow {
   const db = readDb()
   const variant = mapApiSku(item.sku, item.sku.style.code)
   const product = db.products.find((candidate) => candidate.id === variant.productId)
-  const local = db.stock.find((level) => level.variantId === variant.id && level.branchId)
   const onHand = item.sellable + item.nonSellable
   const available = item.sellable
-  const lowStockAt = local?.lowStockAt ?? DEFAULT_LOW_STOCK_AT
 
   return {
     variantId: variant.id,
@@ -63,9 +89,7 @@ export function toBranchStockRow(item: ApiStockItem): BranchStockRow {
     category: product?.category ?? '',
     quantity: onHand,
     available,
-    lowStockAt,
-    status: statusOf(available, lowStockAt),
-    costPrice: product?.costPrice ?? 0,
+    status: statusOf(available),
     sellPrice: variant.sellPrice,
   }
 }

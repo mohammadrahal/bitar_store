@@ -1,11 +1,11 @@
 'use client'
 
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ProductDetailsFields } from '@/components/products/product-details-fields'
 import { Drawer } from '@/components/shared/drawer'
 import { useUpdateProduct } from '@/hooks/use-products'
-import { detailsFrom, productDetailsSchema, type ProductDetailsFormValues } from '@/schemas/product.schema'
+import { productDetailsSchema, type ProductDetailsFormValues } from '@/schemas/product.schema'
 import type { ProductWithVariants } from '@/types'
 
 function toFormValues(product: ProductWithVariants): ProductDetailsFormValues {
@@ -13,10 +13,6 @@ function toFormValues(product: ProductWithVariants): ProductDetailsFormValues {
     name: product.name,
     category: product.category,
     sellPrice: product.sellPrice,
-    season: product.details?.season ?? '',
-    brand: product.details?.brand ?? '',
-    material: product.details?.material ?? '',
-    description: product.details?.description ?? '',
   }
 }
 
@@ -26,19 +22,16 @@ export function ProductForm({ product, onClose }: { product: ProductWithVariants
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<ProductDetailsFormValues>({
     resolver: zodResolver(productDetailsSchema),
     defaultValues: toFormValues(product),
   })
 
-  const submit = handleSubmit((values) => {
-    const { season, brand, material, description, ...rest } = values
-    update.mutate(
-      { productId: product.id, input: { ...rest, details: detailsFrom({ season, brand, material, description }) } },
-      { onSuccess: onClose },
-    )
-  })
+  const submit = handleSubmit((values) =>
+    update.mutate({ productId: product.id, input: values }, { onSuccess: onClose }),
+  )
 
   return (
     <Drawer
@@ -60,6 +53,7 @@ export function ProductForm({ product, onClose }: { product: ProductWithVariants
     >
       <ProductDetailsFields
         register={register}
+        control={control}
         errors={errors}
         priceHint="A new price applies to every active SKU. To price one SKU, use its row on the model page."
       />

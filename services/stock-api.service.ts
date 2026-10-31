@@ -1,6 +1,6 @@
 import { getApiClient } from '@/lib/api'
 import { mapApiSku, mapApiStyle } from '@/lib/api/map-catalog'
-import { toBranchStockRow } from '@/lib/api/map-stock'
+import { parseMovementSkuIds, toBranchStockRow } from '@/lib/api/map-stock'
 import type { ApiStockItem, StockListParams } from '@/lib/api/types'
 import { mirrorCatalog } from '@/mocks/mirror'
 import { readDb } from '@/mocks/store'
@@ -33,7 +33,6 @@ function mirrorStockFromItems(items: ApiStockItem[]): void {
         updatedAt: item.sku.updatedAt,
       },
       styleVariants,
-      local,
     )
   })
 
@@ -73,10 +72,38 @@ export async function listBranchStockFromApi(branchId: string, search = ''): Pro
   )
 }
 
+/* A long history is not worth sweeping for this answer: the server refuses a
+   SKU that has moved anyway, so a partial set only costs a clearer message. */
+const MOVEMENT_PAGES = 20
+
+/**
+ * SKU ids with any movement at a branch, from `GET /stock/movements`. Opening
+ * stock is accepted only for a SKU that has never moved there, so this is what
+ * says which ones can still be opened.
+ */
+export async function movedSkusAt(branchId: string): Promise<Set<string>> {
+  const api = getApiClient()
+  const moved = new Set<string>()
+  for (let page = 0; page < MOVEMENT_PAGES; page += 1) {
+    const { rows, skuIds } = parseMovementSkuIds(
+      await api.listStockMovements({ branchId, limit: PAGE, offset: page * PAGE }),
+    )
+    for (const id of skuIds) moved.add(id)
+    if (rows < PAGE) break
+  }
+  return moved
+}
+
+/** Rows for one style at one branch, zero rows included. */
+export async function styleStockItems(branchId: string, styleId: string): Promise<ApiStockItem[]> {
+  return fetchStockPages({ branchId, styleId })
+}
+
 /** Sellable units per SKU at one branch (full branch list, not search-filtered). */
 export async function branchSellableMap(branchId: string): Promise<Map<string, number>> {
   const items = await fetchStockPages({ branchId, activeOnly: true })
-  return sellableMapsFromItems(items).bySkuId
+  const { bySkuId, bySkuCode } = sellableMapsFromItems(items)
+  return new Map([...bySkuId, ...bySkuCode])
 }
 
 /** Sellable at one branch for a single style — matches `GET /stock?styleId=`. */

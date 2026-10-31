@@ -1,11 +1,10 @@
 import { getApiClient } from '@/lib/api'
-import { commitDb, readDb } from '@/mocks/store'
-import { actorName } from '@/services/mock-ledger'
-import type { OpeningStockPost } from '@/types'
+import { readDb } from '@/mocks/store'
+import { movedSkusAt } from '@/services/stock-api.service'
 
 export interface OpeningStock {
   branchId: string
-  /** Units per variant id. Only quantities above zero are sent to the API. */
+  /** Units per SKU id. Only quantities above zero are sent to the API. */
   quantities: Record<string, number>
 }
 
@@ -22,42 +21,33 @@ export async function placeOpeningStock(plan: OpeningStock[]): Promise<void> {
   }
 }
 
-/** Every location whose opening count has already been posted. */
-export async function listOpeningPosts(): Promise<OpeningStockPost[]> {
-  return readDb().openingPosts
-}
-
-export async function openingPostFor(branchId: string): Promise<OpeningStockPost | null> {
-  return readDb().openingPosts.find((post) => post.branchId === branchId) ?? null
+export interface OpeningStockState {
+  /** SKUs the server has already moved here, which it will not open again. */
+  movedSkuIds: string[]
 }
 
 /**
- * Posts a counted opening quantity for one location, once.
- *
- * The API refuses a SKU that already has movement at that branch, so a second
- * attempt would partly succeed and partly fail. Recording the post here closes
- * the screen instead: a location is opened one time, and anything after that is
- * a count or a receipt. The record is local until the backend keeps it.
+ * What can still be opened at a location. `POST /stock/opening` accepts a SKU
+ * that has never moved at that branch and refuses one that has, so the sheet
+ * offers exactly the first set — which is how a model added later gets its
+ * first units at a location that opened months ago.
  */
-export async function postOpeningStock(input: OpeningStock): Promise<OpeningStockPost> {
-  const db = readDb()
-  if (db.openingPosts.some((post) => post.branchId === input.branchId)) {
-    throw new Error('Opening stock has already been posted for this location. Use a physical count instead.')
-  }
+export async function openingStateFor(branchId: string): Promise<OpeningStockState> {
+  return { movedSkuIds: [...(await movedSkusAt(branchId))] }
+}
 
-  const lines = Object.values(input.quantities).filter((quantity) => quantity > 0).length
-  if (lines === 0) throw new Error('Enter at least one counted quantity.')
+export async function postOpeningStock(input: OpeningStock): Promise<{ lines: number }> {
+  const entries = Object.entries(input.quantities).filter(([, quantity]) => quantity > 0)
+  if (entries.length === 0) throw new Error('Enter at least one counted quantity.')
+
+  const moved = await movedSkusAt(input.branchId)
+  const refused = entries.filter(([skuId]) => moved.has(skuId)).length
+  if (refused > 0) {
+    throw new Error(
+      `${refused} ${refused === 1 ? 'SKU has' : 'SKUs have'} already moved at this location, so they cannot be opened again.`,
+    )
+  }
 
   await placeOpeningStock([input])
-
-  const post: OpeningStockPost = {
-    branchId: input.branchId,
-    postedAt: new Date().toISOString(),
-    postedBy: actorName(),
-    lines,
-  }
-  const next = readDb()
-  next.openingPosts.push(post)
-  commitDb(next)
-  return post
+  return { lines: entries.length }
 }

@@ -17,20 +17,18 @@ async function fetchAll<T>(page: (offset: number) => Promise<T[]>): Promise<T[]>
   }
 }
 
-/** Styles as products and SKUs as variants, keeping the barcodes and cost this device already knows. */
+/** Styles as products and SKUs as variants, keeping the barcodes already mirrored. */
 export function toCatalog(styles: ApiStyle[], skus: ApiSku[]): { products: Product[]; variants: Variant[] } {
   const db = readDb()
   const codeOf = new Map(styles.map((style) => [style.id, style.code]))
   const barcodeOf = new Map(db.variants.map((variant) => [variant.id, variant.barcode]))
   const variants = skus.map((sku) => mapApiSku(sku, codeOf.get(sku.styleId) ?? '', barcodeOf.get(sku.id)))
-  const products = styles.map((style) => {
-    const local = db.products.find((product) => product.id === style.id)
-    return mapApiStyle(
+  const products = styles.map((style) =>
+    mapApiStyle(
       style,
       variants.filter((variant) => variant.productId === style.id),
-      local && { costPrice: local.costPrice, details: local.details },
-    )
-  })
+    ),
+  )
   return { products, variants }
 }
 

@@ -5,13 +5,8 @@ import { toast } from 'sonner'
 import { useBranches } from '@/hooks/use-branches'
 import { queryKeys } from '@/lib/query-keys'
 import { syncCatalog } from '@/services/catalog-sync.service'
-import {
-  getBranchStockUnits,
-  getStockOverview,
-  listBranchStock,
-  setLowStockAt,
-  type LowStockAtInput,
-} from '@/services/stock.service'
+import { unitsByProduct, unitsByVariant } from '@/services/product-stock.service'
+import { getBranchStockUnits, getStockOverview, listBranchStock } from '@/services/stock.service'
 import type { BranchScope } from '@/types'
 
 export function useBranchStockUnits(branchId: string) {
@@ -72,20 +67,29 @@ export function useBranchStockRows(branchId: string) {
   })
 }
 
-export function useSetLowStockAt() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (input: LowStockAtInput) => setLowStockAt(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stock.all })
-    },
-    onError: (error: Error) => toast.error(error.message),
+/** Units per model for the products list, narrowed by the header filter. */
+export function useProductUnits(scope: BranchScope) {
+  const branches = useBranchesKey()
+  return useQuery({
+    queryKey: queryKeys.stock.byProduct(scope),
+    queryFn: () => unitsByProduct(scope),
+    enabled: branches !== null,
+  })
+}
+
+/** The same, per SKU of one model. */
+export function useVariantUnits(productId: string, scope: BranchScope) {
+  const branches = useBranchesKey()
+  return useQuery({
+    queryKey: queryKeys.stock.styleUnits(productId, scope),
+    queryFn: () => unitsByVariant(productId, scope),
+    enabled: branches !== null && Boolean(productId),
   })
 }
 
 /**
- * Stat cards and attention list together. Still gated on the catalog, because
- * the Products card counts the mirrored catalog rather than anything in scope.
+ * The stat cards. Gated on the catalog, because the Products card counts the
+ * mirrored catalog rather than anything in scope.
  */
 export function useStockOverview(scope: BranchScope) {
   const branches = useMirroredBranches()

@@ -8,6 +8,7 @@ import { useBranches } from '@/hooks/use-branches'
 import { useSaveUserGrants, useUserAccess } from '@/hooks/use-users'
 import {
   PERMISSION_GROUPS,
+  PERMISSION_HINTS,
   PERMISSION_LABELS,
   PLATFORM_SCOPE,
   type EmployeePermission,
@@ -79,7 +80,7 @@ export function UserPermissionsForm({ user, onClose }: { user: StaffUser; onClos
           {PERMISSION_GROUPS.map((group) => {
             const bucket = group.platformWide ? PLATFORM_SCOPE : activeScope
             return (
-              <section key={group.label} className="full">
+              <section key={group.label} className="full switch-stack">
                 <h3 className="eyebrow">
                   {group.label}
                   {group.platformWide ? ' — all locations' : ` — ${nameOf(activeScope)}`}
@@ -91,7 +92,7 @@ export function UserPermissionsForm({ user, onClose }: { user: StaffUser; onClos
                     checked={keysAt(bucket).includes(permission)}
                     onCheckedChange={(on) => toggle(bucket, permission, on)}
                     label={PERMISSION_LABELS[permission]}
-                    description={permission}
+                    description={PERMISSION_HINTS[permission]}
                   />
                 ))}
               </section>

@@ -59,7 +59,10 @@ export function useProductMutationCallbacks() {
 }
 
 /** The model was saved even when some combinations were refused, so those are a warning, not a failure. */
-function reportSkipped({ skipped, unbarcoded }: CreatedProduct) {
+function reportSkipped({ skipped, unbarcoded, openingFailed }: CreatedProduct) {
+  if (openingFailed) {
+    toast.warning('The model was saved, but its opening count did not post', { description: openingFailed })
+  }
   if (skipped.length > 0) {
     toast.warning(`${skipped.length} ${skipped.length === 1 ? 'variant was' : 'variants were'} not added`, {
       description: skipped.join('\n'),
@@ -80,7 +83,12 @@ export function useCreateProduct() {
       invalidate()
       const { product } = result
       const count = product.variants.length
-      toast.success(`${product.name} saved as ${product.code} with ${count} ${count === 1 ? 'variant' : 'variants'}`)
+      const placed = result.opened
+        ? ` · ${result.opened.lines} ${result.opened.lines === 1 ? 'line' : 'lines'} counted in`
+        : ''
+      toast.success(
+        `${product.name} saved as ${product.code} with ${count} ${count === 1 ? 'variant' : 'variants'}${placed}`,
+      )
       reportSkipped(result)
     },
     onError: reportError,
