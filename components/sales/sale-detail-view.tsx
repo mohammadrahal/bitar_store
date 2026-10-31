@@ -6,11 +6,13 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useSale } from '@/hooks/use-sales'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
 
 export function SaleDetailView({ saleId }: { saleId: string }) {
   const { data: sale, isPending, isError, error, refetch } = useSale(saleId)
+  useDocumentTitle(sale?.reference)
 
   if (isPending) return <Skeleton rows={1} stats={0} />
   if (isError) return <ErrorState title="Could not load this sale" error={error} onRetry={() => void refetch()} />

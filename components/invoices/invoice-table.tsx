@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ReceiptText } from 'lucide-react'
 import { InvoiceKindBadge, InvoiceStatusPill } from '@/components/invoices/invoice-badges'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { Can } from '@/components/shared/can'
 import type { Permission } from '@/lib/permissions'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -19,6 +20,7 @@ export function InvoiceTable({
   emptyTitle = 'No documents yet',
   emptyDescription = 'Raise a sale at the till or record a supplier purchase to start the ledger.',
   emptyActionLabel = 'New document',
+  dataset,
 }: {
   invoices: InvoiceRow[]
   /** True when a filter is narrowing the list, which changes the empty copy. */
@@ -30,6 +32,8 @@ export function InvoiceTable({
   emptyTitle?: string
   emptyDescription?: string
   emptyActionLabel?: string
+  /** Names the scope and page on screen, so the entrance plays once per set. */
+  dataset?: string
 }) {
   if (invoices.length === 0) {
     return (
@@ -77,9 +81,9 @@ export function InvoiceTable({
             <th scope="col">Status</th>
           </tr>
         </thead>
-        <tbody>
-          {invoices.map((invoice) => (
-            <tr key={invoice.id}>
+        <MotionTbody dataset={dataset}>
+          {invoices.map((invoice, index) => (
+            <MotionTr key={invoice.id} index={index}>
               <td>
                 <Link href={`/invoices/${invoice.id}`} className="link-cell">
                   <strong>{invoice.number}</strong>
@@ -101,9 +105,9 @@ export function InvoiceTable({
               <td>
                 <InvoiceStatusPill status={invoice.status} />
               </td>
-            </tr>
+            </MotionTr>
           ))}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

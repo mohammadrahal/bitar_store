@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react'
 import { UserForm } from '@/components/users/user-form'
 import { UserPermissionsForm } from '@/components/users/user-permissions-form'
 import { UserTable } from '@/components/users/user-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
@@ -54,28 +55,30 @@ export function UsersView() {
 
       <PreviewBadge feature="Location assignments and employee permission keys" />
 
-      {isPending ? (
-        <Skeleton rows={1} stats={0} />
-      ) : isError ? (
-        <Panel title="All users">
-          <div className="panel-body">
-            <ErrorState title="Could not load users" error={error} onRetry={() => void refetch()} />
-          </div>
-        </Panel>
-      ) : (
-        <Panel title="All users" description={`${users.length} ${users.length === 1 ? 'account' : 'accounts'}`}>
-          <UserTable
-            users={users}
-            currentUserId={currentUser.id}
-            lastSuperAdminId={lastSuperAdminId}
-            pendingUserId={setActive.isPending ? setActive.variables?.id : null}
-            onCreate={() => setDialog({ kind: 'create' })}
-            onEdit={(user) => setDialog({ kind: 'edit', user })}
-            onPermissions={(user) => setDialog({ kind: 'permissions', user })}
-            onActiveChange={handleActiveChange}
-          />
-        </Panel>
-      )}
+      <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+        {isPending ? (
+          <Skeleton rows={1} stats={0} />
+        ) : isError ? (
+          <Panel title="All users">
+            <div className="panel-body">
+              <ErrorState title="Could not load users" error={error} onRetry={() => void refetch()} />
+            </div>
+          </Panel>
+        ) : (
+          <Panel title="All users" description={`${users.length} ${users.length === 1 ? 'account' : 'accounts'}`}>
+            <UserTable
+              users={users}
+              currentUserId={currentUser.id}
+              lastSuperAdminId={lastSuperAdminId}
+              pendingUserId={setActive.isPending ? setActive.variables?.id : null}
+              onCreate={() => setDialog({ kind: 'create' })}
+              onEdit={(user) => setDialog({ kind: 'edit', user })}
+              onPermissions={(user) => setDialog({ kind: 'permissions', user })}
+              onActiveChange={handleActiveChange}
+            />
+          </Panel>
+        )}
+      </MotionSwap>
 
       {dialog?.kind === 'create' && <UserForm onClose={close} />}
       {dialog?.kind === 'edit' && <UserForm user={dialog.user} onClose={close} />}

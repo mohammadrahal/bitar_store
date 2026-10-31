@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { SearchInput } from '@/components/shared/search-input'
 import { InvoiceForm } from '@/components/invoices/invoice-form'
 import { InvoiceTable } from '@/components/invoices/invoice-table'
@@ -129,25 +130,28 @@ export function InvoicesView() {
           )}
         </div>
 
-        {isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={1} stats={0} />
-          </div>
-        ) : isError ? (
-          <div className="panel-body">
-            <ErrorState title="Could not load invoices" error={error} onRetry={() => void refetch()} />
-          </div>
-        ) : (
-          <>
-            <InvoiceTable
-              invoices={visible}
-              filtered={isFiltered}
-              showBranch={scope === ALL_BRANCHES}
-              onCreate={() => setCreating(true)}
-            />
-            <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
-          </>
-        )}
+        <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+          {isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={1} stats={0} />
+            </div>
+          ) : isError ? (
+            <div className="panel-body">
+              <ErrorState title="Could not load invoices" error={error} onRetry={() => void refetch()} />
+            </div>
+          ) : (
+            <>
+              <InvoiceTable
+                invoices={visible}
+                dataset={`${scope}-${currentPage}`}
+                filtered={isFiltered}
+                showBranch={scope === ALL_BRANCHES}
+                onCreate={() => setCreating(true)}
+              />
+              <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
+            </>
+          )}
+        </MotionSwap>
       </Panel>
 
       {/* No branch, no document: the form would open on an empty Branch select. */}

@@ -1,4 +1,11 @@
-import type { Invoice, InvoiceKind, InvoiceStatus, SalesChannel } from '@/types'
+import type { Invoice, InvoiceKind, InvoicePaymentMethod, InvoiceStatus, SalesChannel } from '@/types'
+
+export const INVOICE_PAYMENT_METHODS = ['cash', 'whish'] as const
+
+export const INVOICE_PAYMENT_LABELS: Record<InvoicePaymentMethod, string> = {
+  cash: 'Cash',
+  whish: 'Whish',
+}
 
 export const INVOICE_KINDS = [
   'sale',
@@ -52,6 +59,12 @@ export function pricedAtCost(kind: InvoiceKind) {
 
 export function isAdjustmentKind(kind: InvoiceKind) {
   return kind === 'adjustment_in' || kind === 'adjustment_out'
+}
+
+/** Trade documents are paid; older rows without a method are treated as cash. */
+export function paymentMethodOf(invoice: Invoice): InvoicePaymentMethod | undefined {
+  if (invoice.isInternal || isAdjustmentKind(invoice.kind)) return undefined
+  return invoice.paymentMethod ?? 'cash'
 }
 
 /**

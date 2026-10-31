@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { FadeIn } from '@/components/motion/fade-in'
 
 export function EmptyState({
   icon: Icon,
@@ -12,13 +13,13 @@ export function EmptyState({
   action?: React.ReactNode
 }) {
   return (
-    <div className="empty-state">
+    <FadeIn className="empty-state">
       <span className="empty-icon" aria-hidden="true">
         <Icon size={20} />
       </span>
       <strong>{title}</strong>
       <p>{description}</p>
       {action}
-    </div>
+    </FadeIn>
   )
 }

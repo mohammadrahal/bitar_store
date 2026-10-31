@@ -26,6 +26,8 @@ ul.chip-row { list-style: none; margin: 0; padding: 0; }
 .sale-lines.stacked .sale-card-head strong { font-size: var(--fs-sm); font-weight: 500; }
 
 .panel-foot { padding: 16px 24px; border-top: 1px solid hsl(var(--border)); }
+/* A panel that ends in a form puts its buttons on a footer rule, like a drawer. */
+.panel-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid hsl(var(--border)); }
 
 .dialog-form { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
 .dialog-form .dialog-actions { margin-top: 0; }
@@ -59,7 +61,7 @@ ul.chip-row { list-style: none; margin: 0; padding: 0; }
 
 /* ---------- Layout ---------- */
 .split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
-.split-aside { position: sticky; top: calc(var(--topbar-h) + 20px); display: flex; flex-direction: column; gap: 16px; }
+.split-aside { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 16px; }
 .stack { display: flex; flex-direction: column; gap: 20px; }
 .notice { display: flex; align-items: flex-start; gap: 8px; padding: 12px 14px; border-radius: var(--r-sm); background: hsl(var(--muted) / .6); border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: var(--fs-sm); line-height: 1.5; }
 .notice svg { flex: none; margin-top: 2px; color: hsl(var(--accent)); }

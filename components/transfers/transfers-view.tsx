@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { ArrowLeftRight, Plus } from 'lucide-react'
 import { TransferStatusPill } from '@/components/transfers/transfer-status-pill'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -52,64 +54,66 @@ export function TransfersView() {
         <div className="toolbar">
           <FilterChips label="Filter by status" options={FILTERS} value={status} onChange={setStatus} />
         </div>
-        {isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={3} stats={0} />
-          </div>
-        ) : isError ? (
-          <div className="panel-body">
-            <ErrorState title="Could not load transfers" error={error} onRetry={() => void refetch()} />
-          </div>
-        ) : transfers.length === 0 ? (
-          <div className="panel-body">
-            <EmptyState
-              icon={ArrowLeftRight}
-              title={status === 'open' ? 'No open transfers' : 'No transfers here'}
-              description="Requests, dispatches and receipts for your locations will show up here."
-            />
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="card-table">
-              <caption className="sr-only">Transfers, newest first</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Transfer</th>
-                  <th scope="col">Route</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" className="num">Requested</th>
-                  <th scope="col" className="num">Dispatched</th>
-                  <th scope="col" className="num">Received</th>
-                  <th scope="col" className="num">In transit</th>
-                  <th scope="col">Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transfers.map((transfer) => (
-                  <tr key={transfer.id}>
-                    <td className="card-title">
-                      <Link href={`/transfers/${transfer.id}`} className="link-cell tabular">
-                        {transfer.number}
-                      </Link>
-                      <small>{transfer.lines.length} {transfer.lines.length === 1 ? 'variant' : 'variants'}</small>
-                    </td>
-                    <td data-label="Route">
-                      {transfer.fromName} → {transfer.toName}
-                    </td>
-                    <td data-label="Status">
-                      <TransferStatusPill status={transfer.status} />
-                    </td>
-                    <td className="num tabular" data-label="Requested">{formatNumber(transfer.totals.requested)}</td>
-                    <td className="num tabular" data-label="Dispatched">{formatNumber(transfer.totals.dispatched)}</td>
-                    <td className="num tabular" data-label="Received">{formatNumber(transfer.totals.received)}</td>
-                    <td className="num tabular" data-label="In transit">{formatNumber(transfer.totals.inTransit)}</td>
-                    <td className="tabular" data-label="Updated">{formatRelativeDateTime(transfer.updatedAt)}</td>
+        <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+          {isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={3} stats={0} />
+            </div>
+          ) : isError ? (
+            <div className="panel-body">
+              <ErrorState title="Could not load transfers" error={error} onRetry={() => void refetch()} />
+            </div>
+          ) : transfers.length === 0 ? (
+            <div className="panel-body">
+              <EmptyState
+                icon={ArrowLeftRight}
+                title={status === 'open' ? 'No open transfers' : 'No transfers here'}
+                description="Requests, dispatches and receipts for your locations will show up here."
+              />
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="card-table">
+                <caption className="sr-only">Transfers, newest first</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Transfer</th>
+                    <th scope="col">Route</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="num">Requested</th>
+                    <th scope="col" className="num">Dispatched</th>
+                    <th scope="col" className="num">Received</th>
+                    <th scope="col" className="num">In transit</th>
+                    <th scope="col">Updated</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <MotionTbody dataset={`${scope}-${status}`}>
+                  {transfers.map((transfer, index) => (
+                    <MotionTr key={transfer.id} index={index}>
+                      <td className="card-title">
+                        <Link href={`/transfers/${transfer.id}`} className="link-cell tabular">
+                          {transfer.number}
+                        </Link>
+                        <small>{transfer.lines.length} {transfer.lines.length === 1 ? 'variant' : 'variants'}</small>
+                      </td>
+                      <td data-label="Route">
+                        {transfer.fromName} → {transfer.toName}
+                      </td>
+                      <td data-label="Status">
+                        <TransferStatusPill status={transfer.status} />
+                      </td>
+                      <td className="num tabular" data-label="Requested">{formatNumber(transfer.totals.requested)}</td>
+                      <td className="num tabular" data-label="Dispatched">{formatNumber(transfer.totals.dispatched)}</td>
+                      <td className="num tabular" data-label="Received">{formatNumber(transfer.totals.received)}</td>
+                      <td className="num tabular" data-label="In transit">{formatNumber(transfer.totals.inTransit)}</td>
+                      <td className="tabular" data-label="Updated">{formatRelativeDateTime(transfer.updatedAt)}</td>
+                    </MotionTr>
+                  ))}
+                </MotionTbody>
+              </table>
+            </div>
+          )}
+        </MotionSwap>
       </Panel>
     </>
   )

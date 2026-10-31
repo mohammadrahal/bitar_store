@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import { BranchForm } from '@/components/branches/branch-form'
 import { BranchTable } from '@/components/branches/branch-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { Can } from '@/components/shared/can'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ErrorState } from '@/components/shared/error-state'
@@ -46,27 +47,29 @@ export function BranchesView() {
         }
       />
 
-      {isPending ? (
-        <Skeleton rows={1} stats={0} />
-      ) : isError ? (
-        <Panel title="All branches">
-          <div className="panel-body">
-            <ErrorState title="Could not load branches" error={error} onRetry={() => void refetch()} />
-          </div>
-        </Panel>
-      ) : (
-        <Panel
-          title="All branches"
-          description={`${branches.length} ${branches.length === 1 ? 'branch' : 'branches'}`}
-        >
-          <BranchTable
-            branches={branches}
-            onCreate={() => setDialog({ kind: 'create' })}
-            onEdit={(branch) => setDialog({ kind: 'edit', branch })}
-            onDelete={(branch) => setDialog({ kind: 'delete', branch })}
-          />
-        </Panel>
-      )}
+      <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+        {isPending ? (
+          <Skeleton rows={1} stats={0} />
+        ) : isError ? (
+          <Panel title="All branches">
+            <div className="panel-body">
+              <ErrorState title="Could not load branches" error={error} onRetry={() => void refetch()} />
+            </div>
+          </Panel>
+        ) : (
+          <Panel
+            title="All branches"
+            description={`${branches.length} ${branches.length === 1 ? 'branch' : 'branches'}`}
+          >
+            <BranchTable
+              branches={branches}
+              onCreate={() => setDialog({ kind: 'create' })}
+              onEdit={(branch) => setDialog({ kind: 'edit', branch })}
+              onDelete={(branch) => setDialog({ kind: 'delete', branch })}
+            />
+          </Panel>
+        )}
+      </MotionSwap>
 
       {dialog?.kind === 'create' && <BranchForm onClose={close} />}
       {dialog?.kind === 'edit' && (

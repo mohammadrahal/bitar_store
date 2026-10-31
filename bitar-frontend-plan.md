@@ -86,7 +86,7 @@ Admin-only routes require the `admin` role.
 
 | Method | Path | Access | Request body | Success |
 |---|---|---|---|---|
-| `GET` | `/health` | Public | — | `200` `{ "status": "ok" }` |
+| `GET` | `/health` | Public | — | `200` `{ "status": "ok"  }` |
 | `POST` | `/auth/login` | Public | `{ "email", "password" }` | `200` token and user |
 | `GET` | `/auth/me` | Authenticated | — | `200` user and access context |
 | `GET` | `/branches` | Authenticated | — | `200` array of visible branches |
@@ -129,7 +129,7 @@ A style describes a product model; a SKU is a sellable size/color variant of a
 style. Catalog list endpoints accept `search`, `activeOnly`, `limit`, and `offset`
 query parameters. `GET /skus` also accepts `styleId`. Search is optional text up to
 100 characters; `activeOnly` must be `true` or `false`. Lists default to `limit=50`
-and `offset=0`; `limit` must be between 1 and 200 and `offset` must be zero or
+and `offset=0`; `limit` must be between 1 and 20 and `offset` must be zero or
 greater. SKU lookup requires a non-empty `code` query parameter and matches an
 exact barcode first, then an exact SKU code.
 

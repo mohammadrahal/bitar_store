@@ -11,11 +11,13 @@ import { PageHeader } from '@/components/shared/page-header'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useBranch } from '@/hooks/use-branches'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useCurrentUser } from '@/store/user-store'
 
 export function BranchDetailView({ branchId }: { branchId: string }) {
   const user = useCurrentUser()
   const { data: branch, isPending, isError, error, refetch } = useBranch(branchId)
+  useDocumentTitle(branch?.name)
 
   if (isPending) return <Skeleton rows={1} />
   if (isError) return <ErrorState title="Branch unavailable" error={error} onRetry={() => void refetch()} />

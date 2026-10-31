@@ -13,12 +13,14 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useTransfer } from '@/hooks/use-transfers'
 import { formatRelativeDateTime } from '@/lib/format'
 
 export function TransferDetailView({ transferId }: { transferId: string }) {
   const { data: transfer, isPending, isError, error, refetch } = useTransfer(transferId)
   const [receiving, setReceiving] = useState(false)
+  useDocumentTitle(transfer?.number)
 
   return (
     <>

@@ -3,6 +3,7 @@
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { InvoiceLineFields } from '@/components/invoices/invoice-line-fields'
+import { InvoicePaymentField } from '@/components/invoices/invoice-payment-field'
 import { InvoiceSummary } from '@/components/invoices/invoice-summary'
 import { Can } from '@/components/shared/can'
 import { Drawer } from '@/components/shared/drawer'
@@ -60,6 +61,8 @@ function toFormValues(
     discount: invoice.discount,
     notes: invoice.notes ?? '',
     salesChannel: invoice.salesChannel,
+    paymentMethod: invoice.paymentMethod ?? 'cash',
+    whishReference: invoice.whishReference ?? '',
     lines: invoice.lines.map((line) => ({
       id: line.id,
       variantId: line.variantId,
@@ -127,6 +130,7 @@ export function InvoiceForm({
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -137,6 +141,8 @@ export function InvoiceForm({
   const branchId = watch('branchId')
   const lines = watch('lines')
   const discount = watch('discount')
+  const paymentMethod = watch('paymentMethod') ?? 'cash'
+  const whishReference = watch('whishReference') ?? ''
   const totals = invoiceTotals(lines ?? [], Number.isFinite(discount) ? discount : 0)
 
   // Switching kind would leave sell prices on a purchase, so it locks once lines exist.
@@ -155,6 +161,8 @@ export function InvoiceForm({
         kind,
         notes: values.notes || undefined,
         salesChannel: kind === 'sale' || kind === 'sale_return' ? (channel ?? 'b2c') : undefined,
+        paymentMethod: isAdjustmentKind(kind) ? undefined : values.paymentMethod,
+        whishReference: isAdjustmentKind(kind) || values.paymentMethod !== 'whish' ? undefined : values.whishReference,
       }
       if (invoice) update.mutate({ invoiceId: invoice.id, input }, { onSuccess: onClose })
       else
@@ -286,6 +294,18 @@ export function InvoiceForm({
           <Field label="Discount" error={errors.discount?.message} hint="Taken off the subtotal">
             <input {...register('discount', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
           </Field>
+        )}
+        {!isAdjustment && (
+          <InvoicePaymentField
+            method={paymentMethod}
+            onMethodChange={(method) => {
+              setValue('paymentMethod', method, { shouldValidate: true })
+              if (method === 'cash') setValue('whishReference', '', { shouldValidate: true })
+            }}
+            reference={whishReference}
+            onReferenceChange={(value) => setValue('whishReference', value, { shouldValidate: true, shouldDirty: true })}
+            referenceError={errors.whishReference?.message}
+          />
         )}
         <Field label="Notes" error={errors.notes?.message} hint="Optional" className="full">
           <textarea {...register('notes')} rows={2} placeholder="Anything worth remembering about this document" />

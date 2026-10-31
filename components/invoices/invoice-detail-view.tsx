@@ -16,6 +16,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import {
   useDeleteInvoice,
   useInvoice,
@@ -29,8 +30,10 @@ import { invoiceTotals } from '@/lib/invoice-totals'
 import {
   documentSubject,
   INVOICE_KIND_LABELS,
+  INVOICE_PAYMENT_LABELS,
   isEditable,
   PARTY_LABELS,
+  paymentMethodOf,
   pricedAtCost,
 } from '@/lib/invoices'
 
@@ -41,6 +44,7 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
   const { canAccessLocation } = usePermission()
   const { data: invoice, isPending, isError, error, refetch } = useInvoice(invoiceId)
   const [dialog, setDialog] = useState<Dialog | null>(null)
+  useDocumentTitle(invoice?.number)
 
   const issue = useIssueInvoice()
   const markPaid = useMarkInvoicePaid()
@@ -63,6 +67,7 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
 
   const totals = invoiceTotals(invoice.lines, invoice.discount)
   const showMargin = !pricedAtCost(invoice.kind) && !invoice.isInternal
+  const paymentMethod = paymentMethodOf(invoice)
 
   return (
     <>
@@ -124,6 +129,12 @@ export function InvoiceDetailView({ invoiceId }: { invoiceId: string }) {
       <div className="doc-meta">
         <InvoiceKindBadge kind={invoice.kind} isInternal={invoice.isInternal} />
         <InvoiceStatusPill status={invoice.status} />
+        {paymentMethod && (
+          <span className="muted">
+            {INVOICE_PAYMENT_LABELS[paymentMethod]}
+            {paymentMethod === 'whish' && invoice.whishReference ? ` · ${invoice.whishReference}` : ''}
+          </span>
+        )}
         {invoice.status === 'draft' && <span className="muted">Nothing has moved yet.</span>}
         {invoice.transferId && (
           <Link href={`/transfers/${invoice.transferId}`} className="link-row">

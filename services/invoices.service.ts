@@ -13,6 +13,7 @@ import {
   type Invoice,
   type InvoiceKind,
   type InvoiceLine,
+  type InvoicePaymentMethod,
   type InvoiceRow,
   type InvoiceWithLines,
   type SalesChannel,
@@ -31,7 +32,18 @@ export interface InvoiceInput {
   discount: number
   notes?: string
   salesChannel?: SalesChannel
+  paymentMethod?: InvoicePaymentMethod
+  whishReference?: string
   lines: InvoiceLineInput[]
+}
+
+function paymentFieldsOf(input: InvoiceInput): Pick<Invoice, 'paymentMethod' | 'whishReference'> {
+  if (isAdjustmentKind(input.kind)) return { paymentMethod: undefined, whishReference: undefined }
+  const paymentMethod = input.paymentMethod ?? 'cash'
+  return {
+    paymentMethod,
+    whishReference: paymentMethod === 'whish' ? input.whishReference?.trim() || undefined : undefined,
+  }
 }
 
 function branchName(db: MockDb, branchId: string) {
@@ -162,6 +174,7 @@ export async function createInvoice(
     notes: input.notes?.trim() || undefined,
     isInternal: false,
     salesChannel,
+    ...paymentFieldsOf(input),
     createdAt: new Date().toISOString(),
   }
 
@@ -206,6 +219,7 @@ export async function updateInvoice(id: string, input: InvoiceInput): Promise<In
       discount: invoiceTotals(lines, input.discount).discount,
       notes: input.notes?.trim() || undefined,
       salesChannel: isCustomerSaleKind(input.kind) ? (input.salesChannel ?? invoice.salesChannel ?? 'b2c') : undefined,
+      ...paymentFieldsOf(input),
     })
     current.invoiceLines = current.invoiceLines.filter((line) => line.invoiceId !== id)
     current.invoiceLines.push(...lines)

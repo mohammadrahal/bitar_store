@@ -9,10 +9,12 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useVariantDetail } from '@/hooks/use-inventory'
 
 export function VariantDetailView({ variantId }: { variantId: string }) {
   const { data, isPending, isError, error, refetch } = useVariantDetail(variantId)
+  useDocumentTitle(data && `${data.productName} ${data.color} / ${data.size}`)
 
   return (
     <>

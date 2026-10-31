@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Pencil, Store, Trash2, Warehouse } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
@@ -58,9 +59,9 @@ export function BranchTable({
             </th>
           </tr>
         </thead>
-        <tbody>
-          {branches.map((branch) => (
-            <tr key={branch.id}>
+        <MotionTbody>
+          {branches.map((branch, index) => (
+            <MotionTr key={branch.id} index={index}>
               <td>
                 <Link href={`/branches/${branch.id}`} className="link-cell">
                   {branch.name}
@@ -121,9 +122,9 @@ export function BranchTable({
                   </Can>
                 </div>
               </td>
-            </tr>
+            </MotionTr>
           ))}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

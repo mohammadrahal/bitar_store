@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { ReceiptText } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { SearchInput } from '@/components/shared/search-input'
 import { Can } from '@/components/shared/can'
 import { ErrorState } from '@/components/shared/error-state'
@@ -120,74 +122,76 @@ export function B2cRetailSalesPanel({
         )}
       </div>
 
-      {!branchId ? (
-        <div className="panel-body">
-          <EmptyState icon={ReceiptText} title="Pick a branch" description="Choose a location to see its till sales for the day." />
-        </div>
-      ) : listQuery.isPending ? (
-        <div className="panel-body">
-          <Skeleton rows={1} stats={0} />
-        </div>
-      ) : listQuery.isError ? (
-        <div className="panel-body">
-          <ErrorState title="Could not load sales" error={listQuery.error} onRetry={() => void listQuery.refetch()} />
-        </div>
-      ) : visible.length === 0 ? (
-        <div className="panel-body">
-          {isFiltered ? (
-            <EmptyState icon={ReceiptText} title="No sales match" description="Try another date or search term." />
-          ) : (
-            <EmptyState
-              icon={ReceiptText}
-              title="No retail sales yet"
-              description="Ring up a walk-in or till sale to remove units from branch stock."
-              action={
-                <Can permission="sales.create">
-                  <button type="button" className="btn btn-primary" onClick={onCreate}>
-                    New B2C sale
-                  </button>
-                </Can>
-              }
-            />
-          )}
-        </div>
-      ) : (
-        <>
-          <div className="table-wrap">
-            <table className="card-table">
-              <caption className="sr-only">Completed retail sales</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Reference</th>
-                  <th scope="col">When</th>
-                  <th scope="col">Seller</th>
-                  <th scope="col" className="num">
-                    Units
-                  </th>
-                  <th scope="col" className="num">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((sale) => (
-                  <tr key={sale.id}>
-                    <td className="card-title">
-                      <Link href={`/sales/${sale.id}`}>{sale.reference}</Link>
-                      {sale.note ? <small>{sale.note}</small> : null}
-                    </td>
-                    <td>{formatDocumentDate(sale.soldAt)}</td>
-                    <td>{sale.soldBy.name}</td>
-                    <td className="num tabular">{saleUnits(sale)}</td>
-                    <td className="num tabular">{formatPrice(Number(sale.total))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <MotionSwap state={!branchId ? 'no-branch' : listQuery.isPending ? 'loading' : listQuery.isError ? 'error' : 'ready'}>
+        {!branchId ? (
+          <div className="panel-body">
+            <EmptyState icon={ReceiptText} title="Pick a branch" description="Choose a location to see its till sales for the day." />
           </div>
-          <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
-        </>
-      )}
+        ) : listQuery.isPending ? (
+          <div className="panel-body">
+            <Skeleton rows={1} stats={0} />
+          </div>
+        ) : listQuery.isError ? (
+          <div className="panel-body">
+            <ErrorState title="Could not load sales" error={listQuery.error} onRetry={() => void listQuery.refetch()} />
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="panel-body">
+            {isFiltered ? (
+              <EmptyState icon={ReceiptText} title="No sales match" description="Try another date or search term." />
+            ) : (
+              <EmptyState
+                icon={ReceiptText}
+                title="No retail sales yet"
+                description="Ring up a walk-in or till sale to remove units from branch stock."
+                action={
+                  <Can permission="sales.create">
+                    <button type="button" className="btn btn-primary" onClick={onCreate}>
+                      New B2C sale
+                    </button>
+                  </Can>
+                }
+              />
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="table-wrap">
+              <table className="card-table">
+                <caption className="sr-only">Completed retail sales</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Reference</th>
+                    <th scope="col">When</th>
+                    <th scope="col">Seller</th>
+                    <th scope="col" className="num">
+                      Units
+                    </th>
+                    <th scope="col" className="num">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <MotionTbody dataset={`${branchId}-${currentPage}`}>
+                  {visible.map((sale, index) => (
+                    <MotionTr key={sale.id} index={index}>
+                      <td className="card-title">
+                        <Link href={`/sales/${sale.id}`}>{sale.reference}</Link>
+                        {sale.note ? <small>{sale.note}</small> : null}
+                      </td>
+                      <td>{formatDocumentDate(sale.soldAt)}</td>
+                      <td>{sale.soldBy.name}</td>
+                      <td className="num tabular">{saleUnits(sale)}</td>
+                      <td className="num tabular">{formatPrice(Number(sale.total))}</td>
+                    </MotionTr>
+                  ))}
+                </MotionTbody>
+              </table>
+            </div>
+            <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
+          </>
+        )}
+      </MotionSwap>
     </Panel>
   )
 }

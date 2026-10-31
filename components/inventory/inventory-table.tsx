@@ -1,6 +1,7 @@
 'use client'
 
 import { PackageSearch } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { StockBadge } from '@/components/shared/stock-badge'
 import { balanceText } from '@/lib/balances'
@@ -24,6 +25,7 @@ export function InventoryTable({
   selectedId,
   onSelect,
   filtered,
+  dataset,
 }: {
   rows: InventoryRow[]
   /** Totals over every row that matched, not just this page. */
@@ -31,6 +33,8 @@ export function InventoryTable({
   selectedId: string | null
   onSelect: (row: InventoryRow) => void
   filtered: boolean
+  /** Names the scope and page on screen, so the entrance plays once per set. */
+  dataset?: string
 }) {
   if (rows.length === 0) {
     return (
@@ -60,9 +64,9 @@ export function InventoryTable({
             <th scope="col">Status</th>
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.variantId} className={`row-button ${row.variantId === selectedId ? 'selected' : ''}`}>
+        <MotionTbody dataset={dataset}>
+          {rows.map((row, index) => (
+            <MotionTr key={row.variantId} className={`row-button ${row.variantId === selectedId ? 'selected' : ''}`} index={index}>
               <td className="card-title">
                 <button
                   type="button"
@@ -85,9 +89,9 @@ export function InventoryTable({
               <td data-label="Status">
                 <StockBadge row={row} />
               </td>
-            </tr>
+            </MotionTr>
           ))}
-        </tbody>
+        </MotionTbody>
         <tfoot>
           <tr>
             <td className="card-title">Totals</td>

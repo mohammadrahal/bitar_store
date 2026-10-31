@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { PackageCheck } from 'lucide-react'
 import { ReceiptForm } from '@/components/receiving/receipt-form'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -42,111 +44,113 @@ export function ReceiptsPanel() {
   return (
     <>
       <Panel title="Receipts" description={isPending ? 'Loading…' : `${rows?.length ?? 0} in total, newest first`}>
-        {isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={3} stats={0} />
-          </div>
-        ) : isError ? (
-          <div className="panel-body">
-            <ErrorState title="Could not load receipts" error={error} onRetry={() => void refetch()} />
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="panel-body">
-            <EmptyState
-              icon={PackageCheck}
-              title="No receipts yet"
-              description="Record what a supplier delivered to the warehouse. A draft changes nothing until it is confirmed."
-            />
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="card-table">
-              <caption className="sr-only">Supplier receipts</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Receipt</th>
-                  <th scope="col">Supplier</th>
-                  <th scope="col" className="num">
-                    Units
-                  </th>
-                  {canViewCosts && (
+        <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+          {isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={3} stats={0} />
+            </div>
+          ) : isError ? (
+            <div className="panel-body">
+              <ErrorState title="Could not load receipts" error={error} onRetry={() => void refetch()} />
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="panel-body">
+              <EmptyState
+                icon={PackageCheck}
+                title="No receipts yet"
+                description="Record what a supplier delivered to the warehouse. A draft changes nothing until it is confirmed."
+              />
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="card-table">
+                <caption className="sr-only">Supplier receipts</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Receipt</th>
+                    <th scope="col">Supplier</th>
                     <th scope="col" className="num">
-                      Total cost
+                      Units
                     </th>
-                  )}
-                  <th scope="col">Status</th>
-                  <th scope="col">
-                    <span className="sr-only">Actions</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td className="card-title" data-label="Receipt">
-                      {row.number}
-                      <small>
-                        {formatDocumentDate(row.receivedOn)}
-                        {row.invoiceReference ? ` · ${row.invoiceReference}` : ''}
-                        {row.correctsId ? ' · correction' : ''}
-                      </small>
-                    </td>
-                    <td data-label="Supplier">{row.supplierName}</td>
-                    <td className="num tabular" data-label="Units">
-                      {row.units}
-                    </td>
                     {canViewCosts && (
-                      <td className="num tabular" data-label="Total cost">
-                        {formatPrice(row.total)}
-                      </td>
+                      <th scope="col" className="num">
+                        Total cost
+                      </th>
                     )}
-                    <td data-label="Status">
-                      <span className={`pill ${STATUS_TONES[row.status]}`}>
-                        <span className="pill-dot" aria-hidden="true" />
-                        {STATUS_LABELS[row.status]}
-                      </span>
-                      {row.correctionReason && <small className="muted"> {row.correctionReason}</small>}
-                    </td>
-                    <td data-label="Actions">
-                      <div className="row-actions">
-                        {row.status === 'draft' && mayEnter && (
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(row)}>
-                            Edit
-                          </button>
-                        )}
-                        {row.status === 'draft' && mayConfirm && (
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            disabled={confirm.isPending}
-                            onClick={() => setConfirming(row)}
-                          >
-                            Confirm
-                          </button>
-                        )}
-                        {row.status === 'draft' && mayEnter && (
-                          <button
-                            type="button"
-                            className="text-btn"
-                            disabled={cancel.isPending}
-                            onClick={() => cancel.mutate(row.id)}
-                          >
-                            Cancel
-                          </button>
-                        )}
-                        {row.status === 'confirmed' && mayConfirm && (
-                          <button type="button" className="text-btn" onClick={() => setCorrecting(row)}>
-                            Correct
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                    <th scope="col">Status</th>
+                    <th scope="col">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <MotionTbody>
+                  {rows.map((row, index) => (
+                    <MotionTr key={row.id} index={index}>
+                      <td className="card-title" data-label="Receipt">
+                        {row.number}
+                        <small>
+                          {formatDocumentDate(row.receivedOn)}
+                          {row.invoiceReference ? ` · ${row.invoiceReference}` : ''}
+                          {row.correctsId ? ' · correction' : ''}
+                        </small>
+                      </td>
+                      <td data-label="Supplier">{row.supplierName}</td>
+                      <td className="num tabular" data-label="Units">
+                        {row.units}
+                      </td>
+                      {canViewCosts && (
+                        <td className="num tabular" data-label="Total cost">
+                          {formatPrice(row.total)}
+                        </td>
+                      )}
+                      <td data-label="Status">
+                        <span className={`pill ${STATUS_TONES[row.status]}`}>
+                          <span className="pill-dot" aria-hidden="true" />
+                          {STATUS_LABELS[row.status]}
+                        </span>
+                        {row.correctionReason && <small className="muted"> {row.correctionReason}</small>}
+                      </td>
+                      <td data-label="Actions">
+                        <div className="row-actions">
+                          {row.status === 'draft' && mayEnter && (
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(row)}>
+                              Edit
+                            </button>
+                          )}
+                          {row.status === 'draft' && mayConfirm && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={confirm.isPending}
+                              onClick={() => setConfirming(row)}
+                            >
+                              Confirm
+                            </button>
+                          )}
+                          {row.status === 'draft' && mayEnter && (
+                            <button
+                              type="button"
+                              className="text-btn"
+                              disabled={cancel.isPending}
+                              onClick={() => cancel.mutate(row.id)}
+                            >
+                              Cancel
+                            </button>
+                          )}
+                          {row.status === 'confirmed' && mayConfirm && (
+                            <button type="button" className="text-btn" onClick={() => setCorrecting(row)}>
+                              Correct
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </MotionTr>
+                  ))}
+                </MotionTbody>
+              </table>
+            </div>
+          )}
+        </MotionSwap>
       </Panel>
 
       {editing && <ReceiptForm receipt={editing} onClose={() => setEditing(null)} />}

@@ -2,12 +2,22 @@
 
 import Link from 'next/link'
 import { CheckCircle2 } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { StockStatusPill } from '@/components/shared/status-pill'
 import { ThresholdCell } from '@/components/stock/threshold-cell'
 import type { LowStockRow } from '@/types'
 
-export function LowStockTable({ rows, showBranch }: { rows: LowStockRow[]; showBranch: boolean }) {
+export function LowStockTable({
+  rows,
+  showBranch,
+  dataset,
+}: {
+  rows: LowStockRow[]
+  showBranch: boolean
+  /** Names the scope and page on screen, so the entrance plays once per set. */
+  dataset?: string
+}) {
   if (rows.length === 0) {
     return (
       <div className="panel-body">
@@ -37,9 +47,9 @@ export function LowStockTable({ rows, showBranch }: { rows: LowStockRow[]; showB
             <th scope="col">Status</th>
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={`${row.variantId}-${row.branchId}`}>
+        <MotionTbody dataset={dataset}>
+          {rows.map((row, index) => (
+            <MotionTr key={`${row.variantId}-${row.branchId}`} index={index}>
               <td>
                 <strong>
                   {row.productName} · {row.size} / {row.color}
@@ -62,9 +72,9 @@ export function LowStockTable({ rows, showBranch }: { rows: LowStockRow[]; showB
               <td>
                 <StockStatusPill status={row.status} />
               </td>
-            </tr>
+            </MotionTr>
           ))}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

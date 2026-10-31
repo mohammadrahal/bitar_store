@@ -11,7 +11,7 @@ function utf8Bytes(value: string) {
 
 export const emailField = z.string().trim().toLowerCase().email('Enter a valid email').max(254, 'Email is too long')
 
-const fullNameField = z
+export const fullNameField = z
   .string()
   .trim()
   .min(2, 'Full name must be at least 2 characters')

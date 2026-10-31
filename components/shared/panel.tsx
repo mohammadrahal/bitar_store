@@ -1,3 +1,8 @@
+'use client'
+
+import { motion } from 'motion/react'
+import { useFadeInProps } from '@/components/motion/fade-in'
+
 export function Panel({
   title,
   description,
@@ -12,7 +17,7 @@ export function Panel({
   className?: string
 }) {
   return (
-    <section className={`panel ${className ?? ''}`}>
+    <motion.section className={`panel ${className ?? ''}`} {...useFadeInProps(0.1)}>
       <div className="panel-heading">
         <div>
           <h2>{title}</h2>
@@ -21,6 +26,6 @@ export function Panel({
         {actions}
       </div>
       {children}
-    </section>
+    </motion.section>
   )
 }

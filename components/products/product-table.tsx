@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Archive, ArchiveRestore, Package, Pencil } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { formatPrice } from '@/lib/format'
@@ -24,6 +25,7 @@ export function ProductTable({
   archivedView,
   onEdit,
   onArchive,
+  dataset,
 }: {
   products: ProductWithVariants[]
   /** True when a search or category filter is narrowing the list. */
@@ -31,6 +33,8 @@ export function ProductTable({
   archivedView: boolean
   onEdit: (product: ProductWithVariants) => void
   onArchive: (product: ProductWithVariants) => void
+  /** Names the page and view on screen, so the entrance plays once per set. */
+  dataset?: string
 }) {
   if (products.length === 0) {
     return (
@@ -76,9 +80,9 @@ export function ProductTable({
             </th>
           </tr>
         </thead>
-        <tbody>
-          {products.map((product) => (
-            <tr key={product.id}>
+        <MotionTbody dataset={dataset}>
+          {products.map((product, index) => (
+            <MotionTr key={product.id} index={index}>
               <td className="card-title">
                 <Link href={`/products/${product.id}`} className="link-cell">
                   {product.name}
@@ -123,9 +127,9 @@ export function ProductTable({
                   </Can>
                 </div>
               </td>
-            </tr>
+            </MotionTr>
           ))}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

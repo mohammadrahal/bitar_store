@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { SearchInput } from '@/components/shared/search-input'
 import { ArchiveProductDialog } from '@/components/products/archive-product-dialog'
 import { ProductForm } from '@/components/products/product-form'
@@ -122,26 +123,29 @@ export function ProductsView() {
           )}
         </div>
 
-        {isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={1} stats={0} />
-          </div>
-        ) : isError ? (
-          <div className="panel-body">
-            <ErrorState title="Could not load products" error={error} onRetry={() => void refetch()} />
-          </div>
-        ) : (
-          <>
-            <ProductTable
-              products={visible}
-              filtered={isFiltered}
-              archivedView={show === 'archived'}
-              onEdit={(product) => setDialog({ kind: 'edit', product })}
-              onArchive={(product) => setDialog({ kind: 'archive', product })}
-            />
-            <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
-          </>
-        )}
+        <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+          {isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={1} stats={0} />
+            </div>
+          ) : isError ? (
+            <div className="panel-body">
+              <ErrorState title="Could not load products" error={error} onRetry={() => void refetch()} />
+            </div>
+          ) : (
+            <>
+              <ProductTable
+                products={visible}
+                dataset={`${show}-${currentPage}`}
+                filtered={isFiltered}
+                archivedView={show === 'archived'}
+                onEdit={(product) => setDialog({ kind: 'edit', product })}
+                onArchive={(product) => setDialog({ kind: 'archive', product })}
+              />
+              <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
+            </>
+          )}
+        </MotionSwap>
       </Panel>
 
       {dialog?.kind === 'edit' && <ProductForm key={dialog.product.id} product={dialog.product} onClose={() => setDialog(null)} />}

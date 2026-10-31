@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { LowStockTable } from '@/components/dashboard/low-stock-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { OperationsCards } from '@/components/dashboard/operations-cards'
 import { BranchStatCards, NetworkStatCards } from '@/components/dashboard/stat-cards'
 import { ErrorState } from '@/components/shared/error-state'
@@ -62,10 +63,14 @@ export function InventoryOverview({
 
   return (
     <>
-      {stats ? (
-        mode === 'network' ? <NetworkStatCards stats={stats} /> : <BranchStatCards stats={stats} />
-      ) : overview.isError ? null : (
-        <StatCardsSkeleton />
+      {overview.isError ? null : (
+        <MotionSwap state={stats ? 'ready' : 'loading'}>
+          {stats ? (
+            mode === 'network' ? <NetworkStatCards stats={stats} /> : <BranchStatCards stats={stats} />
+          ) : (
+            <StatCardsSkeleton />
+          )}
+        </MotionSwap>
       )}
 
       <OperationsCards scope={scope} />
@@ -76,30 +81,36 @@ export function InventoryOverview({
         title="Needs attention"
         description={attentionDescription(overview.isPending, overview.isError, rows.length)}
       >
-        {overview.isError ? (
-          <div className="panel-body">
-            <ErrorState
-              title="Could not load stock figures"
-              error={overview.error}
-              onRetry={() => void overview.refetch()}
-            />
-          </div>
-        ) : overview.isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={3} stats={0} />
-          </div>
-        ) : (
-          <>
-            <LowStockTable rows={visible} showBranch={mode === 'network' && scope === ALL_BRANCHES} />
-            <Pagination
-              page={currentPage}
-              pageCount={pageCount}
-              total={rows.length}
-              pageSize={PAGE_SIZE}
-              onPage={setPage}
-            />
-          </>
-        )}
+        <MotionSwap state={overview.isError ? 'error' : overview.isPending ? 'loading' : 'ready'}>
+          {overview.isError ? (
+            <div className="panel-body">
+              <ErrorState
+                title="Could not load stock figures"
+                error={overview.error}
+                onRetry={() => void overview.refetch()}
+              />
+            </div>
+          ) : overview.isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={3} stats={0} />
+            </div>
+          ) : (
+            <>
+              <LowStockTable
+                rows={visible}
+                showBranch={mode === 'network' && scope === ALL_BRANCHES}
+                dataset={`${scope}-${currentPage}`}
+              />
+              <Pagination
+                page={currentPage}
+                pageCount={pageCount}
+                total={rows.length}
+                pageSize={PAGE_SIZE}
+                onPage={setPage}
+              />
+            </>
+          )}
+        </MotionSwap>
       </Panel>
     </>
   )

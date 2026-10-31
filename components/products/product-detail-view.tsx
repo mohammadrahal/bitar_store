@@ -14,6 +14,7 @@ import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
+import { useDocumentTitle } from '@/hooks/use-document-title'
 import { useProduct } from '@/hooks/use-products'
 import { usePermission } from '@/hooks/use-permission'
 import { formatPrice } from '@/lib/format'
@@ -27,6 +28,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
   const { data: product, isPending, isError, error, refetch } = useProduct(productId)
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const close = () => setDialog(null)
+  useDocumentTitle(product?.name)
 
   if (isPending) return <Skeleton rows={1} stats={0} />
   if (isError) return <ErrorState title="Could not load this product" error={error} onRetry={() => void refetch()} />

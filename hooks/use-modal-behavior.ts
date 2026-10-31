@@ -18,6 +18,9 @@ export function useModalBehavior(containerRef: RefObject<HTMLElement | null>, on
     const previouslyFocused = document.activeElement as HTMLElement | null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
+    /* The shell scrolls an inner column, so the body lock alone would leave the
+       page scrolling behind the modal. */
+    document.body.classList.add('modal-open')
 
     const initial = container.querySelector<HTMLElement>('[data-autofocus]') ?? container.querySelector<HTMLElement>(FOCUSABLE)
     initial?.focus()
@@ -46,6 +49,7 @@ export function useModalBehavior(containerRef: RefObject<HTMLElement | null>, on
     return () => {
       container.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previousOverflow
+      document.body.classList.remove('modal-open')
       previouslyFocused?.focus?.()
     }
   }, [containerRef])

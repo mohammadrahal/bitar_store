@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { QuantityInput } from '@/components/shared/quantity-input'
 import type { ReplenishmentRow } from '@/types'
 
@@ -13,11 +14,14 @@ export function ReplenishmentTable({
   picked,
   keyOf,
   onChange,
+  dataset,
 }: {
   rows: ReplenishmentRow[]
   picked: Record<string, number>
   keyOf: (row: ReplenishmentRow) => string
   onChange: (key: string, quantity: number) => void
+  /** Names the scope on screen, so the entrance plays once per set. */
+  dataset?: string
 }) {
   const capOf = (row: ReplenishmentRow) => {
     const others = rows
@@ -41,13 +45,13 @@ export function ReplenishmentTable({
             <th scope="col" className="num">Send</th>
           </tr>
         </thead>
-        <tbody>
-          {rows.map((row) => {
+        <MotionTbody dataset={dataset}>
+          {rows.map((row, index) => {
             const key = keyOf(row)
             const value = picked[key] ?? 0
             const cap = capOf(row)
             return (
-              <tr key={key} className={value > 0 ? 'selected' : ''}>
+              <MotionTr key={key} index={index} className={value > 0 ? 'selected' : ''}>
                 <td>
                   <input
                     type="checkbox"
@@ -81,10 +85,10 @@ export function ReplenishmentTable({
                     />
                   )}
                 </td>
-              </tr>
+              </MotionTr>
             )
           })}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

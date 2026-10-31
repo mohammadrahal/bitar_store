@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { PackageCheck } from 'lucide-react'
 import { ReplenishmentTable } from '@/components/replenishment/replenishment-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { Panel } from '@/components/shared/panel'
@@ -78,38 +79,41 @@ export function SuggestionsPanel({ scope }: { scope: BranchScope }) {
         </button>
       }
     >
-      {isPending ? (
-        <div className="panel-body">
-          <Skeleton rows={3} stats={0} />
-        </div>
-      ) : isError ? (
-        <div className="panel-body">
-          <ErrorState title="Could not load suggestions" error={error} onRetry={() => void refetch()} />
-        </div>
-      ) : !warehouseId ? (
-        <div className="panel-body">
-          <EmptyState
-            icon={PackageCheck}
-            title="No warehouse set"
-            description="A super admin needs to mark one location as the main warehouse on the Branches page."
+      <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
+        {isPending ? (
+          <div className="panel-body">
+            <Skeleton rows={3} stats={0} />
+          </div>
+        ) : isError ? (
+          <div className="panel-body">
+            <ErrorState title="Could not load suggestions" error={error} onRetry={() => void refetch()} />
+          </div>
+        ) : !warehouseId ? (
+          <div className="panel-body">
+            <EmptyState
+              icon={PackageCheck}
+              title="No warehouse set"
+              description="A super admin needs to mark one location as the main warehouse on the Branches page."
+            />
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="panel-body">
+            <EmptyState
+              icon={PackageCheck}
+              title="Nothing to replenish"
+              description="Every location is above its low-stock threshold, counting what is already in transit."
+            />
+          </div>
+        ) : (
+          <ReplenishmentTable
+            dataset={scope}
+            rows={rows}
+            picked={picked}
+            keyOf={rowKey}
+            onChange={(key, quantity) => setPicked((current) => ({ ...current, [key]: quantity }))}
           />
-        </div>
-      ) : rows.length === 0 ? (
-        <div className="panel-body">
-          <EmptyState
-            icon={PackageCheck}
-            title="Nothing to replenish"
-            description="Every location is above its low-stock threshold, counting what is already in transit."
-          />
-        </div>
-      ) : (
-        <ReplenishmentTable
-          rows={rows}
-          picked={picked}
-          keyOf={rowKey}
-          onChange={(key, quantity) => setPicked((current) => ({ ...current, [key]: quantity }))}
-        />
-      )}
+        )}
+      </MotionSwap>
     </Panel>
   )
 }

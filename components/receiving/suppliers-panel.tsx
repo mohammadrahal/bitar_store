@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { Pencil, Plus, Truck } from 'lucide-react'
 import { SupplierForm } from '@/components/receiving/supplier-form'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
+import { MotionSwap } from '@/components/motion/motion-swap'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
@@ -35,83 +37,85 @@ export function SuppliersPanel() {
           ) : null
         }
       >
-        {isPending ? (
-          <div className="panel-body">
-            <Skeleton rows={2} stats={0} />
-          </div>
-        ) : suppliers.length === 0 ? (
-          <div className="panel-body">
-            <EmptyState
-              icon={Truck}
-              title="No suppliers yet"
-              description="Add the businesses Bitar buys from; every receipt names one."
-              action={
-                mayManage ? (
-                  <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
-                    Add supplier
-                  </button>
-                ) : undefined
-              }
-            />
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="card-table">
-              <caption className="sr-only">Suppliers</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col">Phone</th>
-                  {mayManage && (
-                    <>
-                      <th scope="col">Active</th>
-                      <th scope="col">
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {suppliers.map((supplier) => (
-                  <tr key={supplier.id}>
-                    <td className="card-title" data-label="Name">
-                      {supplier.name}
-                    </td>
-                    <td data-label="Phone" className="tabular">
-                      {supplier.phone}
-                    </td>
+        <MotionSwap state={isPending ? 'loading' : 'ready'}>
+          {isPending ? (
+            <div className="panel-body">
+              <Skeleton rows={2} stats={0} />
+            </div>
+          ) : suppliers.length === 0 ? (
+            <div className="panel-body">
+              <EmptyState
+                icon={Truck}
+                title="No suppliers yet"
+                description="Add the businesses Bitar buys from; every receipt names one."
+                action={
+                  mayManage ? (
+                    <button type="button" className="btn btn-primary" onClick={() => setAdding(true)}>
+                      Add supplier
+                    </button>
+                  ) : undefined
+                }
+              />
+            </div>
+          ) : (
+            <div className="table-wrap">
+              <table className="card-table">
+                <caption className="sr-only">Suppliers</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Name</th>
+                    <th scope="col">Phone</th>
                     {mayManage && (
                       <>
-                        <td data-label="Active">
-                          <SwitchToggle
-                            checked={!supplier.archived}
-                            disabled={setArchived.isPending}
-                            label={`${supplier.archived ? 'Restore' : 'Archive'} ${supplier.name}`}
-                            onCheckedChange={(active) =>
-                              setArchived.mutate({ id: supplier.id, archived: !active })
-                            }
-                          />
-                        </td>
-                        <td data-label="Actions">
-                          <button
-                            type="button"
-                            className="icon-btn"
-                            aria-label={`Edit ${supplier.name}`}
-                            title="Edit"
-                            onClick={() => setEditing(supplier)}
-                          >
-                            <Pencil size={16} />
-                          </button>
-                        </td>
+                        <th scope="col">Active</th>
+                        <th scope="col">
+                          <span className="sr-only">Actions</span>
+                        </th>
                       </>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <MotionTbody>
+                  {suppliers.map((supplier, index) => (
+                    <MotionTr key={supplier.id} index={index}>
+                      <td className="card-title" data-label="Name">
+                        {supplier.name}
+                      </td>
+                      <td data-label="Phone" className="tabular">
+                        {supplier.phone}
+                      </td>
+                      {mayManage && (
+                        <>
+                          <td data-label="Active">
+                            <SwitchToggle
+                              checked={!supplier.archived}
+                              disabled={setArchived.isPending}
+                              label={`${supplier.archived ? 'Restore' : 'Archive'} ${supplier.name}`}
+                              onCheckedChange={(active) =>
+                                setArchived.mutate({ id: supplier.id, archived: !active })
+                              }
+                            />
+                          </td>
+                          <td data-label="Actions">
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              aria-label={`Edit ${supplier.name}`}
+                              title="Edit"
+                              onClick={() => setEditing(supplier)}
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          </td>
+                        </>
+                      )}
+                    </MotionTr>
+                  ))}
+                </MotionTbody>
+              </table>
+            </div>
+          )}
+        </MotionSwap>
       </Panel>
 
       {adding && <SupplierForm onClose={() => setAdding(false)} />}

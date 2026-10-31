@@ -1,6 +1,7 @@
 'use client'
 
 import { KeyRound, Pencil, Users } from 'lucide-react'
+import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { SwitchToggle } from '@/components/shared/switch'
 import { usePermission } from '@/hooks/use-permission'
@@ -69,12 +70,12 @@ export function UserTable({
             </th>
           </tr>
         </thead>
-        <tbody>
-          {users.map((user) => {
+        <MotionTbody>
+          {users.map((user, index) => {
             const isSelf = user.id === currentUserId
             const locked = isSelf || user.id === lastSuperAdminId || !mayDeactivate
             return (
-              <tr key={user.id}>
+              <MotionTr key={user.id} index={index}>
                 <td>{user.fullName}</td>
                 <td>{user.email}</td>
                 <td>{ROLE_LABELS[user.role]}</td>
@@ -110,10 +111,10 @@ export function UserTable({
                     </button>
                   </div>
                 </td>
-              </tr>
+              </MotionTr>
             )
           })}
-        </tbody>
+        </MotionTbody>
       </table>
     </div>
   )

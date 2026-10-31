@@ -186,6 +186,9 @@ export type InvoiceKind =
 /** How a sale reached the customer: wholesale (B2B) or retail (B2C). */
 export type SalesChannel = 'b2b' | 'b2c'
 
+/** How a trade document was paid. Adjustments and transfer legs have none. */
+export type InvoicePaymentMethod = 'cash' | 'whish'
+
 /** Drafts hold no stock. Issuing applies it; voiding gives it back. */
 export type InvoiceStatus = 'draft' | 'issued' | 'paid' | 'void'
 
@@ -217,6 +220,10 @@ export interface Invoice {
   transferId?: string
   /** Set on customer-facing sales and their returns; purchases leave this unset. */
   salesChannel?: SalesChannel
+  /** Cash or Whish. Unset on adjustments and transfer legs. */
+  paymentMethod?: InvoicePaymentMethod
+  /** Confirmation from Whish; set only when `paymentMethod` is `whish`. */
+  whishReference?: string
   createdAt: string
 }
 

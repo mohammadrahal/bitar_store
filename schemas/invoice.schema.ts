@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { INVOICE_KINDS, isAdjustmentKind } from '@/lib/invoices'
+import { INVOICE_KINDS, INVOICE_PAYMENT_METHODS, isAdjustmentKind } from '@/lib/invoices'
 import { todayAsDateInput } from '@/lib/format'
 
 export const invoiceLineSchema = z.object({
@@ -27,6 +27,8 @@ export const invoiceSchema = z
     discount: z.number({ error: 'Enter an amount' }).min(0, 'Must be 0 or more'),
     notes: z.string().trim().max(400, 'Notes are too long'),
     salesChannel: z.enum(['b2b', 'b2c']).optional(),
+    paymentMethod: z.enum(INVOICE_PAYMENT_METHODS).default('cash'),
+    whishReference: z.string().trim().max(64, 'Reference is too long'),
     lines: z.array(invoiceLineSchema).min(1, 'Add at least one line'),
   })
   .superRefine((values, ctx) => {
@@ -37,6 +39,10 @@ export const invoiceSchema = z
       }
     } else if (values.partyName.length < 2) {
       ctx.addIssue({ code: 'custom', message: 'Name must be at least 2 characters', path: ['partyName'] })
+    }
+
+    if (!isAdjustmentKind(values.kind) && values.paymentMethod === 'whish' && values.whishReference.length < 1) {
+      ctx.addIssue({ code: 'custom', message: 'Enter the Whish reference', path: ['whishReference'] })
     }
 
     const seen = new Map<string, number>()
@@ -75,6 +81,8 @@ export function emptyInvoiceValues(branchId: string, salesChannel?: 'b2b' | 'b2c
     discount: 0,
     notes: '',
     salesChannel,
+    paymentMethod: 'cash',
+    whishReference: '',
     lines: [],
   }
 }
