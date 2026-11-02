@@ -21,8 +21,8 @@ export function DashboardView() {
         title={`Welcome back, ${user.name}`}
         description={
           scopedBranch
-            ? `Stock health at ${scopedBranch.name}. Use the header filter to widen the scope.`
-            : 'Stock health across every branch, with the items that need attention first.'
+            ? `Trade and stock health at ${scopedBranch.name}. Use the header filter to widen the scope.`
+            : 'Trade and stock health across every branch, with the items that need attention first.'
         }
       />
       <InventoryOverview scope={scope} mode="network">

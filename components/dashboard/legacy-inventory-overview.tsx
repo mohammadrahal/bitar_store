@@ -1,7 +1,7 @@
 'use client'
 
 import { MotionSwap } from '@/components/motion/motion-swap'
-import { OperationsCards } from '@/components/dashboard/operations-cards'
+import { OperationsTile } from '@/components/dashboard/operations-cards'
 import { BranchStatCards, NetworkStatCards } from '@/components/dashboard/stat-cards'
 import { useStockOverview } from '@/hooks/use-stock'
 import type { BranchScope } from '@/types'
@@ -28,20 +28,23 @@ export function LegacyInventoryOverview({
 }) {
   const overview = useStockOverview(scope)
   const stats = overview.data?.stats
+  const todayTile = <OperationsTile scope={scope} />
 
   return (
     <>
       {overview.isError ? null : (
         <MotionSwap state={stats ? 'ready' : 'loading'}>
           {stats && !overview.isPending ? (
-            mode === 'network' ? <NetworkStatCards stats={stats} /> : <BranchStatCards stats={stats} />
+            mode === 'network' ? (
+              <NetworkStatCards stats={stats} leading={todayTile} />
+            ) : (
+              <BranchStatCards stats={stats} leading={todayTile} />
+            )
           ) : (
             <StatCardsSkeleton />
           )}
         </MotionSwap>
       )}
-
-      <OperationsCards scope={scope} />
 
       {children}
     </>

@@ -50,3 +50,6 @@ export function topSellersChartHeight(rowCount: number) {
 export function branchSalesChartHeight(rowCount: number) {
   return Math.max(rowCount * BRANCH_SALES_ROW_HEIGHT + CHART_AXIS_HEIGHT, 180)
 }
+
+/** The trend plots a fixed window, so its height does not follow the data. */
+export const REVENUE_TREND_HEIGHT = 260

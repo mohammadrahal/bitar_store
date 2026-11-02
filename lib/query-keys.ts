@@ -110,5 +110,7 @@ export const queryKeys = {
   },
   dashboard: {
     overview: (scope: BranchScope) => ['dashboard', 'overview', scope] as const,
+    trend: (scope: BranchScope, days: number) => ['dashboard', 'trend', scope, days] as const,
+    trendComparison: (scope: BranchScope, days: number) => ['dashboard', 'trend-previous', scope, days] as const,
   },
 } as const

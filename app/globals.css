@@ -438,7 +438,7 @@ button.stat-card:focus-visible {
 /* ---------- Panels ---------- */
 .panel { overflow: hidden; min-width: 0; }
 .panel-heading { padding: 20px 24px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.panel-heading h2 { font-size: var(--fs-lg); font-weight: 600; margin-bottom: 4px; }
+.panel-heading h2, .panel-heading h3 { font-size: var(--fs-lg); font-weight: 600; margin-bottom: 4px; }
 .panel-heading p { color: hsl(var(--muted-foreground)); font-size: var(--fs-sm); }
 .panel-body { padding: 0 24px 24px; }
 
@@ -731,6 +731,46 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
 .segmented.compact { padding: 2px; }
 .segmented.compact button { height: 28px; padding: 0 12px; font-size: var(--fs-xs); }
 
+/* ---------- Overview sections ---------- */
+/* The overview is read in bands: a heading row names each band and carries the
+   control that scopes it, so a filter never sits inside a panel it only
+   partly governs. */
+.performance { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.section-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.section-title { font-size: var(--fs-sm); font-weight: 500; color: hsl(var(--muted-foreground)); text-transform: uppercase; letter-spacing: .08em; }
+/* The trend is the subject; the mix is the aside beside it. */
+.trend-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; align-items: start; min-width: 0; }
+.performance-body { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+/* A new range redraws in place: the old figures stay, dimmed, instead of the
+   section collapsing to a skeleton and shoving the page around. */
+.is-refetching { opacity: .6; transition: opacity .15s ease-out; }
+.is-refetching .stats-grid { pointer-events: none; }
+
+/* The change against the previous window. The arrow and the sign carry the
+   direction, so the tone is never the only thing saying which way it went. */
+.stat-delta { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font-size: var(--fs-xs); font-weight: 500; }
+.stat-delta svg { flex: none; }
+.stat-delta-since { color: hsl(var(--muted-foreground)); font-weight: 400; }
+.stat-delta.tone-good { color: hsl(var(--success)); }
+.stat-delta.tone-bad { color: hsl(var(--destructive)); }
+.stat-delta.tone-flat { color: hsl(var(--muted-foreground)); }
+
+/* ---------- Revenue splits ---------- */
+/* A thin segmented bar carries no text of its own: the rows beneath it already
+   name every part and give its figure, and the swatch on each row is the
+   legend. Widths are proportional; a part at zero draws nothing. */
+.revenue-splits { display: flex; flex-direction: column; gap: 24px; }
+.revenue-split { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.revenue-split-label { color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .08em; }
+.split-bar { display: flex; gap: 2px; height: 8px; border-radius: 999px; overflow: hidden; background: hsl(var(--card)); }
+.split-bar-part { min-width: 2px; }
+.split-bar-empty { background: hsl(var(--muted)); }
+.split-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.split-rows li { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.split-name { color: hsl(var(--muted-foreground)); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.split-share { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); }
+.split-amount { color: hsl(var(--foreground)); font-weight: 500; min-width: 7ch; text-align: right; }
+
 /* ---------- Documents ---------- */
 .back-link {
   display: inline-flex;
@@ -848,7 +888,7 @@ table { width: 100%; border-collapse: collapse; text-align: left; }
   .auth-head .logo-full { display: block; margin-bottom: 8px; }
 }
 @media (max-width: 1024px) {
-  .chart-grid { grid-template-columns: 1fr; }
+  .chart-grid, .trend-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
   .sidebar { display: none; }
