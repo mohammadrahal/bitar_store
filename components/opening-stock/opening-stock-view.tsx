@@ -15,6 +15,8 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useOpeningState, usePostOpeningStock } from '@/hooks/use-opening-stock'
 import { usePermission } from '@/hooks/use-permission'
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import { useStockPicker } from '@/hooks/use-inventory'
 
 const LIMIT = 60
@@ -50,6 +52,7 @@ export function OpeningStockView() {
      leaves it out: what is left is whatever the catalog gained since. */
   const moved = new Set(opening.data?.movedSkuIds ?? [])
   const openable = (variants.data ?? []).filter((option) => !moved.has(option.variantId))
+  const pagination = usePagination(openable, 20, `${branchId}:${term}`)
 
   return (
     <>
@@ -133,7 +136,7 @@ export function OpeningStockView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {openable.map((option) => (
+                    {pagination.visible.map((option) => (
                       <tr key={option.variantId}>
                         <td className="card-title" data-label="Variant">
                           {option.productName} — {option.color} / {option.size}
@@ -165,6 +168,13 @@ export function OpeningStockView() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={pagination.page}
+                pageCount={pagination.pageCount}
+                total={pagination.total}
+                pageSize={pagination.pageSize}
+                onPage={pagination.setPage}
+              />
               <div className="panel-body action-bar">
                 {mayPost ? (
                   <button

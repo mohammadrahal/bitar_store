@@ -18,11 +18,20 @@ export function SaleItemCard({
   branchId,
   inCart,
   onAdd,
+  /** Sales and warehouse dispatch cap quantity to sellable at `branchId`. Replenishment only shows counts. */
+  availability = 'enforce',
+  addLabel = 'Add to sale',
+  embedded = false,
 }: {
   branchId: string
   inCart: Record<string, number>
   onAdd: (option: VariantOption, quantity: number) => void
+  availability?: 'enforce' | 'inform'
+  addLabel?: string
+  /** Fits inside an invoice sheet instead of a till card. */
+  embedded?: boolean
 }) {
+  const enforceStock = availability === 'enforce'
   const [input, setInput] = useState('')
   const search = useDebouncedValue(input)
   const modelsQuery = useSaleModels(search)
@@ -51,7 +60,8 @@ export function SaleItemCard({
   const leftOf = (option: VariantOption) => Math.max(0, (option.available ?? 0) - (inCart[option.variantId] ?? 0))
   const chosen = options.find((option) => option.color === color && option.size === size)
   const left = chosen ? leftOf(chosen) : 0
-  const qty = chosen ? Math.min(quantity, left) : 0
+  const maxQty = enforceStock ? left : 9999
+  const qty = chosen ? (enforceStock ? Math.min(quantity, maxQty) : Math.max(1, quantity)) : 0
   const previewTotal = chosen ? lineTotal({ quantity: qty, unitPrice: chosen.sellPrice }) : 0
 
   const pickModel = (id: string) => {
@@ -61,9 +71,11 @@ export function SaleItemCard({
     setQuantity(1)
   }
 
+  const sectionClass = embedded ? 'invoice-line-picker' : 'sale-card'
+
   if (!branchId) {
     return (
-      <section className="sale-card" aria-label="Add an item">
+      <section className={sectionClass} aria-label="Add an item">
         <p className="muted">Choose the selling location above before adding items.</p>
       </section>
     )
@@ -73,7 +85,7 @@ export function SaleItemCard({
   const loadingVariants = Boolean(productId && variantsQuery.isPending)
 
   return (
-    <section className="sale-card" aria-label="Add an item">
+    <section className={sectionClass} aria-label="Add an item">
       <SearchInput
         className="search-field--full"
         value={input}
@@ -138,7 +150,7 @@ export function SaleItemCard({
             {sizes.map((entry) => {
               const option = options.find((candidate) => candidate.color === color && candidate.size === entry)
               const available = option ? leftOf(option) : 0
-              const none = !option || available === 0
+              const none = !option || (enforceStock && available === 0)
               return (
                 <button
                   key={entry}
@@ -152,7 +164,9 @@ export function SaleItemCard({
                   }}
                 >
                   {entry}
-                  {none ? (
+                  {!option ? (
+                    <span className="chip-count">—</span>
+                  ) : enforceStock && available === 0 ? (
                     <span className="chip-count">Out of stock</span>
                   ) : (
                     <span className="chip-count">{available} here</span>
@@ -161,19 +175,31 @@ export function SaleItemCard({
               )
             })}
           </div>
-          {sizes.every((entry) => {
-            const option = options.find((candidate) => candidate.color === color && candidate.size === entry)
-            return !option || leftOf(option) === 0
-          }) && (
-            <p className="field-hint">
-              Availability is the sellable count from the API for the branch under Selling from—not local mock stock.
-              Switch branch if units are elsewhere, or add opening stock at this branch for these SKUs.
-            </p>
-          )}
+          {enforceStock &&
+            sizes.every((entry) => {
+              const option = options.find((candidate) => candidate.color === color && candidate.size === entry)
+              return !option || leftOf(option) === 0
+            }) && (
+              <p className="field-hint">
+                Counts come from <code>GET /stock</code> for the selected branch (sellable units). If everything is zero
+                but you expect stock, check Inventory for that branch or post opening stock — the backend owns these
+                numbers, not the browser cache.
+              </p>
+            )}
+          {!enforceStock &&
+            sizes.every((entry) => {
+              const option = options.find((candidate) => candidate.color === color && candidate.size === entry)
+              return option && leftOf(option) === 0
+            }) && (
+              <p className="field-hint">
+                Zero here means your branch has none on hand (from the API). You can still add lines — that is what a
+                replenishment request is for.
+              </p>
+            )}
         </>
       )}
 
-      {chosen && left > 0 && (
+      {chosen && (enforceStock ? left > 0 : true) && (
         <>
           <div className="sale-card-head">
             <span>
@@ -193,7 +219,7 @@ export function SaleItemCard({
               )}
             </span>
           </div>
-          <QtyStepper value={qty} max={left} onChange={setQuantity} label="Quantity" />
+          <QtyStepper value={qty} max={maxQty} onChange={setQuantity} label="Quantity" />
           <button
             type="button"
             className="btn btn-dashed"
@@ -203,7 +229,7 @@ export function SaleItemCard({
               setQuantity(1)
             }}
           >
-            Add to sale
+            {addLabel}
           </button>
         </>
       )}

@@ -2,18 +2,29 @@ export { ApiError } from '@/lib/api/api-error'
 export { createApi, type BitarApi } from '@/lib/api/create-api'
 export { fetchHealth, fetchMe, loginWithApi } from '@/lib/api/auth.api'
 export {
+  createPageRequest,
   createRequest,
+  createTotalRequest,
   getApiBaseUrl,
+  newIdempotencyKey,
   onUnauthorized,
   send,
+  sendPage,
+  sendWithTotal,
+  type ApiPage,
   type HttpMethod,
+  type PageRequestFn,
   type RequestFn,
   type RequestOptions,
+  type TotalRequestFn,
 } from '@/lib/api/client'
 export { createBranchesApi, type BranchesApi } from '@/lib/api/branches.api'
 export { createCatalogApi, type CatalogApi } from '@/lib/api/catalog.api'
+export { createCategoriesApi, type CategoriesApi } from '@/lib/api/categories.api'
+export { createDashboardApi, type DashboardApi } from '@/lib/api/dashboard.api'
 export { createSalesApi, type SalesApi } from '@/lib/api/sales.api'
 export { createStockApi, type StockApi } from '@/lib/api/stock.api'
+export { createTransfersApi, type TransfersApi } from '@/lib/api/transfers.api'
 export { createUsersApi, type UsersApi } from '@/lib/api/users.api'
 export { getApiClient } from '@/lib/api/get-api-client'
 export type {
@@ -25,16 +36,41 @@ export type {
   ApiSkuWithStyle,
   ApiStyle,
   ApiStyleDetail,
+  ApiAuditEvent,
+  ApiReplenishmentSuggestions,
+  ApiReorderLevel,
   ApiSale,
+  ApiSalesSummary,
   ApiStockItem,
+  ApiStockMovement,
+  ApiStockOverview,
+  ApiTopSkusResult,
+  ApiTransfer,
   CreateSaleInput,
+  CreateTransferInput,
+  ListTransfersParams,
   OpeningStockInput,
   StockListParams,
+  StockMovementParams,
+  StockOverviewParams,
+  StockShortage,
+  TransferStatus,
   ApiUser,
+  ApiDashboardOverview,
+  ApiCategory,
+  DashboardOverviewParams,
+  ApiPermissionCatalog,
+  ApiSaleHistoryRow,
+  ApiUserPermissions,
+  ApiWarehouse,
   CatalogListParams,
   CreateSkuInput,
   CreateStyleInput,
+  PermissionSource,
+  SalesHistoryParams,
+  SalesHistoryResult,
   SkuListParams,
+  UpdateCategoryInput,
   UpdateSkuInput,
   UpdateStyleInput,
   CreateBranchInput,

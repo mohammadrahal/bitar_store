@@ -22,7 +22,8 @@ export function useCatalogSync() {
   return useQuery({
     queryKey: queryKeys.products.catalog(),
     queryFn: syncCatalog,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   })
 }
 
@@ -57,7 +58,7 @@ export function useBranchesKey(): string | null {
   return branches ? branchKey(branches) : null
 }
 
-/* Rows, not the quantity map: hooks/use-invoices.ts owns useBranchStock. */
+/* Rows, not the quantity map: branch stock list hooks live beside till sales. */
 export function useBranchStockRows(branchId: string) {
   const branches = useMirroredBranches()
   return useQuery({
@@ -74,6 +75,7 @@ export function useProductUnits(scope: BranchScope) {
     queryKey: queryKeys.stock.byProduct(scope),
     queryFn: () => unitsByProduct(scope),
     enabled: branches !== null,
+    staleTime: 30_000,
   })
 }
 
@@ -91,11 +93,11 @@ export function useVariantUnits(productId: string, scope: BranchScope) {
  * The stat cards. Gated on the catalog, because the Products card counts the
  * mirrored catalog rather than anything in scope.
  */
-export function useStockOverview(scope: BranchScope) {
+export function useStockOverview(scope: BranchScope, { enabled = true }: { enabled?: boolean } = {}) {
   const branches = useMirroredBranches()
   return useQuery({
     queryKey: queryKeys.stock.overview(scope, branches ?? ''),
     queryFn: () => getStockOverview(scope),
-    enabled: branches !== null,
+    enabled: enabled && branches !== null,
   })
 }

@@ -34,6 +34,8 @@ export function LocationAssignmentsField({
     onChange(value.map((entry) => (entry.locationId === locationId ? { ...entry, access } : entry)))
   }
 
+  const warehouseBranch = branches?.find((branch) => branch.kind === 'warehouse')
+
   if (!branches?.length) {
     return (
       <div className="field full">
@@ -45,6 +47,12 @@ export function LocationAssignmentsField({
   return (
     <fieldset className="field full">
       <legend>Locations</legend>
+      {warehouseBranch && (
+        <p className="field-hint assignment-warehouse-hint">
+          For replenishment requests, also assign <strong>{warehouseBranch.name}</strong> (the warehouse branch) so the
+          app can link the main inventory.
+        </p>
+      )}
       <ul className="assignment-list">
         {branches.map((branch) => {
           const access = accessOf(branch.id)

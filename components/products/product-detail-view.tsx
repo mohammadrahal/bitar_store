@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Archive, ArchiveRestore, ArrowLeft, Pencil, Plus } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, Pencil, Plus, Printer } from 'lucide-react'
+import { printBarcodeLabels } from '@/components/products/barcode-print'
 import { AddVariantsDrawer } from '@/components/products/add-variants-drawer'
 import { ArchiveProductDialog } from '@/components/products/archive-product-dialog'
 import { ProductForm } from '@/components/products/product-form'
@@ -78,7 +79,33 @@ export function ProductDetailView({ productId }: { productId: string }) {
         </p>
       )}
 
-      <Panel title={`${count} ${count === 1 ? 'variant' : 'variants'}`} description={count ? prices : undefined}>
+      <Panel
+        title={`${count} ${count === 1 ? 'variant' : 'variants'}`}
+        description={count ? prices : undefined}
+        actions={
+          count > 0 ? (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                const labels = product.variants.flatMap((variant) => {
+                  const codes = product.barcodes[variant.id] ?? []
+                  return codes.map((row) => ({
+                    productName: product.name,
+                    variantLabel: `${variant.color} / ${variant.size}`,
+                    sku: variant.sku,
+                    code: row.code,
+                  }))
+                })
+                printBarcodeLabels(labels)
+              }}
+            >
+              <Printer size={16} aria-hidden="true" />
+              Print all barcodes
+            </button>
+          ) : undefined
+        }
+      >
         {count === 0 ? (
           <div className="panel-body">
             <p className="subtitle">No variants on this model yet.</p>

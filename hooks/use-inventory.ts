@@ -3,19 +3,22 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useBranchesKey, useMirroredBranches } from '@/hooks/use-stock'
+import { invalidateStockQueries } from '@/lib/invalidate-stock'
 import { queryKeys } from '@/lib/query-keys'
 import { getVariantDetail, listInventory, type InventoryQuery } from '@/services/inventory.service'
 import { getOperationsSummary } from '@/services/operations.service'
 import { searchVariants } from '@/services/products.service'
 import { getWarehouseId, setWarehouse } from '@/services/locations.service'
+import { useUserStore } from '@/store/user-store'
 import type { BranchScope } from '@/types'
 
 export function useInventory(query: InventoryQuery) {
-  const mirrored = useMirroredBranches()
+  const branches = useBranchesKey()
   return useQuery({
-    queryKey: [...queryKeys.stock.inventory(query.scope, query.filter, query.search), mirrored ?? ''],
+    queryKey: [...queryKeys.stock.inventory(query.scope, query.filter, query.search), branches ?? ''],
     queryFn: () => listInventory(query),
-    enabled: mirrored !== null,
+    enabled: branches !== null,
+    staleTime: 30_000,
   })
 }
 
@@ -28,12 +31,13 @@ export function useVariantDetail(variantId: string) {
   })
 }
 
-export function useOperationsSummary(scope: BranchScope) {
+export function useOperationsSummary(scope: BranchScope, { enabled = true }: { enabled?: boolean } = {}) {
   const branches = useBranchesKey()
   return useQuery({
     queryKey: queryKeys.stock.operations(scope),
     queryFn: () => getOperationsSummary(scope),
-    enabled: branches !== null,
+    enabled: enabled && branches !== null,
+    staleTime: 60_000,
   })
 }
 
@@ -52,18 +56,21 @@ export function useSetWarehouse() {
   return useMutation({
     mutationFn: (branchId: string) => setWarehouse(branchId),
     onSuccess: (name) => {
-      void queryClient.invalidateQueries()
+      invalidateStockQueries(queryClient)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.branches.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.locations.warehouse() })
       toast.success(`${name} is now the main warehouse`)
     },
     onError: (error: Error) => toast.error(error.message),
   })
 }
 
-export function useWarehouseId() {
+export function useWarehouseId(branchId?: string) {
   const branches = useBranchesKey()
+  const token = useUserStore((state) => state.token)
   return useQuery({
-    queryKey: [...queryKeys.locations.warehouse(), branches ?? ''],
-    queryFn: getWarehouseId,
-    enabled: branches !== null,
+    queryKey: [...queryKeys.locations.warehouse(), branches ?? '', branchId ?? ''],
+    queryFn: () => getWarehouseId({ branchId }),
+    enabled: branches !== null && Boolean(token),
   })
 }

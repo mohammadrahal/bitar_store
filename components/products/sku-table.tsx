@@ -1,13 +1,16 @@
 'use client'
 
 import Link from 'next/link'
-import { Barcode, CircleOff, RotateCcw, Tag } from 'lucide-react'
+import { Barcode, CircleOff, Printer, RotateCcw, Tag } from 'lucide-react'
+import { printBarcodeLabels } from '@/components/products/barcode-print'
 import { Can } from '@/components/shared/can'
 import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useSetVariantActive } from '@/hooks/use-skus'
 import { useVariantUnits } from '@/hooks/use-stock'
 import { formatBarcode } from '@/lib/barcode'
 import { formatNumber, formatPrice } from '@/lib/format'
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import type { ProductDetail, Variant } from '@/types'
 
 /** One row per SKU: its own price, barcodes and on-sale status. */
@@ -24,8 +27,10 @@ export function SkuTable({
   const scope = useBranchScope()
   const { data: units } = useVariantUnits(product.id, scope)
   const editable = !product.archived
+  const { visible, page, pageCount, total, pageSize, setPage } = usePagination(product.variants, 15, product.id)
 
   return (
+    <>
     <div className="table-wrap">
       <table className="card-table">
         <caption className="sr-only">Color and size variants for {product.name}</caption>
@@ -43,7 +48,7 @@ export function SkuTable({
           </tr>
         </thead>
         <tbody>
-          {product.variants.map((variant) => {
+          {visible.map((variant) => {
             const barcodes = product.barcodes[variant.id] ?? []
             const busy = setActive.isPending && setActive.variables?.variantId === variant.id
             return (
@@ -84,6 +89,25 @@ export function SkuTable({
                         <button
                           type="button"
                           className="icon-btn"
+                          disabled={barcodes.length === 0}
+                          onClick={() =>
+                            printBarcodeLabels(
+                              barcodes.map((row) => ({
+                                productName: product.name,
+                                variantLabel: `${variant.color} / ${variant.size}`,
+                                sku: variant.sku,
+                                code: row.code,
+                              })),
+                            )
+                          }
+                          aria-label={`Print barcodes for ${variant.sku}`}
+                          title="Print barcode"
+                        >
+                          <Printer size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn"
                           disabled={busy}
                           onClick={() => setActive.mutate({ variantId: variant.id, isActive: variant.archived, sku: variant.sku })}
                           aria-label={`${variant.archived ? 'Reactivate' : 'Deactivate'} ${variant.sku}`}
@@ -101,5 +125,7 @@ export function SkuTable({
         </tbody>
       </table>
     </div>
+    <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPage={setPage} />
+    </>
   )
 }

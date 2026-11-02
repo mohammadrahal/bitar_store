@@ -1,19 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { Trash2 } from 'lucide-react'
 import { LineDiscountField, type LineDiscount } from '@/components/sales/line-discount'
 import { PaymentFields } from '@/components/sales/payment-fields'
 import { SaleFooter } from '@/components/sales/sale-footer'
-import { SaleItemCard } from '@/components/sales/sale-item-card'
+import { CatalogLinePicker } from '@/components/sales/catalog-line-picker'
 import { Field } from '@/components/shared/field'
 import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
 import { ViewOnlyNotice } from '@/components/shared/view-only-notice'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
+import { useSavePendingSale } from '@/hooks/use-pending-sales'
 import { useCreateSale } from '@/hooks/use-sales'
+import { getPendingSale } from '@/services/pending-sales.service'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { usePermission } from '@/hooks/use-permission'
 import { isConflict, messageOf } from '@/lib/errors'
@@ -34,19 +37,49 @@ function lineNet(line: CartLine): number {
   return Math.max(0, gross - off)
 }
 
+function optionFromPendingLine(line: { skuId: string; label: string; unitPrice: number }): VariantOption {
+  const [productName, variantPart] = line.label.split(' · ')
+  const [color, size] = (variantPart ?? '').split(' / ')
+  return {
+    variantId: line.skuId,
+    productId: '',
+    productName: productName ?? line.label,
+    sku: line.skuId,
+    barcode: '',
+    color: color ?? '',
+    size: size ?? '',
+    sellPrice: line.unitPrice,
+    available: 0,
+  }
+}
+
 export function NewSaleView() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { can, locationScoped } = usePermission()
   const online = useOnlineStatus()
   const defaultBranch = useDefaultBranchId()
   const create = useCreateSale()
+  const savePending = useSavePendingSale()
   const idempotency = useIdempotencyKey()
 
   const [branchChoice, setBranch] = useState('')
   const [lines, setLines] = useState<CartLine[]>([])
   const [customer, setCustomer] = useState('')
   const [payment, setPayment] = useState<PaymentDraft>(emptyPayment)
+  const [pendingDraftId, setPendingDraftId] = useState<string | null>(null)
   const branchId = locationScoped ? defaultBranch : branchChoice
+
+  useEffect(() => {
+    const draftId = searchParams.get('pending')
+    if (!draftId) return
+    const draft = getPendingSale(draftId)
+    if (!draft) return
+    if (!locationScoped) setBranch(draft.branchId)
+    setPendingDraftId(draft.id)
+    setCustomer(draft.note)
+    setLines(draft.lines.map((line) => ({ option: optionFromPendingLine(line), quantity: line.quantity })))
+  }, [searchParams, locationScoped])
 
   const mayApplyDiscount = can('discounts.apply', branchId || undefined)
 
@@ -70,6 +103,30 @@ export function NewSaleView() {
       return current.map((line) => (line === existing ? { ...line, quantity: line.quantity + quantity } : line))
     })
 
+  const saveAsPending = () => {
+    if (!branchId || lines.length === 0) return
+    savePending.mutate(
+      {
+        id: pendingDraftId ?? undefined,
+        branchId,
+        note: customer.trim(),
+        lines: lines.map((line) => ({
+          skuId: line.option.variantId,
+          label: `${line.option.productName} · ${line.option.color} / ${line.option.size}`,
+          quantity: line.quantity,
+          unitPrice: line.option.sellPrice,
+        })),
+      },
+      {
+        onSuccess: (sale) => {
+          setPendingDraftId(sale.id)
+          toast.success('Pending sale saved — complete payment at the till when ready')
+          router.push('/sales/b2c')
+        },
+      },
+    )
+  }
+
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
     if (lines.length === 0 || problem) return
@@ -92,6 +149,11 @@ export function NewSaleView() {
       {
         onSuccess: (sale) => {
           idempotency.reset()
+          if (pendingDraftId) {
+            import('@/services/pending-sales.service').then(({ deletePendingSale }) => {
+              deletePendingSale(pendingDraftId)
+            })
+          }
           router.push(`/sales/${sale.id}`)
         },
       },
@@ -117,7 +179,23 @@ export function NewSaleView() {
 
       <ViewOnlyNotice locationId={branchId} action="ring up sales" />
 
-      <SaleItemCard branchId={branchId} inCart={inCart} onAdd={add} />
+      <section className="sale-card" aria-label="Add an item">
+        {branchId ? (
+          <CatalogLinePicker
+            branchId={branchId}
+            inCart={inCart}
+            onAdd={add}
+            enforceStock
+            addLabel="Add to sale"
+            searchPlaceholder="Search model, code or SKU"
+            searchAriaLabel="Search models for sale"
+            itemLabel="add to sale"
+            className="catalog-picker catalog-picker--sale"
+          />
+        ) : (
+          <p className="muted">Choose the selling location above before adding items.</p>
+        )}
+      </section>
 
       {lines.length > 0 && (
         <section className="sale-card" aria-label="Items on this sale">
@@ -179,6 +257,8 @@ export function NewSaleView() {
         pending={create.isPending}
         disabled={lines.length === 0 || !online || !branchId || Boolean(problem)}
         problem={lines.length > 0 ? (problem ?? undefined) : undefined}
+        onSavePending={branchId && lines.length > 0 ? saveAsPending : undefined}
+        savingPending={savePending.isPending}
       />
     </form>
   )

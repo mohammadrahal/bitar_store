@@ -17,6 +17,8 @@ import type { LocationAssignment, Role } from '@/types'
 export interface StaffUser extends Omit<ApiUser, 'role'> {
   role: Role
   locations: LocationAssignment[]
+  /** Branch ids this employee may use (from local mirror after grant/revoke in Users). */
+  branchIds: string[]
 }
 
 export interface SaveUserInput {
@@ -28,21 +30,23 @@ export interface SaveUserInput {
   locations: LocationAssignment[]
 }
 
-function toStaffUser(user: ApiUser): StaffUser {
-  return { ...user, role: toRole(user.role), locations: assignmentsFor(user.id, []) }
+function toStaffUser(user: ApiUser, branchIds: string[] = []): StaffUser {
+  return { ...user, role: toRole(user.role), locations: assignmentsFor(user.id, branchIds), branchIds }
 }
 
 export async function listUsers(): Promise<StaffUser[]> {
   const users = await getApiClient().listUsers()
-  return users.map(toStaffUser)
+  return users.map((user) => {
+    const role = toRole(user.role)
+    const branchIds =
+      role === 'super_admin'
+        ? []
+        : getUserAccess(user.id).locations.map((entry) => entry.locationId)
+    return toStaffUser(user, branchIds)
+  })
 }
 
-/**
- * The API has no endpoint that lists a user's locations, so the assignments
- * picked here are remembered in this browser: to prefill the form, to know
- * which grant to revoke when one is removed, and to hold the access level and
- * per-location keys the API cannot store yet.
- */
+/** Branch grants for one user from the server; view-only level is still local-only. */
 async function syncLocations(userId: string, role: Role, locations: LocationAssignment[]) {
   const api = getApiClient()
   const previous = getUserAccess(userId).locations
@@ -71,6 +75,12 @@ async function syncLocations(userId: string, role: Role, locations: LocationAssi
     grants[entry.locationId] = kept[entry.locationId] ?? [...defaults.perLocation]
   }
   setUserAccess(userId, { locations: wanted, grants })
+  await loadUserAccess(userId)
+}
+
+/** Branch access for one user in this browser (updated when an admin grants or revokes). */
+export async function loadUserAccess(userId: string): Promise<StoredUserAccess> {
+  return getUserAccess(userId)
 }
 
 export async function createUser(input: SaveUserInput): Promise<StaffUser> {
@@ -82,7 +92,7 @@ export async function createUser(input: SaveUserInput): Promise<StaffUser> {
   })
   if (input.password) await api.setPassword(user.id, input.password)
   await syncLocations(user.id, input.role, input.locations)
-  return toStaffUser(user)
+  return toStaffUser(user, input.role === 'employee' ? input.locations.map((entry) => entry.locationId) : [])
 }
 
 export async function updateUser(id: string, input: SaveUserInput): Promise<StaffUser> {
@@ -97,7 +107,9 @@ export async function updateUser(id: string, input: SaveUserInput): Promise<Staf
   )
   if (input.password) await api.setPassword(id, input.password)
   if (!isSelf) await syncLocations(id, input.role, input.locations)
-  return toStaffUser(user)
+  const branchIds =
+    input.role === 'employee' ? (await loadUserAccess(id)).locations.map((entry) => entry.locationId) : []
+  return toStaffUser(user, branchIds)
 }
 
 /**
@@ -124,8 +136,6 @@ export function getUserGrants(userId: string): Record<string, string[]> {
 
 export async function saveUserGrants(userId: string, grants: Record<string, string[]>): Promise<void> {
   for (const [scope, keys] of Object.entries(grants)) setGrants(userId, scope, keys)
-  /* Keys live in this browser until the API can store them; nothing to call. */
-  return Promise.resolve()
 }
 
 /**

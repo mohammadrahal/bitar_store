@@ -1,6 +1,6 @@
 import { ApiError, fetchMe } from '@/lib/api'
 import type { MeResponse, UserRole } from '@/lib/api'
-import { assignmentsFor, getUserAccess } from '@/lib/user-access'
+import { assignmentsFromBranchIds, getUserAccess, mirrorSessionBranchAccess } from '@/lib/user-access'
 import type { Role, User } from '@/types'
 
 /** Names typed in lower case ("admin", "rana haddad") read as proper names; mixed case is left alone. */
@@ -26,7 +26,8 @@ export function toApiRole(role: Role): UserRole {
 
 export function toSessionUser({ user, permissions, branchIds, canViewCosts }: MeResponse): User {
   const role = toRole(user.role)
-  const locations = assignmentsFor(user.id, branchIds)
+  mirrorSessionBranchAccess(user.id, branchIds)
+  const locations = assignmentsFromBranchIds(branchIds)
   return {
     id: user.id,
     name: displayName(user.fullName),

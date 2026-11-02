@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { invalidateStockQueries } from '@/lib/invalidate-stock'
 import { queryKeys } from '@/lib/query-keys'
 import { openingStateFor, postOpeningStock, type OpeningStock } from '@/services/opening-stock.service'
 
@@ -20,7 +21,7 @@ export function usePostOpeningStock() {
     mutationFn: (input: OpeningStock) => postOpeningStock(input),
     onSuccess: (post) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.openingStock.all })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stock.all })
+      invalidateStockQueries(queryClient)
       toast.success(`Opening stock posted: ${post.lines} ${post.lines === 1 ? 'line' : 'lines'} at this location`)
     },
     onError: (error: Error) => toast.error(error.message),

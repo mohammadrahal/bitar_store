@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180" role="img" aria-label="Bitar Fashion">
+  <!--
+    Brass ground with a cream letterform: the accent token (#B08D57) reads
+    against both a light and a dark browser chrome, so the tab icon needs no
+    prefers-color-scheme switch. Replace the glyph with the production mark
+    when it is available as artwork.
+  -->
+  <rect width="180" height="180" rx="37" fill="#B08D57" />
+  <text
+    x="90"
+    y="92"
+    fill="#F7F5F0"
+    font-family="Playfair Display, Georgia, Times New Roman, serif"
+    font-size="112"
+    font-weight="600"
+    letter-spacing="-4"
+    text-anchor="middle"
+    dominant-baseline="central"
+  >B</text>
+</svg>

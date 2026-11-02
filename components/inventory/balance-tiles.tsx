@@ -14,7 +14,7 @@ import type { Balances } from '@/types'
  * yet and say so rather than showing a zero that would read as a fact.
  */
 export function BalanceTiles({ totals }: { totals: Balances }) {
-  const { can } = usePermission()
+  const { can, canSeeTransfers } = usePermission()
   const pending = 'Not available yet'
   const stock = can('stock.view')
   const inventory = stock ? inventoryHref() : undefined
@@ -32,7 +32,7 @@ export function BalanceTiles({ totals }: { totals: Balances }) {
         value={balanceText(totals.reserved, formatNumber)}
         detail={totals.reserved === null ? pending : 'Approved for transfer'}
         icon={Lock}
-        href={stock ? '/transfers' : undefined}
+        href={stock && canSeeTransfers() ? '/transfers' : undefined}
       />
       <StatCard
         label="On hold"

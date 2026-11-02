@@ -88,7 +88,7 @@ export function InventoryView() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
   const visible = rows?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE) ?? []
-  const selected = selectedId ?? visible[0]?.variantId ?? null
+  const highlightedId = selectedId ?? visible[0]?.variantId ?? null
   const filtered = filter !== 'all' || search.trim() !== ''
 
   return (
@@ -141,14 +141,14 @@ export function InventoryView() {
                   rows={visible}
                   dataset={`${scope}-${currentPage}`}
                   totals={totals}
-                  selectedId={selected}
+                  selectedId={highlightedId}
                   onSelect={(row) => setSelectedId(row.variantId)}
                   filtered={filtered}
                 />
                 <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
               </Panel>
               <aside className="split-aside" aria-label="Selected variant">
-                {selected && <SelectedVariantCard variantId={selected} />}
+                {selectedId && <SelectedVariantCard variantId={selectedId} />}
               </aside>
             </div>
           </div>

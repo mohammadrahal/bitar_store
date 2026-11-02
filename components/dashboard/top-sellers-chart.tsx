@@ -3,13 +3,10 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartLegend, ChartTooltip } from '@/components/dashboard/chart-tooltip'
 import { createSegmentShape } from '@/components/dashboard/chart-marks'
-import { outermostSeries } from '@/lib/chart-geometry'
+import { outermostSeries, topSellersChartHeight } from '@/lib/chart-geometry'
 import { CHART_GRID, CHART_TEXT, MARK_THICKNESS, seriesColor } from '@/lib/chart-palette'
 import { formatNumber, formatPrice } from '@/lib/format'
 import type { SalesAnalytics } from '@/types'
-
-const ROW_HEIGHT = 34
-const AXIS_HEIGHT = 48
 
 interface Row extends Record<string, unknown> {
   productName: string
@@ -28,7 +25,7 @@ export function TopSellersChart({ analytics }: { analytics: SalesAnalytics }) {
 
   const seriesIds = series.map((entry) => entry.id)
   const outermost = (row: Record<string, unknown>) => outermostSeries(seriesIds, row)
-  const height = Math.max(rows.length * ROW_HEIGHT + AXIS_HEIGHT, 200)
+  const height = topSellersChartHeight(rows.length)
   const label = `Top ${rows.length} products by units sold${series.length > 1 ? ', split by branch' : ''}`
 
   return (

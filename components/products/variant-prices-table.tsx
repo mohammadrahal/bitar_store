@@ -1,5 +1,7 @@
 'use client'
 
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import { comboKey } from '@/schemas/product.schema'
 
 /**
@@ -20,8 +22,6 @@ export function VariantPricesTable({
   defaultPrice: number
   onPriceChange: (next: Record<string, number>) => void
 }) {
-  if (combos.length === 0) return <p className="muted">Pick colors and sizes to set prices.</p>
-
   const setPrice = (key: string, text: string) => {
     const next = { ...prices }
     if (text === '') delete next[key]
@@ -29,7 +29,12 @@ export function VariantPricesTable({
     onPriceChange(next)
   }
 
+  const pagination = usePagination(combos, 20)
+
+  if (combos.length === 0) return <p className="muted">Pick colors and sizes to set prices.</p>
+
   return (
+    <>
     <div className="table-wrap opening-grid">
       <table className="variant-grid">
         <caption className="sr-only">Sell price per variant. Leave blank to use the model price.</caption>
@@ -40,7 +45,7 @@ export function VariantPricesTable({
           </tr>
         </thead>
         <tbody>
-          {combos.map(({ color, size }) => {
+          {pagination.visible.map(({ color, size }) => {
             const key = comboKey(color, size)
             return (
               <tr key={key}>
@@ -66,5 +71,13 @@ export function VariantPricesTable({
         </tbody>
       </table>
     </div>
+    <Pagination
+      page={pagination.page}
+      pageCount={pagination.pageCount}
+      total={pagination.total}
+      pageSize={pagination.pageSize}
+      onPage={pagination.setPage}
+    />
+    </>
   )
 }

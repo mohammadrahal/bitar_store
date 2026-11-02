@@ -7,6 +7,49 @@ import type { VariantOption } from '@/types'
 /** Something a scanner could have produced: one token, no spaces. */
 const SCANNABLE = /^[\x21-\x7E]{4,64}$/
 
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function variantIdFromMirror(reference: string): string | null {
+  const trimmed = reference.trim()
+  if (!trimmed) return null
+  const term = trimmed.toLowerCase()
+  const db = readDb()
+  const bySku = db.variants.find(
+    (variant) => variant.sku.toLowerCase() === term || variant.sku === trimmed.toUpperCase(),
+  )
+  if (bySku) return bySku.id
+  const byBarcode = db.variants.find((variant) => variant.barcode === trimmed)
+  return byBarcode?.id ?? null
+}
+
+/**
+ * API transfer lines need the sku uuid. Accepts uuid, sku code (e.g. MD000001-8B6-XS), or barcode.
+ */
+export async function resolveSkuReferenceToId(reference: string): Promise<string | null> {
+  const trimmed = reference.trim()
+  if (!trimmed) return null
+  if (UUID.test(trimmed)) return trimmed
+
+  const local = variantIdFromMirror(trimmed)
+  if (local) return local
+
+  if (!SCANNABLE.test(trimmed)) return null
+
+  if (await lookUp(trimmed)) return variantIdFromMirror(trimmed)
+
+  try {
+    const sku = await getApiClient().lookupSku(trimmed)
+    const scanned = sku.barcodes.find((barcode) => barcode.code === trimmed) ?? sku.barcodes[0]
+    const variant = mapApiSku(sku, sku.style.code, scanned?.code ?? '')
+    mirrorCatalog([], [variant])
+    return variant.id
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null
+    throw error
+  }
+}
+
 function optionsFrom(db: MockDb, term: string): VariantOption[] {
   return db.variants.flatMap<VariantOption>((variant) => {
     const product = db.products.find((candidate) => candidate.id === variant.productId)
@@ -20,6 +63,7 @@ function optionsFrom(db: MockDb, term: string): VariantOption[] {
         barcode: variant.barcode,
         productId: product.id,
         productName: product.name,
+        productCode: product.code,
         size: variant.size,
         color: variant.color,
         sellPrice: variant.sellPrice,

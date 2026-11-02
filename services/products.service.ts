@@ -1,4 +1,4 @@
-import { getApiClient } from '@/lib/api'
+import { ApiError, getApiClient } from '@/lib/api'
 import { DEFAULT_CURRENCY, priceText } from '@/lib/api/map-catalog'
 import type { ProductFilters } from '@/lib/query-keys'
 import { buildSku, buildVariantCode, formatModelCode } from '@/lib/sku'
@@ -59,7 +59,7 @@ function matches(product: ProductWithVariants, search: string) {
 }
 
 export async function listProducts(filters: ProductFilters): Promise<ProductWithVariants[]> {
-  await syncCatalog()
+  if (!readDb().catalogSynced) await syncCatalog()
   const { products, variants } = readDb()
   const search = filters.search.trim().toLowerCase()
   const show = filters.show ?? 'active'
@@ -72,8 +72,32 @@ export async function listProducts(filters: ProductFilters): Promise<ProductWith
 }
 
 export async function listCategories(): Promise<string[]> {
-  const categories = [...new Set(readDb().products.map((product) => product.category))]
-  return categories.sort((a, b) => a.localeCompare(b))
+  try {
+    const categories = await getApiClient().listCategories({ activeOnly: true })
+    return categories.map((category) => category.name).sort((a, b) => a.localeCompare(b))
+  } catch {
+    /* Older backends or a brief outage: fall back to names already on models. */
+    const names = [...new Set(readDb().products.map((product) => product.category).filter(Boolean))]
+    return names.sort((a, b) => a.localeCompare(b))
+  }
+}
+
+/** A product may only use a category that already exists. */
+async function ensureCategory(name: string): Promise<string> {
+  const trimmed = name.trim()
+  if (!trimmed) return trimmed
+  const api = getApiClient()
+  const existing = (await api.listCategories()).find((category) => category.name.toLowerCase() === trimmed.toLowerCase())
+  if (existing) return existing.name
+  try {
+    return (await api.createCategory(trimmed)).name
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 409) {
+      const again = (await api.listCategories()).find((category) => category.name.toLowerCase() === trimmed.toLowerCase())
+      if (again) return again.name
+    }
+    throw error
+  }
 }
 
 export async function getProduct(productId: string): Promise<ProductWithVariants> {
@@ -143,7 +167,8 @@ export async function createProduct(input: ProductInput): Promise<CreatedProduct
   if (input.variants.length === 0) throw new Error('Tick at least one color and size combination.')
   await syncCatalog()
   const code = input.code.trim().toUpperCase() || nextStyleCode(readDb().products)
-  const style = await getApiClient().createStyle({ code, name: input.name.trim(), category: input.category.trim() })
+  const category = await ensureCategory(input.category)
+  const style = await getApiClient().createStyle({ code, name: input.name.trim(), category })
   const outcome = await createSkus(style.id, style.code, input.variants, input.sellPrice)
   await refreshStyle(style.id)
   const opening = await openCountedUnits(input, outcome.created)
@@ -182,7 +207,8 @@ async function openCountedUnits(
 export async function updateProduct(productId: string, input: ProductDetailsInput): Promise<ProductWithVariants> {
   const api = getApiClient()
   const current = await getProduct(productId)
-  await api.updateStyle(productId, { name: input.name.trim(), category: input.category.trim() })
+  const category = await ensureCategory(input.category)
+  await api.updateStyle(productId, { name: input.name.trim(), category })
   if (input.sellPrice !== current.sellPrice) {
     const price = priceText(input.sellPrice)
     const live = current.variants.filter((variant) => !variant.archived && variant.sellPrice !== input.sellPrice)

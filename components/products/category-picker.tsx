@@ -6,9 +6,8 @@ import { Field } from '@/components/shared/field'
 import { useCategories } from '@/hooks/use-products'
 
 /**
- * One category per model. The chips are what the catalog already uses; a new
- * one is typed in and comes into being with the first model that carries it,
- * since the API has no category of its own.
+ * One category per model. The chips are the owner's category list; a new name
+ * is created on save if it is not already there.
  */
 export function CategoryPicker({
   value,

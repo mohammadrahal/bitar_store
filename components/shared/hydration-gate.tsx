@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Skeleton } from '@/components/shared/skeleton'
 import { isUnauthorized } from '@/lib/errors'
 import { bootstrapSession } from '@/services/session.service'
+import { warmWarehouseLink } from '@/services/warehouse-link.service'
 import { useUIStore } from '@/store/ui-store'
 import { clearLegacySessionStorage, useUserStore } from '@/store/user-store'
 
@@ -28,7 +29,9 @@ export function HydrationGate({
       const { token, user, setUser, signOut } = useUserStore.getState()
       if (token) {
         try {
-          setUser(await bootstrapSession(token))
+          const fresh = await bootstrapSession(token)
+          setUser(fresh)
+          warmWarehouseLink(fresh)
         } catch (error) {
           /* A network blip keeps the cached session; a rejected token does not. */
           if (!user || isUnauthorized(error)) signOut()

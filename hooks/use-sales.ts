@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { invalidateStockQueries } from '@/lib/invalidate-stock'
 import { queryKeys, salesQueryKeys } from '@/lib/query-keys'
 import { createSale, getSale, listSales, type NewSaleInput } from '@/services/sales.service'
 
@@ -13,11 +14,11 @@ export function useSale(saleId: string) {
   })
 }
 
-export function useSalesList(branchId: string, date?: string) {
+export function useSalesList(branchId: string, date?: string, enabled = true) {
   return useQuery({
     queryKey: salesQueryKeys.list(branchId, date ?? ''),
     queryFn: () => listSales({ branchId, date, limit: 200 }),
-    enabled: Boolean(branchId),
+    enabled: Boolean(branchId) && enabled,
   })
 }
 
@@ -29,7 +30,7 @@ export function useCreateSale() {
     mutationFn: ({ input, idempotencyKey }: { input: NewSaleInput; idempotencyKey: string }) =>
       createSale(input, idempotencyKey),
     onSuccess: (sale) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stock.all })
+      invalidateStockQueries(queryClient)
       void queryClient.invalidateQueries({ queryKey: salesQueryKeys.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all })
       toast.success(`Sale ${sale.reference} completed`)

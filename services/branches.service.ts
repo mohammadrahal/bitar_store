@@ -20,7 +20,7 @@ export interface BranchInput {
  * employee is granted one branch, so their list says nothing about the rest
  * and must never be treated as complete.
  */
-function seesWholeNetwork(): boolean {
+export function seesWholeNetwork(): boolean {
   const user = useUserStore.getState().user
   return user ? can(user, 'locations.view_all') : false
 }

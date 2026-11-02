@@ -5,7 +5,7 @@ import type { SaleModelOption, VariantOption } from '@/types'
 
 /** Active styles for the till model row — from the API catalog, not a variant page slice. */
 export async function listSaleModels(search: string, limit = 24): Promise<SaleModelOption[]> {
-  await syncCatalog()
+  if (!readDb().catalogSynced) await syncCatalog()
   const term = search.trim().toLowerCase()
   const db = readDb()
 
@@ -29,12 +29,13 @@ export async function listSaleModels(search: string, limit = 24): Promise<SaleMo
       productId: product.id,
       productCode: product.code,
       productName: product.name,
+      variantCount: db.variants.filter((variant) => variant.productId === product.id && !isRetired(db, variant)).length,
     }))
 }
 
 /** Every sellable SKU on a style at this branch, with sellable counts from the API. */
 export async function listSaleVariants(branchId: string, productId: string): Promise<VariantOption[]> {
-  await syncCatalog()
+  if (!readDb().catalogSynced) await syncCatalog()
   const sellable = await branchSellableMapForStyle(branchId, productId)
   const db = readDb()
   const product = db.products.find((candidate) => candidate.id === productId)

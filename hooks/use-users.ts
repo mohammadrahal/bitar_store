@@ -5,8 +5,7 @@ import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query-keys'
 import {
   createUser,
-  getUserGrants,
-  getUserLocations,
+  loadUserAccess,
   listUsers,
   saveUserGrants,
   setUserActive,
@@ -75,11 +74,11 @@ export function useSetUserActive() {
   })
 }
 
-/** Locations and keys for one account, as remembered in this browser. */
+/** Branch access from the API; extra permission keys are stored on this device until the permissions UI uses the server. */
 export function useUserAccess(userId: string) {
   return useQuery({
     queryKey: queryKeys.users.access(userId),
-    queryFn: () => ({ locations: getUserLocations(userId), grants: getUserGrants(userId) }),
+    queryFn: () => loadUserAccess(userId),
     enabled: Boolean(userId),
   })
 }

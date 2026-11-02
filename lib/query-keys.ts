@@ -11,7 +11,17 @@ export interface ProductFilters {
 export const salesQueryKeys = {
   all: ['sales'] as const,
   list: (branchId: string, date: string) => ['sales', 'list', branchId, date] as const,
+  history: (branchId: string, from: string, to: string, offset: number, search: string) =>
+    ['sales', 'history', branchId, from, to, offset, search] as const,
   detail: (saleId: string) => ['sales', 'detail', saleId] as const,
+  pendingSales: (branchId: string) => ['sales', 'pending-sales', branchId] as const,
+} as const
+
+/** B2B wholesale documents (local until the documents API ships). */
+export const invoiceQueryKeys = {
+  all: ['invoices', 'wholesale'] as const,
+  list: (branchId: string, status: string) => ['invoices', 'wholesale', 'list', branchId, status] as const,
+  detail: (id: string) => ['invoices', 'wholesale', 'detail', id] as const,
 } as const
 
 /** Every query key in the app, so invalidation never guesses at a shape. */
@@ -39,7 +49,8 @@ export const queryKeys = {
   },
   analytics: {
     all: ['analytics'] as const,
-    sales: (scope: BranchScope) => ['analytics', 'sales', scope] as const,
+    sales: (scope: BranchScope, source: 'reports' | 'sales' = 'sales') =>
+      ['analytics', 'sales', scope, source] as const,
   },
   sales: salesQueryKeys,
   stock: {
@@ -80,5 +91,24 @@ export const queryKeys = {
   openingStock: {
     all: ['opening-stock'] as const,
     post: (branchId: string) => ['opening-stock', 'post', branchId] as const,
+  },
+  transfers: {
+    all: ['transfers'] as const,
+    list: (branchId: string, status: string, offset: number) =>
+      ['transfers', 'list', branchId, status, offset] as const,
+    detail: (id: string) => ['transfers', 'detail', id] as const,
+  },
+  warehouse: {
+    stockNetwork: (search: string, offset: number) => ['warehouse', 'overview', search, offset] as const,
+    reorderLevels: (branchId: string, search: string) => ['warehouse', 'reorder-levels', branchId, search] as const,
+    replenishment: (branchId: string) => ['warehouse', 'replenishment', branchId] as const,
+  },
+  reports: {
+    summary: (branchId: string, from: string, to: string) => ['reports', 'summary', branchId, from, to] as const,
+    topSkus: (branchId: string, from: string, to: string) => ['reports', 'top-skus', branchId, from, to] as const,
+    audit: (offset: number) => ['reports', 'audit', offset] as const,
+  },
+  dashboard: {
+    overview: (scope: BranchScope) => ['dashboard', 'overview', scope] as const,
   },
 } as const

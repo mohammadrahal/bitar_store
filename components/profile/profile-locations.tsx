@@ -1,12 +1,15 @@
 'use client'
 
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
+import { Pagination } from '@/components/shared/pagination'
 import { useBranches } from '@/hooks/use-branches'
+import { usePagination } from '@/hooks/use-pagination'
 import type { User } from '@/types'
 
 /** Where this account may work, and whether it may only look. */
 export function ProfileLocations({ user }: { user: User }) {
   const { data: branches, isPending } = useBranches()
+  const { visible, page, pageCount, total, pageSize, setPage } = usePagination(user.locations)
 
   if (user.locations.length === 0) {
     return (
@@ -17,6 +20,7 @@ export function ProfileLocations({ user }: { user: User }) {
   }
 
   return (
+    <>
     <div className="table-wrap">
       <table>
         <caption className="sr-only">Assigned locations</caption>
@@ -27,7 +31,7 @@ export function ProfileLocations({ user }: { user: User }) {
           </tr>
         </thead>
         <MotionTbody>
-          {user.locations.map((assignment, index) => {
+          {visible.map((assignment, index) => {
             const branch = branches?.find((candidate) => candidate.id === assignment.locationId)
             const full = assignment.access === 'full'
             return (
@@ -48,5 +52,7 @@ export function ProfileLocations({ user }: { user: User }) {
         </MotionTbody>
       </table>
     </div>
+    <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPage={setPage} />
+    </>
   )
 }

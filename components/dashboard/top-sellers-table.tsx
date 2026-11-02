@@ -1,5 +1,7 @@
 'use client'
 
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import { formatNumber, formatPrice } from '@/lib/format'
 import type { SalesAnalytics } from '@/types'
 
@@ -7,8 +9,10 @@ import type { SalesAnalytics } from '@/types'
 export function TopSellersTable({ analytics }: { analytics: SalesAnalytics }) {
   const { series, topProducts } = analytics
   const perBranch = series.length > 1
+  const { visible, page, pageCount, total, pageSize, setPage } = usePagination(topProducts, 10)
 
   return (
+    <>
     <div className="table-wrap">
       <table>
         <caption className="sr-only">Top products by units sold</caption>
@@ -30,7 +34,7 @@ export function TopSellersTable({ analytics }: { analytics: SalesAnalytics }) {
           </tr>
         </thead>
         <tbody>
-          {topProducts.map((product) => (
+          {visible.map((product) => (
             <tr key={product.productName}>
               <td>
                 <strong>{product.productName}</strong>
@@ -50,5 +54,7 @@ export function TopSellersTable({ analytics }: { analytics: SalesAnalytics }) {
         </tbody>
       </table>
     </div>
+    <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPage={setPage} />
+    </>
   )
 }

@@ -1,5 +1,10 @@
 import { readDb, type MockDb } from '@/mocks/store'
+import {
+  canLoadInventoryFromOverview,
+  loadStockOverviewForInventory,
+} from '@/services/inventory-overview-source'
 import { visibleBranchIds, visibleScope } from '@/services/mock-ledger'
+import { mapApiSku, mapApiStyle } from '@/lib/api/map-catalog'
 import { branchStockItems } from '@/services/stock-api.service'
 import {
   ALL_BRANCHES,
@@ -57,23 +62,41 @@ interface Carried {
   balances: Balances
 }
 
-/** `GET /stock` for every location in scope, folded into one row per variant. */
+function foldStockItem(byVariant: Map<string, Carried>, item: {
+  sku: { id: string }
+  sellable: number
+  nonSellable: number
+  inTransit: number
+}) {
+  if (item.sellable + item.nonSellable + item.inTransit === 0) return
+  const current = byVariant.get(item.sku.id) ?? { balances: emptyBalances() }
+  current.balances.onHand += item.sellable + item.nonSellable
+  current.balances.nonSellable += item.nonSellable
+  current.balances.available += item.sellable
+  current.balances.inTransit += item.inTransit
+  byVariant.set(item.sku.id, current)
+}
+
+/** `GET /stock` per location in parallel, folded into one row per variant. */
 async function carriedByVariant(db: MockDb, scope: BranchScope): Promise<Map<string, Carried>> {
   const byVariant = new Map<string, Carried>()
+  const pages = await Promise.all(locationsIn(db, scope).map((location) => branchStockItems(location.id)))
+  for (const items of pages) {
+    for (const item of items) foldStockItem(byVariant, item)
+  }
+  return byVariant
+}
 
-  for (const location of locationsIn(db, scope)) {
-    for (const item of await branchStockItems(location.id)) {
-      /* A location that holds none of a SKU does not carry it, so it is not
-         listed as out of stock there: it is simply not sold there. */
-      if (item.sellable + item.nonSellable + item.inTransit === 0) continue
-
-      const current = byVariant.get(item.sku.id) ?? { balances: emptyBalances() }
-      current.balances.onHand += item.sellable + item.nonSellable
-      current.balances.nonSellable += item.nonSellable
-      current.balances.available += item.sellable
-      current.balances.inTransit += item.inTransit
-      byVariant.set(item.sku.id, current)
-    }
+async function carriedFromOverview(search: string): Promise<Map<string, Carried>> {
+  const overview = await loadStockOverviewForInventory(search)
+  const byVariant = new Map<string, Carried>()
+  for (const item of overview.items) {
+    foldStockItem(byVariant, {
+      sku: item.sku,
+      sellable: item.totals.sellable,
+      nonSellable: item.totals.nonSellable,
+      inTransit: item.totals.inTransit,
+    })
   }
   return byVariant
 }
@@ -81,7 +104,10 @@ async function carriedByVariant(db: MockDb, scope: BranchScope): Promise<Map<str
 /** One row per variant, its balances summed over the locations in scope. */
 export async function listInventory(query: InventoryQuery): Promise<InventoryRow[]> {
   const db = readDb()
-  const carried = await carriedByVariant(db, visibleScope(query.scope))
+  const scope = visibleScope(query.scope)
+  const carried = canLoadInventoryFromOverview(scope)
+    ? await carriedFromOverview(query.search)
+    : await carriedByVariant(db, scope)
   const term = query.search.trim().toLowerCase()
   const rows: InventoryRow[] = []
 
@@ -121,35 +147,78 @@ export async function listInventory(query: InventoryQuery): Promise<InventoryRow
 
 export async function getVariantDetail(variantId: string): Promise<VariantDetail> {
   const db = readDb()
-  const variant = db.variants.find((candidate) => candidate.id === variantId)
-  const product = variant && db.products.find((candidate) => candidate.id === variant.productId)
-  if (!variant || !product) throw new Error('This variant no longer exists.')
+  let variant = db.variants.find((candidate) => candidate.id === variantId)
+  let product = variant ? db.products.find((candidate) => candidate.id === variant!.productId) : undefined
 
   const totals = emptyBalances()
   const locations: LocationBalance[] = []
 
-  for (const branch of locationsIn(db, ALL_BRANCHES)) {
-    const item = (await branchStockItems(branch.id)).find((candidate) => candidate.sku.id === variantId)
-    const balances: Balances = {
-      onHand: (item?.sellable ?? 0) + (item?.nonSellable ?? 0),
-      nonSellable: item?.nonSellable ?? 0,
-      reserved: null,
-      onHold: null,
-      available: item?.sellable ?? 0,
-      inTransit: item?.inTransit ?? 0,
+  if (canLoadInventoryFromOverview(ALL_BRANCHES)) {
+    if (!variant) throw new Error('This variant no longer exists.')
+    const overview = await loadStockOverviewForInventory(variant.sku)
+    const item = overview.items.find((row) => row.sku.id === variantId)
+    if (!item) throw new Error('This variant no longer exists.')
+    variant = mapApiSku(item.sku, item.sku.style.code)
+    product = mapApiStyle(
+      {
+        id: item.sku.styleId,
+        code: item.sku.style.code,
+        name: item.sku.style.name,
+        category: null,
+        isActive: item.sku.isActive,
+        createdAt: item.sku.createdAt,
+        updatedAt: item.sku.updatedAt,
+      },
+      [variant],
+    )
+    for (const row of item.locations) {
+      const branch = overview.locations.find((loc) => loc.id === row.branchId)
+      const balances: Balances = {
+        onHand: row.sellable + row.nonSellable,
+        nonSellable: row.nonSellable,
+        reserved: null,
+        onHold: null,
+        available: row.sellable,
+        inTransit: row.inTransit,
+      }
+      totals.onHand += balances.onHand
+      totals.nonSellable += balances.nonSellable
+      totals.available += balances.available
+      totals.inTransit += balances.inTransit
+      locations.push({
+        ...balances,
+        branchId: row.branchId,
+        branchName: branch?.name ?? row.branchId,
+        isWarehouse: branch?.kind === 'warehouse' || row.branchId === db.warehouseId,
+      })
     }
-    totals.onHand += balances.onHand
-    totals.nonSellable += balances.nonSellable
-    totals.available += balances.available
-    totals.inTransit += balances.inTransit
-
-    locations.push({
-      ...balances,
-      branchId: branch.id,
-      branchName: branch.name,
-      isWarehouse: branch.id === db.warehouseId,
+  } else {
+    if (!variant || !product) throw new Error('This variant no longer exists.')
+    const pages = await Promise.all(locationsIn(db, ALL_BRANCHES).map((branch) => branchStockItems(branch.id)))
+    locationsIn(db, ALL_BRANCHES).forEach((branch, index) => {
+      const item = pages[index]?.find((candidate) => candidate.sku.id === variantId)
+      const balances: Balances = {
+        onHand: (item?.sellable ?? 0) + (item?.nonSellable ?? 0),
+        nonSellable: item?.nonSellable ?? 0,
+        reserved: null,
+        onHold: null,
+        available: item?.sellable ?? 0,
+        inTransit: item?.inTransit ?? 0,
+      }
+      totals.onHand += balances.onHand
+      totals.nonSellable += balances.nonSellable
+      totals.available += balances.available
+      totals.inTransit += balances.inTransit
+      locations.push({
+        ...balances,
+        branchId: branch.id,
+        branchName: branch.name,
+        isWarehouse: branch.id === db.warehouseId,
+      })
     })
   }
+
+  if (!variant || !product) throw new Error('This variant no longer exists.')
 
   locations.sort((a, b) => Number(b.isWarehouse) - Number(a.isWarehouse) || a.branchName.localeCompare(b.branchName))
 

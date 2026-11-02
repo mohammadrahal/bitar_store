@@ -35,7 +35,7 @@ export function BranchesView() {
         description={
           locationScoped
             ? 'The branch you work from.'
-            : 'Create stores and assign employees to them from Users.'
+            : 'Create stores and assign people to them from the Employees page.'
         }
         actions={
           <Can permission="settings.manage">

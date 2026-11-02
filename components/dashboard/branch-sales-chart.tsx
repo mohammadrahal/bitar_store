@@ -3,12 +3,11 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from '@/components/dashboard/chart-tooltip'
 import { createSegmentShape } from '@/components/dashboard/chart-marks'
+import { branchSalesChartHeight } from '@/lib/chart-geometry'
 import { CHART_GRID, CHART_TEXT, MARK_THICKNESS, seriesColor } from '@/lib/chart-palette'
 import { CURRENCY, formatCurrency, formatNumber, formatPrice } from '@/lib/format'
 import type { SalesAnalytics } from '@/types'
 
-const ROW_HEIGHT = 44
-const AXIS_HEIGHT = 48
 const SERIES_ID = 'revenue'
 
 interface Row extends Record<string, unknown> {
@@ -35,7 +34,7 @@ export function BranchSalesChart({ analytics }: { analytics: SalesAnalytics }) {
     units: branch.units,
   }))
 
-  const height = Math.max(rows.length * ROW_HEIGHT + AXIS_HEIGHT, 180)
+  const height = branchSalesChartHeight(rows.length)
 
   return (
     <div className="chart-block">

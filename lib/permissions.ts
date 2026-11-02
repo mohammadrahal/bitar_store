@@ -1,3 +1,11 @@
+import {
+  canDispatchTransfers,
+  canManageMinimums,
+  canRequestTransfer,
+  canSeeTransfers,
+  canViewAdminWarehouseTools,
+  canViewFinancialReports,
+} from '@/lib/api-access'
 import { isBranchId } from '@/lib/branch-slug'
 import {
   BASELINE_PERMISSIONS,
@@ -102,10 +110,21 @@ const ROUTE_PERMISSIONS: [prefix: string, rule: PermissionRule][] = [
   ['/products/new', 'catalog.create'],
   ['/sales/new', 'sales.create'],
   ['/sales/b2c', ['sales.view_own', 'sales.view_branch']],
+  ['/sales/b2b', 'locations.view_all'],
   ['/sales/', ['sales.view_own', 'sales.view_branch']],
   ['/inventory', 'stock.view'],
   ['/opening-stock', 'opening_stock.post'],
   ['/users', 'users.manage'],
+]
+
+const API_ROUTE_ACCESS: [prefix: string, allowed: (user: User) => boolean][] = [
+  ['/transfers/new', canRequestTransfer],
+  ['/transfers', canSeeTransfers],
+  ['/replenishment', canManageMinimums],
+  ['/reorder-levels', canManageMinimums],
+  ['/stock-network', canViewAdminWarehouseTools],
+  ['/reports', canViewFinancialReports],
+  ['/audit', canViewAdminWarehouseTools],
 ]
 
 /**
@@ -121,6 +140,9 @@ export function redirectPathFor(user: User, pathname: string): string | null {
 
   const rule = ROUTE_PERMISSIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
   if (rule && !canAny(user, rule[1])) return home
+
+  const apiRule = API_ROUTE_ACCESS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  if (apiRule && !apiRule[1](user)) return home
 
   /* A branch page is addressed by its store code, which only the branch list
      can resolve, so the check here covers the id form and BranchGuard does the

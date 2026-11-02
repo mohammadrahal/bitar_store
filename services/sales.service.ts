@@ -1,6 +1,6 @@
 import { getApiClient } from '@/lib/api'
 import { priceText } from '@/lib/api/map-catalog'
-import type { ApiSale, CreateSaleInput, SalesListParams } from '@/lib/api/types'
+import type { ApiSale, CreateSaleInput, SalesHistoryParams, SalesHistoryResult, SalesListParams } from '@/lib/api/types'
 
 /** A completed POS sale, named for the screens so they need no API types. */
 export type { ApiSale as Sale, ApiSaleLine as SaleLine, ApiSalePayment as SalePayment } from '@/lib/api/types'
@@ -73,4 +73,8 @@ export async function getSale(saleId: string): Promise<ApiSale> {
 
 export async function listSales(params: SalesListParams): Promise<{ businessDate: string; sales: ApiSale[] }> {
   return getApiClient().listSales(params)
+}
+
+export async function getSalesHistory(params: SalesHistoryParams = {}): Promise<SalesHistoryResult> {
+  return getApiClient().getSalesHistory(params)
 }

@@ -1,7 +1,11 @@
 'use client'
 
+'use client'
+
 import Link from 'next/link'
+import { Pagination } from '@/components/shared/pagination'
 import { useBranchHref } from '@/hooks/use-branches'
+import { usePagination } from '@/hooks/use-pagination'
 import { balanceText } from '@/lib/balances'
 import { formatNumber } from '@/lib/format'
 import type { Balances, LocationBalance } from '@/types'
@@ -18,8 +22,10 @@ export function LocationBalancesTable({
   compact?: boolean
 }) {
   const hrefOf = useBranchHref()
+  const { visible, page, pageCount, total, pageSize, setPage } = usePagination(locations, 10)
 
   return (
+    <>
     <div className="table-wrap">
       <table className="card-table">
         <caption className="sr-only">Balances by location</caption>
@@ -34,7 +40,7 @@ export function LocationBalancesTable({
           </tr>
         </thead>
         <tbody>
-          {locations.map((location) => (
+          {visible.map((location) => (
             <tr key={location.branchId}>
               <td className="card-title">
                 {location.isWarehouse ? (
@@ -72,5 +78,7 @@ export function LocationBalancesTable({
         )}
       </table>
     </div>
+    <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPage={setPage} />
+    </>
   )
 }

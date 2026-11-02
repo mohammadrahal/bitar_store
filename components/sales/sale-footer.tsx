@@ -6,6 +6,8 @@ export function SaleFooter({
   pending,
   disabled,
   problem,
+  onSavePending,
+  savingPending,
 }: {
   total: number
   units: number
@@ -13,6 +15,8 @@ export function SaleFooter({
   disabled: boolean
   /** Why the sale cannot be completed yet, shown beside the button. */
   problem?: string
+  onSavePending?: () => void
+  savingPending?: boolean
 }) {
   return (
     <footer className="sale-footer">
@@ -23,9 +27,21 @@ export function SaleFooter({
           </span>
           <strong>{formatPrice(total)}</strong>
         </div>
-        <button type="submit" className="btn btn-primary" disabled={disabled || pending}>
-          {pending ? 'Confirming with the server…' : 'Confirm sale'}
-        </button>
+        <div className="sale-footer-actions">
+          {onSavePending && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              disabled={pending || savingPending}
+              onClick={onSavePending}
+            >
+              {savingPending ? 'Saving…' : 'Save pending sale'}
+            </button>
+          )}
+          <button type="submit" className="btn btn-primary" disabled={disabled || pending}>
+            {pending ? 'Confirming with the server…' : 'Confirm sale'}
+          </button>
+        </div>
         {problem ? (
           <small className="field-error">{problem}</small>
         ) : (

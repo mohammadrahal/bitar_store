@@ -1,5 +1,7 @@
 'use client'
 
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import { comboKey } from '@/schemas/product.schema'
 
 /**
@@ -18,8 +20,6 @@ export function OpeningQuantitiesTable({
   onChange: (next: Record<string, number>) => void
   disabled?: boolean
 }) {
-  if (combos.length === 0) return <p className="muted">Pick colors and sizes to count them in.</p>
-
   const setQuantity = (key: string, text: string) => {
     const next = { ...quantities }
     const parsed = Math.floor(Number(text))
@@ -28,7 +28,12 @@ export function OpeningQuantitiesTable({
     onChange(next)
   }
 
+  const pagination = usePagination(combos, 20)
+
+  if (combos.length === 0) return <p className="muted">Pick colors and sizes to count them in.</p>
+
   return (
+    <>
     <div className="table-wrap opening-grid">
       <table className="variant-grid">
         <caption className="sr-only">Opening units per variant. Leave blank to place none.</caption>
@@ -39,7 +44,7 @@ export function OpeningQuantitiesTable({
           </tr>
         </thead>
         <tbody>
-          {combos.map(({ color, size }) => {
+          {pagination.visible.map(({ color, size }) => {
             const key = comboKey(color, size)
             return (
               <tr key={key}>
@@ -66,5 +71,13 @@ export function OpeningQuantitiesTable({
         </tbody>
       </table>
     </div>
+    <Pagination
+      page={pagination.page}
+      pageCount={pagination.pageCount}
+      total={pagination.total}
+      pageSize={pagination.pageSize}
+      onPage={pagination.setPage}
+    />
+    </>
   )
 }

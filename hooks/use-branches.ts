@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { usePermission } from '@/hooks/use-permission'
 import { ApiError } from '@/lib/api'
 import { branchHref } from '@/lib/branch-slug'
+import { invalidateStockQueries } from '@/lib/invalidate-stock'
 import { queryKeys } from '@/lib/query-keys'
 import type { UpdateBranchInput } from '@/lib/api'
 import {
@@ -28,6 +29,7 @@ export function useBranches() {
   return useQuery({
     queryKey: queryKeys.branches.list(scope),
     queryFn: () => listBranches(scope),
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -57,7 +59,7 @@ function useBranchMutationCallbacks() {
   return {
     invalidate: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.branches.all })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stock.all })
+      invalidateStockQueries(queryClient)
     },
     reportError: (error: Error) => toast.error(error.message),
   }

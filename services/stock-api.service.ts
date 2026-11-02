@@ -7,6 +7,26 @@ import { readDb } from '@/mocks/store'
 import type { BranchStockRow, Product, Variant } from '@/types'
 
 const PAGE = 200
+const BRANCH_PAGES_CACHE_MS = 30_000
+
+type StockPagesParams = Omit<StockListParams, 'limit' | 'offset'>
+
+function stockPagesKey(params: StockPagesParams): string {
+  return JSON.stringify({
+    branchId: params.branchId ?? '',
+    styleId: params.styleId ?? '',
+    search: params.search?.trim() ?? '',
+    activeOnly: params.activeOnly ?? false,
+  })
+}
+
+const branchPagesCache = new Map<string, { data: ApiStockItem[]; at: number }>()
+const branchPagesInflight = new Map<string, Promise<ApiStockItem[]>>()
+
+export function clearBranchStockPagesCache(): void {
+  branchPagesCache.clear()
+  branchPagesInflight.clear()
+}
 
 /** Keep the local catalog aligned with SKUs returned from stock reads. */
 function mirrorStockFromItems(items: ApiStockItem[]): void {
@@ -39,15 +59,32 @@ function mirrorStockFromItems(items: ApiStockItem[]): void {
   mirrorCatalog(products, variants)
 }
 
-async function fetchStockPages(params: Omit<StockListParams, 'limit' | 'offset'>): Promise<ApiStockItem[]> {
+async function fetchStockPagesUncached(params: StockPagesParams): Promise<ApiStockItem[]> {
   const api = getApiClient()
   const items: ApiStockItem[] = []
   for (let offset = 0; ; offset += PAGE) {
-    const page = await api.listStock({ ...params, limit: PAGE, offset })
+    const { items: page, total } = await api.listStockPage({ ...params, limit: PAGE, offset })
     mirrorStockFromItems(page)
     items.push(...page)
-    if (page.length < PAGE) return items
+    if (offset + page.length >= total || page.length < PAGE) return items
   }
+}
+
+async function fetchStockPages(params: StockPagesParams): Promise<ApiStockItem[]> {
+  const key = stockPagesKey(params)
+  const hit = branchPagesCache.get(key)
+  if (hit && Date.now() - hit.at < BRANCH_PAGES_CACHE_MS) return hit.data
+
+  let pending = branchPagesInflight.get(key)
+  if (!pending) {
+    pending = fetchStockPagesUncached(params).then((data) => {
+      branchPagesCache.set(key, { data, at: Date.now() })
+      branchPagesInflight.delete(key)
+      return data
+    })
+    branchPagesInflight.set(key, pending)
+  }
+  return pending
 }
 
 async function fetchAllStock(params: Omit<StockListParams, 'limit' | 'offset'>): Promise<BranchStockRow[]> {

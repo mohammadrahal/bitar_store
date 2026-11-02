@@ -145,6 +145,8 @@ export interface SaleModelOption {
   productId: string
   productCode: string
   productName: string
+  /** Active SKU count on this model (invoice browse). */
+  variantCount?: number
 }
 
 /** A catalog variant offered to the invoice line picker. */

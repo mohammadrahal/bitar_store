@@ -32,3 +32,21 @@ export function outermostSeries(seriesIds: readonly string[], row: Record<string
   }
   return ''
 }
+
+/**
+ * The height each dashboard chart lays out to, as a function of its row count.
+ * Lives here rather than in the chart components because the placeholder shown
+ * while recharts loads has to reserve the exact same height, and must not pull
+ * recharts into the first load to find out what it is.
+ */
+export const TOP_SELLERS_ROW_HEIGHT = 34
+export const BRANCH_SALES_ROW_HEIGHT = 44
+const CHART_AXIS_HEIGHT = 48
+
+export function topSellersChartHeight(rowCount: number) {
+  return Math.max(rowCount * TOP_SELLERS_ROW_HEIGHT + CHART_AXIS_HEIGHT, 200)
+}
+
+export function branchSalesChartHeight(rowCount: number) {
+  return Math.max(rowCount * BRANCH_SALES_ROW_HEIGHT + CHART_AXIS_HEIGHT, 180)
+}

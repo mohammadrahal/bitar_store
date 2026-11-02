@@ -1,19 +1,11 @@
-import { delay } from '@/lib/delay'
 import { fromCents, toCents } from '@/lib/money'
 import { paymentCents, salePaymentKind } from '@/lib/sale-payments'
-import { readDb } from '@/mocks/store'
-import { visibleBranchIds, visibleScope } from '@/services/mock-ledger'
-import { listSales } from '@/services/sales.service'
-import { ALL_BRANCHES, type BranchScope, type OperationsSummary, type TodayPaymentMix } from '@/types'
-
-const SALES_PAGE = 200
+import { fetchTodayBranchSales } from '@/services/today-branch-sales.service'
+import type { BranchScope, OperationsSummary, TodayPaymentMix } from '@/types'
 
 /** What the till took today, from `GET /sales` for the current business date. */
 export async function getOperationsSummary(requested: BranchScope): Promise<OperationsSummary> {
-  const db = readDb()
-  const scope = visibleScope(requested)
-  const visible = new Set(visibleBranchIds(db))
-  const inScope = (branchId: string) => visible.has(branchId) && (scope === ALL_BRANCHES || branchId === scope)
+  const snapshot = await fetchTodayBranchSales(requested)
 
   let todaySales = 0
   let todayCents = 0
@@ -21,8 +13,7 @@ export async function getOperationsSummary(requested: BranchScope): Promise<Oper
   const whish = { sales: 0, cents: 0 }
   const split = { sales: 0, cents: 0, cashCents: 0, whishCents: 0 }
 
-  for (const branch of db.branches.filter((branch) => inScope(branch.id))) {
-    const { sales } = await listSales({ branchId: branch.id, limit: SALES_PAGE })
+  for (const { sales } of snapshot.byBranch) {
     todaySales += sales.length
     for (const sale of sales) {
       const cents = toCents(Number(sale.total) || 0)
@@ -55,5 +46,5 @@ export async function getOperationsSummary(requested: BranchScope): Promise<Oper
     },
   }
 
-  return delay({ todaySales, todayRevenue: fromCents(todayCents), todayMix })
+  return { todaySales, todayRevenue: fromCents(todayCents), todayMix }
 }

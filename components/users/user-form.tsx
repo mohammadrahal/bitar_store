@@ -62,8 +62,8 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
 
   return (
     <Drawer
-      eyebrow="Users"
-      title={isEdit ? 'Edit user' : 'New user'}
+      eyebrow="Employees"
+      title={isEdit ? 'Edit employee' : 'New employee'}
       description={
         isEdit
           ? 'The password is only changed when you fill it in.'
@@ -77,7 +77,7 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
             Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={pending || branchesLoading}>
-            {pending ? 'Saving…' : isEdit ? 'Save changes' : 'Create user'}
+            {pending ? 'Saving…' : isEdit ? 'Save changes' : 'Create employee'}
           </button>
         </>
       }

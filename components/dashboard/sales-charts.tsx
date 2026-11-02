@@ -1,19 +1,51 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useState } from 'react'
 import { ReceiptText } from 'lucide-react'
-import { BranchSalesChart } from '@/components/dashboard/branch-sales-chart'
-import { TopSellersChart } from '@/components/dashboard/top-sellers-chart'
 import { TopSellersTable } from '@/components/dashboard/top-sellers-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useSalesAnalytics } from '@/hooks/use-analytics'
+import { branchSalesChartHeight, topSellersChartHeight } from '@/lib/chart-geometry'
 import { formatNumber, formatPrice } from '@/lib/format'
 import type { BranchScope } from '@/types'
 
 type View = 'chart' | 'numbers'
+
+/**
+ * recharts is ~360 KB of the dashboard's JavaScript and nothing above the fold
+ * needs it, so both charts are split out and fetched once the figures arrive.
+ * They render from client state only, so there is nothing for SSR to produce.
+ * Each placeholder reserves the height its chart lays out to, so the panel does
+ * not jump when the module lands.
+ */
+const ChartPlaceholder = () => <div className="chart-placeholder skeleton" aria-hidden="true" />
+
+const TopSellersChart = dynamic(
+  () => import('@/components/dashboard/top-sellers-chart').then((mod) => ({ default: mod.TopSellersChart })),
+  { ssr: false, loading: ChartPlaceholder },
+)
+
+const BranchSalesChart = dynamic(
+  () => import('@/components/dashboard/branch-sales-chart').then((mod) => ({ default: mod.BranchSalesChart })),
+  { ssr: false, loading: ChartPlaceholder },
+)
+
+/**
+ * Holds the height the chart inside it will lay out to, so the placeholder and
+ * the chart occupy the same box and the panel does not jump when the module
+ * lands. The placeholder is absolutely positioned against this.
+ */
+function ChartSlot({ height, children }: { height: number; children: React.ReactNode }) {
+  return (
+    <div className="chart-slot" style={{ minHeight: height }}>
+      {children}
+    </div>
+  )
+}
 
 /**
  * Charts for what sells: top products, and how revenue sits across branches.
@@ -75,19 +107,27 @@ export function SalesCharts({
           data.documentCount === 1 ? 'sale' : 'sales'
         } on ${data.businessDate || 'the current business date'}.`}
         actions={
-          <div className="segmented compact">
-            <button type="button" className={view === 'chart' ? 'active' : ''} onClick={() => setView('chart')}>
-              Chart
-            </button>
-            <button type="button" className={view === 'numbers' ? 'active' : ''} onClick={() => setView('numbers')}>
-              Numbers
-            </button>
+          <div className="segmented compact" role="radiogroup" aria-label="Show best sellers as">
+            {(['chart', 'numbers'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={view === option}
+                className={view === option ? 'active' : ''}
+                onClick={() => setView(option)}
+              >
+                {option === 'chart' ? 'Chart' : 'Numbers'}
+              </button>
+            ))}
           </div>
         }
       >
         {view === 'chart' ? (
           <div className="panel-body">
-            <TopSellersChart analytics={data} />
+            <ChartSlot height={topSellersChartHeight(data.topProducts.length)}>
+              <TopSellersChart analytics={data} />
+            </ChartSlot>
           </div>
         ) : (
           <TopSellersTable analytics={data} />
@@ -97,7 +137,9 @@ export function SalesCharts({
       {showBranchChart && (
         <Panel title="Revenue by location" description={`${formatPrice(data.totalRevenue)} in total.`}>
           <div className="panel-body">
-            <BranchSalesChart analytics={data} />
+            <ChartSlot height={branchSalesChartHeight(data.byBranch.length)}>
+              <BranchSalesChart analytics={data} />
+            </ChartSlot>
           </div>
         </Panel>
       )}

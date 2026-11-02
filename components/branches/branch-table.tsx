@@ -8,6 +8,8 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
 import { useSetWarehouse, useWarehouseId } from '@/hooks/use-inventory'
 import { branchHref } from '@/lib/branch-slug'
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import { BRANCH_WRITES } from '@/services/branches.service'
 import type { Branch } from '@/types'
 
@@ -26,6 +28,7 @@ export function BranchTable({
 }) {
   const { data: warehouseId } = useWarehouseId()
   const setWarehouse = useSetWarehouse()
+  const { visible, page, pageCount, total, pageSize, setPage } = usePagination(branches)
 
   if (branches.length === 0) {
     return (
@@ -33,7 +36,7 @@ export function BranchTable({
         <EmptyState
           icon={Store}
           title="No branches yet"
-          description="Add your first branch, then assign staff to it from the Users screen."
+          description="Add your first branch, then assign staff to it from the Employees screen."
           action={
             <Can permission="settings.manage">
               <button type="button" className="btn btn-primary" onClick={onCreate}>
@@ -47,6 +50,7 @@ export function BranchTable({
   }
 
   return (
+    <>
     <div className="table-wrap">
       <table>
         <caption className="sr-only">Branches</caption>
@@ -61,7 +65,7 @@ export function BranchTable({
           </tr>
         </thead>
         <MotionTbody>
-          {branches.map((branch, index) => (
+          {visible.map((branch, index) => (
             <MotionTr key={branch.id} index={index}>
               <td>
                 <Link href={branchHref(branch)} className="link-cell">
@@ -130,5 +134,7 @@ export function BranchTable({
         </MotionTbody>
       </table>
     </div>
+    <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPage={setPage} />
+    </>
   )
 }
