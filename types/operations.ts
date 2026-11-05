@@ -1,17 +1,17 @@
 /**
  * The five numbers BL-02 tracks for a variant at a location, as far as the API
  * can report them. `GET /stock` answers with sellable, non-sellable and in
- * transit; reserved and on hold have no endpoint yet, so they are null and the
- * UI says "not available yet" instead of inventing a figure.
+ * transit. On hold mirrors non-sellable from the API. Reserved is draft transfer
+ * quantity at the sender (computed client-side until the API exposes it).
  */
 export interface Balances {
   /** Sellable plus non-sellable: everything physically there. */
   onHand: number
   /** Kept out of sale by the server: damaged, disputed or set aside. */
   nonSellable: number
-  /** Promised to an approved transfer. Null until the API returns it. */
+  /** Promised on draft transfers leaving this location. */
   reserved: number | null
-  /** Set aside by a hold. Null until the API returns it. */
+  /** Non-sellable units (damaged / on hold). */
   onHold: number | null
   /** Sellable now. */
   available: number
@@ -19,11 +19,22 @@ export interface Balances {
   inTransit: number
 }
 
-export type InventoryStatus = 'in_stock' | 'out' | 'on_hold' | 'in_transit' | 'archived'
+/**
+ * The one state a variant row leads with. `low` sits between `in_stock` and
+ * `out`: there is something on the shelf, but less than the location's minimum.
+ */
+export type InventoryStatus = 'in_stock' | 'low' | 'out' | 'on_hold' | 'in_transit' | 'archived'
 
-export type InventoryFilter = 'all' | 'out' | 'on_hold' | 'in_transit' | 'archived'
+export type InventoryFilter = 'all' | 'low' | 'out' | 'on_hold' | 'in_transit' | 'reserved' | 'archived'
 
 export interface InventoryRow extends Balances {
+  /**
+   * The highest minimum set for this variant across the locations in scope, or
+   * null where none is set or none could be read.
+   */
+  minQuantity: number | null
+  /** Under its minimum at one or more locations in scope. */
+  belowMinimum: boolean
   variantId: string
   productId: string
   productName: string

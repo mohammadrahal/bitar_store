@@ -1,5 +1,6 @@
 import { ApiError, loginWithApi } from '@/lib/api'
 import { bootstrapSession } from '@/services/session.service'
+import { warmWarehouseLink } from '@/services/warehouse-link.service'
 import type { User } from '@/types'
 
 export interface LoginInput {
@@ -18,6 +19,7 @@ export async function login(input: LoginInput): Promise<Session> {
   try {
     const { token } = await loginWithApi(input.email.trim().toLowerCase(), input.password)
     const user = await bootstrapSession(token)
+    warmWarehouseLink(user)
     return { token, user }
   } catch (error) {
     if (error instanceof ApiError && (error.status === 400 || error.status === 401)) {

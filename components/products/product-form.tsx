@@ -6,12 +6,14 @@ import { ProductDetailsFields } from '@/components/products/product-details-fiel
 import { Drawer } from '@/components/shared/drawer'
 import { useUpdateProduct } from '@/hooks/use-products'
 import { productDetailsSchema, type ProductDetailsFormValues } from '@/schemas/product.schema'
+import { useCurrentUser } from '@/store/user-store'
 import type { ProductWithVariants } from '@/types'
 
 function toFormValues(product: ProductWithVariants): ProductDetailsFormValues {
   return {
     name: product.name,
     category: product.category,
+    unitCost: product.unitCost ?? 0,
     sellPrice: product.sellPrice,
   }
 }
@@ -19,6 +21,7 @@ function toFormValues(product: ProductWithVariants): ProductDetailsFormValues {
 /** Edits a model's details. The code and existing variants never change. */
 export function ProductForm({ product, onClose }: { product: ProductWithVariants; onClose: () => void }) {
   const update = useUpdateProduct()
+  const showCost = useCurrentUser().canViewCosts
   const {
     register,
     handleSubmit,
@@ -55,6 +58,8 @@ export function ProductForm({ product, onClose }: { product: ProductWithVariants
         register={register}
         control={control}
         errors={errors}
+        showCost={showCost}
+        costHint="What you pay the supplier. Saved on this device until the catalog API stores cost."
         priceHint="A new price applies to every active SKU. To price one SKU, use its row on the model page."
       />
     </Drawer>

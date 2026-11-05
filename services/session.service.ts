@@ -1,6 +1,7 @@
 import { ApiError, fetchMe } from '@/lib/api'
+import { refreshApiCapabilities } from '@/lib/api/capabilities'
 import type { MeResponse, UserRole } from '@/lib/api'
-import { assignmentsFor, getUserAccess } from '@/lib/user-access'
+import { assignmentsFromBranchIds, getUserAccess, mirrorSessionBranchAccess } from '@/lib/user-access'
 import type { Role, User } from '@/types'
 
 /** Names typed in lower case ("admin", "rana haddad") read as proper names; mixed case is left alone. */
@@ -26,7 +27,8 @@ export function toApiRole(role: Role): UserRole {
 
 export function toSessionUser({ user, permissions, branchIds, canViewCosts }: MeResponse): User {
   const role = toRole(user.role)
-  const locations = assignmentsFor(user.id, branchIds)
+  mirrorSessionBranchAccess(user.id, branchIds)
+  const locations = assignmentsFromBranchIds(branchIds)
   return {
     id: user.id,
     name: displayName(user.fullName),
@@ -41,9 +43,30 @@ export function toSessionUser({ user, permissions, branchIds, canViewCosts }: Me
   }
 }
 
-/** Loads the access context for a token. Call after login and when restoring a session. */
-export async function bootstrapSession(token: string): Promise<User> {
+/* React runs mount effects twice in development, and the session is restored
+   from one. Concurrent callers share the request rather than sending
+   `GET /auth/me` once each. Cleared as soon as it settles, so this is
+   deduplication and not a cache: the next call still reads the server. */
+let inFlight: { token: string; promise: Promise<User> } | null = null
+
+async function readSession(token: string): Promise<User> {
   const me = await fetchMe(token)
   if (!me.user.isActive) throw new ApiError(401, 'This account has been deactivated.')
+  await refreshApiCapabilities(token, me.user.id)
   return toSessionUser(me)
+}
+
+/**
+ * Loads the access context for a token. Call after login and when restoring a
+ * session. Pass `fresh` right after writing to the account, so the read cannot
+ * be answered by a request that was already on its way.
+ */
+export function bootstrapSession(token: string, { fresh = false } = {}): Promise<User> {
+  if (!fresh && inFlight?.token === token) return inFlight.promise
+
+  const promise = readSession(token).finally(() => {
+    if (inFlight?.promise === promise) inFlight = null
+  })
+  inFlight = { token, promise }
+  return promise
 }

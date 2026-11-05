@@ -222,7 +222,7 @@ Both are UX only. The backend's `401` / `403` are what count.
 | `users.api.ts` | Accounts, passwords, branch access |
 | `branches.api.ts` | Locations, including the `branch` / `warehouse` kind |
 | `catalog.api.ts` | Styles, SKUs, prices, price history, barcodes, code lookup |
-| `stock.api.ts` | Stock list, opening stock, overview, movements |
+| `stock.api.ts` | Stock list, opening stock, overview, movements, adjustments |
 | `sales.api.ts` | Create and read till sales |
 | `reorder-levels.api.ts` | Minimum / target per SKU, replenishment suggestions |
 | `reports.api.ts` | Sales summary, top SKUs, audit events |
@@ -322,7 +322,8 @@ browser (`lib/user-access.ts`) because the backend has no endpoint for them yet
 | `/dashboard` | Network stat cards and today's takings, plus the sales charts | stock + sales reads |
 | `/branches`, `/branches/<code>` | Locations, create a branch or warehouse, one branch's figures and stock | branch + stock reads |
 | `/inventory`, `/inventory/<sku>` | Stock by variant with the five balances; one variant across locations | stock reads |
-| `/products`, `/products/new`, `/products/<id>` | Models, colours and sizes, per-SKU prices and barcodes, optional opening count on create | catalog + opening stock |
+| `/products`, `/products/new`, `/products/<id>` | Models, colours and sizes, per-SKU prices and barcodes. Creating one places no stock | catalog |
+| `/stock-receipts`, `/stock-receipts/new` | Supplier deliveries booked in, plus the server's correction log | stock adjustments |
 | `/sales/new` | The till: pick a model, size and colour, discount a line, take cash or Whish | sale create |
 | `/sales/b2c`, `/sales/<id>` | Today's sales and one sale | sale reads |
 | `/opening-stock` | First units at a location, SKU by SKU | stock movements + opening stock |
@@ -332,10 +333,16 @@ browser (`lib/user-access.ts`) because the backend has no endpoint for them yet
 Notes:
 
 - **Stock only moves through the backend.** Units arrive with an opening count
-  and leave with a till sale; the app has no local ledger.
+  or a received delivery and leave with a till sale; the app has no local ledger.
 - **Opening stock is per SKU, not per location.** A SKU that has never moved at
   a location can be opened there, which is how a model added later gets its
   first units at a location opened months ago.
+- **Creating a model places no stock.** It starts at zero everywhere; the model
+  page then offers the receipt form with its variants already listed. See
+  `ARCHITECTURE.md` section 10 for why the two are separate.
+- **Warehouse first.** Deliveries are received at the main warehouse and shops
+  are stocked from it by transfer, so a receipt defaults to the warehouse and a
+  posted receipt offers **Send to a branch** with From already filled in.
 - **A branch URL carries its store code** (`/branches/hamra`). An id still
   resolves, and the page rewrites the address.
 

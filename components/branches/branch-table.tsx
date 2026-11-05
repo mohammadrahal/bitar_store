@@ -6,8 +6,10 @@ import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ActiveStatusPill } from '@/components/shared/status-pill'
-import { useSetWarehouse, useWarehouseId } from '@/hooks/use-inventory'
+import { useSetWarehouse } from '@/hooks/use-inventory'
 import { branchHref } from '@/lib/branch-slug'
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import { BRANCH_WRITES } from '@/services/branches.service'
 import type { Branch } from '@/types'
 
@@ -24,8 +26,8 @@ export function BranchTable({
   onEdit: (branch: Branch) => void
   onDelete: (branch: Branch) => void
 }) {
-  const { data: warehouseId } = useWarehouseId()
   const setWarehouse = useSetWarehouse()
+  const { visible, page, pageCount, total, pageSize, setPage } = usePagination(branches)
 
   if (branches.length === 0) {
     return (
@@ -33,7 +35,7 @@ export function BranchTable({
         <EmptyState
           icon={Store}
           title="No branches yet"
-          description="Add your first branch, then assign staff to it from the Users screen."
+          description="Add your first branch, then assign staff to it from the Employees screen."
           action={
             <Can permission="settings.manage">
               <button type="button" className="btn btn-primary" onClick={onCreate}>
@@ -47,6 +49,7 @@ export function BranchTable({
   }
 
   return (
+    <>
     <div className="table-wrap">
       <table>
         <caption className="sr-only">Branches</caption>
@@ -54,6 +57,7 @@ export function BranchTable({
           <tr>
             <th scope="col">Branch</th>
             <th scope="col">Code</th>
+            <th scope="col">Role</th>
             <th scope="col">Status</th>
             <th scope="col">
               <span className="sr-only">Actions</span>
@@ -61,7 +65,7 @@ export function BranchTable({
           </tr>
         </thead>
         <MotionTbody>
-          {branches.map((branch, index) => (
+          {visible.map((branch, index) => (
             <MotionTr key={branch.id} index={index}>
               <td>
                 <Link href={branchHref(branch)} className="link-cell">
@@ -69,17 +73,13 @@ export function BranchTable({
                 </Link>
               </td>
               <td className="tabular-nums">{branch.code ?? branch.location}</td>
+              <td>{branch.kind === 'warehouse' ? 'Warehouse' : 'Branch'}</td>
               <td>
-                <span className="row-actions">
-                  <ActiveStatusPill isActive={branch.isActive} />
-                  {(branch.kind === 'warehouse' || branch.id === warehouseId) && (
-                    <span className="pill pill-accent">Warehouse</span>
-                  )}
-                </span>
+                <ActiveStatusPill isActive={branch.isActive} />
               </td>
               <td>
                 <div className="row-actions">
-                  {branch.kind !== 'warehouse' && branch.id !== warehouseId && (
+                  {branch.kind !== 'warehouse' && (
                     <Can permission="settings.manage">
                       <button
                         type="button"
@@ -110,15 +110,9 @@ export function BranchTable({
                       type="button"
                       className="icon-btn danger"
                       onClick={() => onDelete(branch)}
-                      disabled={!BRANCH_WRITES.deactivate || !branch.isActive}
-                      aria-label={`Mark ${branch.name} inactive`}
-                      title={
-                        !branch.isActive
-                          ? 'Already inactive'
-                          : BRANCH_WRITES.deactivate
-                            ? 'Mark inactive'
-                            : UNAVAILABLE
-                      }
+                      disabled={!BRANCH_WRITES.delete}
+                      aria-label={`Delete ${branch.name}`}
+                      title={BRANCH_WRITES.delete ? 'Delete branch' : UNAVAILABLE}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -130,5 +124,7 @@ export function BranchTable({
         </MotionTbody>
       </table>
     </div>
+    <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPage={setPage} />
+    </>
   )
 }

@@ -5,29 +5,47 @@ import { useEffect, useMemo, useState } from 'react'
 import { ReceiptText } from 'lucide-react'
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { MotionSwap } from '@/components/motion/motion-swap'
+import { receiptFromSale } from '@/components/sales/sale-receipt-build'
+import { printSaleReceipt } from '@/components/sales/sale-receipt-print'
 import { SearchInput } from '@/components/shared/search-input'
 import { Can } from '@/components/shared/can'
 import { ErrorState } from '@/components/shared/error-state'
 import { Field } from '@/components/shared/field'
+import { FilterChips, type ChipOption } from '@/components/shared/filter-chips'
 import { LocationSelect } from '@/components/shared/location-select'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
-import { usePermission } from '@/hooks/use-permission'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
+import { useBranches } from '@/hooks/use-branches'
+import { useDeletePendingSale, usePendingSales } from '@/hooks/use-pending-sales'
 import { useSalesList } from '@/hooks/use-sales'
+import { useCurrentUser } from '@/store/user-store'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
+import { pendingSaleTotal, type PendingSale } from '@/services/pending-sales.service'
 import type { Sale } from '@/services/sales.service'
 
 const PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 250
 
+type SaleFilter = 'all' | 'completed' | 'pending'
+
+const FILTER_OPTIONS: ChipOption<SaleFilter>[] = [
+  { value: 'all', label: 'All' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'pending', label: 'Pending sale' },
+]
+
 function saleUnits(sale: Sale) {
   return sale.lines.reduce((sum, line) => sum + line.quantity, 0)
 }
 
-function matchesSearch(sale: Sale, query: string) {
+function pendingUnits(sale: PendingSale) {
+  return sale.lines.reduce((sum, line) => sum + line.quantity, 0)
+}
+
+function matchesSearchSale(sale: Sale, query: string) {
   const haystack = [
     sale.reference,
     sale.note ?? '',
@@ -39,19 +57,27 @@ function matchesSearch(sale: Sale, query: string) {
   return haystack.includes(query)
 }
 
+function matchesSearchPending(sale: PendingSale, query: string) {
+  const haystack = [sale.note, ...sale.lines.map((line) => line.label)].join(' ').toLowerCase()
+  return haystack.includes(query)
+}
+
 export function B2cRetailSalesPanel({
   onCreate,
 }: {
   onCreate: () => void
 }) {
-  const { locationScoped } = usePermission()
-  const defaultBranchId = useDefaultBranchId()
-  const [branchChoice, setBranchChoice] = useState('')
+  const user = useCurrentUser()
+  const { data: branches } = useBranches()
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
   const [date, setDate] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const branchId = locationScoped ? defaultBranchId : branchChoice
+  const [saleFilter, setSaleFilter] = useState<SaleFilter>('all')
+  const branchName = branches?.find((branch) => branch.id === branchId)?.name
 
   useEffect(() => {
     if (searchInput === search) return
@@ -61,49 +87,102 @@ export function B2cRetailSalesPanel({
 
   useEffect(() => {
     setPage(1)
-  }, [search, date, branchId])
+  }, [search, date, branchId, saleFilter])
 
-  const listQuery = useSalesList(branchId, date || undefined)
-  const filtered = useMemo(() => {
+  const listQuery = useSalesList(branchId, date || undefined, saleFilter !== 'pending')
+  const pendingQuery = usePendingSales(branchId)
+  const removePending = useDeletePendingSale()
+
+  const completedSales = useMemo(() => {
+    if (saleFilter === 'pending') return []
     const sales = listQuery.data?.sales ?? []
     const query = search.trim().toLowerCase()
     if (!query) return sales
-    return sales.filter((sale) => matchesSearch(sale, query))
-  }, [listQuery.data?.sales, search])
+    return sales.filter((sale) => matchesSearchSale(sale, query))
+  }, [listQuery.data?.sales, search, saleFilter])
 
-  const total = filtered.length
+  const pendingSales = useMemo(() => {
+    if (saleFilter === 'completed') return []
+    const rows = pendingQuery.data ?? []
+    const query = search.trim().toLowerCase()
+    if (!query) return rows
+    return rows.filter((sale) => matchesSearchPending(sale, query))
+  }, [pendingQuery.data, search, saleFilter])
+
+  type Row =
+    | { kind: 'completed'; id: string; at: string; sale: Sale }
+    | { kind: 'pending'; id: string; at: string; pending: PendingSale }
+
+  const merged = useMemo(() => {
+    const rows: Row[] = [
+      ...completedSales.map((sale) => ({ kind: 'completed' as const, id: sale.id, at: sale.soldAt, sale })),
+      ...pendingSales.map((pending) => ({
+        kind: 'pending' as const,
+        id: pending.id,
+        at: pending.createdAt,
+        pending,
+      })),
+    ]
+    return rows.sort((a, b) => b.at.localeCompare(a.at))
+  }, [completedSales, pendingSales])
+
+  const total = merged.length
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  const isFiltered = search.trim() !== '' || date !== ''
+  const visible = merged.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const isFiltered = search.trim() !== '' || date !== '' || saleFilter !== 'all'
   const businessDate = listQuery.data?.businessDate
+  const loading = saleFilter === 'pending' ? pendingQuery.isPending : listQuery.isPending
+
+  const printPending = (pending: PendingSale) => {
+    printSaleReceipt({
+      reference: `PENDING-${pending.id.slice(0, 8).toUpperCase()}`,
+      status: 'pending',
+      soldAt: pending.createdAt,
+      sellerName: user.name,
+      branchName,
+      note: pending.note,
+      total: pendingSaleTotal(pending),
+      lines: pending.lines.map((line) => ({
+        label: line.label,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        lineTotal: line.quantity * line.unitPrice,
+      })),
+    })
+  }
 
   return (
     <Panel
       title="Retail sales"
       description={
-        listQuery.isPending
+        loading
           ? 'Loading…'
-          : businessDate
-            ? `${total} on ${businessDate}`
-            : `${total} ${total === 1 ? 'sale' : 'sales'}`
+          : saleFilter === 'pending'
+            ? `${total} pending sale${total === 1 ? '' : 's'} on this device`
+            : businessDate && saleFilter === 'completed'
+              ? `${total} on ${businessDate}`
+              : `${total} ${total === 1 ? 'sale' : 'sales'}`
       }
     >
       <div className="toolbar">
-        {!locationScoped && (
+        {allowPageBranchFilter && (
           <Field label="Branch" className="toolbar-field">
-            <LocationSelect value={branchChoice} onChange={setBranchChoice} onlyAccessible />
+            <LocationSelect value={pageBranchId} onChange={setPageBranchId} onlyAccessible />
           </Field>
         )}
-        <Field label="Business date" className="toolbar-field">
-          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-        </Field>
+        {saleFilter !== 'pending' && (
+          <Field label="Business date" className="toolbar-field">
+            <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          </Field>
+        )}
+        <FilterChips label="Show" options={FILTER_OPTIONS} value={saleFilter} onChange={setSaleFilter} />
         <Field label="Search" className="toolbar-field toolbar-field-grow">
           <SearchInput
             className="search-field--full"
             value={searchInput}
             onChange={setSearchInput}
-            placeholder="Reference, customer note or SKU"
+            placeholder="Reference, note or SKU"
             aria-label="Search sales"
           />
         </Field>
@@ -115,6 +194,7 @@ export function B2cRetailSalesPanel({
               setSearchInput('')
               setSearch('')
               setDate('')
+              setSaleFilter('all')
             }}
           >
             Clear filters
@@ -122,28 +202,28 @@ export function B2cRetailSalesPanel({
         )}
       </div>
 
-      <MotionSwap state={!branchId ? 'no-branch' : listQuery.isPending ? 'loading' : listQuery.isError ? 'error' : 'ready'}>
+      <MotionSwap state={!branchId ? 'no-branch' : loading ? 'loading' : listQuery.isError && saleFilter !== 'pending' ? 'error' : 'ready'}>
         {!branchId ? (
           <div className="panel-body">
             <EmptyState icon={ReceiptText} title="Pick a branch" description="Choose a location to see its till sales for the day." />
           </div>
-        ) : listQuery.isPending ? (
+        ) : loading ? (
           <div className="panel-body">
             <Skeleton rows={1} stats={0} />
           </div>
-        ) : listQuery.isError ? (
+        ) : listQuery.isError && saleFilter !== 'pending' ? (
           <div className="panel-body">
             <ErrorState title="Could not load sales" error={listQuery.error} onRetry={() => void listQuery.refetch()} />
           </div>
         ) : visible.length === 0 ? (
           <div className="panel-body">
             {isFiltered ? (
-              <EmptyState icon={ReceiptText} title="No sales match" description="Try another date or search term." />
+              <EmptyState icon={ReceiptText} title="No sales match" description="Try another filter or search term." />
             ) : (
               <EmptyState
                 icon={ReceiptText}
                 title="No retail sales yet"
-                description="Ring up a walk-in or till sale to remove units from branch stock."
+                description="Ring up a walk-in sale, or save the cart as a pending sale until the customer pays at the till."
                 action={
                   <Can permission="sales.create">
                     <button type="button" className="btn btn-primary" onClick={onCreate}>
@@ -158,10 +238,11 @@ export function B2cRetailSalesPanel({
           <>
             <div className="table-wrap">
               <table className="card-table">
-                <caption className="sr-only">Completed retail sales</caption>
+                <caption className="sr-only">Retail sales and pending till carts</caption>
                 <thead>
                   <tr>
                     <th scope="col">Reference</th>
+                    <th scope="col">Status</th>
                     <th scope="col">When</th>
                     <th scope="col">Seller</th>
                     <th scope="col" className="num">
@@ -170,21 +251,74 @@ export function B2cRetailSalesPanel({
                     <th scope="col" className="num">
                       Total
                     </th>
+                    <th scope="col">
+                      <span className="sr-only">Actions</span>
+                    </th>
                   </tr>
                 </thead>
-                <MotionTbody dataset={`${branchId}-${currentPage}`}>
-                  {visible.map((sale, index) => (
-                    <MotionTr key={sale.id} index={index}>
-                      <td className="card-title">
-                        <Link href={`/sales/${sale.id}`}>{sale.reference}</Link>
-                        {sale.note ? <small>{sale.note}</small> : null}
-                      </td>
-                      <td>{formatDocumentDate(sale.soldAt)}</td>
-                      <td>{sale.soldBy.name}</td>
-                      <td className="num tabular">{saleUnits(sale)}</td>
-                      <td className="num tabular">{formatPrice(Number(sale.total))}</td>
-                    </MotionTr>
-                  ))}
+                <MotionTbody dataset={`${branchId}-${currentPage}-${saleFilter}`}>
+                  {visible.map((row, index) =>
+                    row.kind === 'completed' ? (
+                      <MotionTr key={row.id} index={index}>
+                        <td className="card-title">
+                          <Link href={`/sales/${row.sale.id}`}>{row.sale.reference}</Link>
+                          {row.sale.note ? <small>{row.sale.note}</small> : null}
+                        </td>
+                        <td>
+                          <span className="pill pill-healthy">Completed</span>
+                        </td>
+                        <td>{formatDocumentDate(row.sale.soldAt)}</td>
+                        <td>{row.sale.soldBy.name}</td>
+                        <td className="num tabular">{saleUnits(row.sale)}</td>
+                        <td className="num tabular">{formatPrice(Number(row.sale.total))}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() =>
+                              printSaleReceipt({
+                                ...receiptFromSale(row.sale),
+                                branchName,
+                              })
+                            }
+                          >
+                            Print
+                          </button>
+                        </td>
+                      </MotionTr>
+                    ) : (
+                      <MotionTr key={row.id} index={index}>
+                        <td className="card-title">
+                          <span>Pending sale</span>
+                          {row.pending.note ? <small>{row.pending.note}</small> : null}
+                        </td>
+                        <td>
+                          <span className="pill pill-low">Pending</span>
+                        </td>
+                        <td>{formatDocumentDate(row.pending.createdAt)}</td>
+                        <td>{user.name}</td>
+                        <td className="num tabular">{pendingUnits(row.pending)}</td>
+                        <td className="num tabular">{formatPrice(pendingSaleTotal(row.pending))}</td>
+                        <td>
+                          <div className="row-actions">
+                            <Link href={`/sales/new?pending=${row.pending.id}`} className="btn btn-ghost btn-sm">
+                              Resume
+                            </Link>
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={() => printPending(row.pending)}>
+                              Print
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm danger"
+                              onClick={() => removePending.mutate({ id: row.pending.id, branchId: row.pending.branchId })}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </td>
+                      </MotionTr>
+                    ),
+                  )}
                 </MotionTbody>
               </table>
             </div>

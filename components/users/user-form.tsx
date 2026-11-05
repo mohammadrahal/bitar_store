@@ -4,15 +4,19 @@ import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
+import { FilterChips } from '@/components/shared/filter-chips'
 import { SelectInput } from '@/components/shared/select-input'
 import { LocationAssignmentsField } from '@/components/users/location-assignments-field'
+import { UserPermissionFields } from '@/components/users/user-permission-fields'
+import { isApiFeatureMissing } from '@/lib/api/capabilities'
 import { useBranches } from '@/hooks/use-branches'
 import { usePermission } from '@/hooks/use-permission'
-import { useCreateUser, useUpdateUser, useUserAccess } from '@/hooks/use-users'
+import { useBranchAccess, useCreateUser, useUpdateUser, useUserAccess } from '@/hooks/use-users'
+import { usePermissionDraft } from '@/hooks/use-user-permissions'
 import { ROLE_LABELS } from '@/lib/permissions'
 import type { StaffUser } from '@/services/users.service'
 import { emptyUserValues, toUserFormValues, userFormSchema, type UserFormValues } from '@/schemas/user.schema'
-import type { Role } from '@/types'
+import type { LocationAssignment, Role } from '@/types'
 
 /** Only a super admin may hand out the owner roles. */
 function roleOptions(mayChangeRoles: boolean) {
@@ -20,19 +24,42 @@ function roleOptions(mayChangeRoles: boolean) {
   return roles.map((value) => ({ value, label: ROLE_LABELS[value] }))
 }
 
+function managerLocations(branchIds: string[]): LocationAssignment[] {
+  return branchIds.map((locationId) => ({ locationId, access: 'full' }))
+}
+
 export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => void }) {
   const isEdit = Boolean(user)
-  const { user: currentUser, can } = usePermission()
+  const { user: currentUser, can, superAdmin } = usePermission()
   const mayChangeRoles = can('users.role.change')
   const isSelf = currentUser.id === user?.id
   const create = useCreateUser()
   const update = useUpdateUser()
   const { data: branches, isPending: branchesLoading } = useBranches()
   const { data: access } = useUserAccess(user?.id ?? '')
+  const remoteAccess = useBranchAccess(isEdit && user?.role === 'manager' ? user.id : '')
+  const accessReady =
+    !isEdit ||
+    user?.role !== 'manager' ||
+    isApiFeatureMissing('branchAccess') ||
+    remoteAccess.isFetched
+  const managerMode = remoteAccess.data?.mode ?? user?.branchAccessMode ?? 'selected'
+  const managerLocationsForForm = remoteAccess.data
+    ? managerMode === 'selected'
+      ? managerLocations(remoteAccess.data.branchIds)
+      : []
+    : (access?.locations ?? [])
 
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema(!isEdit)),
-    values: isEdit && user ? toUserFormValues(user, access?.locations ?? []) : undefined,
+    values:
+      isEdit && user && accessReady
+        ? toUserFormValues(
+            user,
+            user.role === 'manager' ? managerLocationsForForm : (access?.locations ?? []),
+            user.role === 'manager' ? managerMode : 'selected',
+          )
+        : undefined,
     defaultValues: emptyUserValues,
   })
 
@@ -43,7 +70,10 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
     formState: { errors },
   } = form
   const role = watch('role')
+  const draft = usePermissionDraft(role, user?.id)
   const pending = create.isPending || update.isPending
+  const permissionsApply = !isSelf && role !== 'super_admin'
+  const waitingOnPermissions = permissionsApply && !draft.ready && !draft.catalog.isError
 
   const submit = form.handleSubmit((values) => {
     const payload = {
@@ -51,7 +81,15 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
       fullName: values.fullName,
       role: values.role,
       password: values.password || undefined,
-      locations: values.role === 'employee' ? values.locations : [],
+      locations:
+        values.role === 'manager' && values.branchAccess === 'all'
+          ? []
+          : values.role === 'super_admin'
+            ? []
+            : values.locations,
+      branchAccess: values.role === 'manager' ? values.branchAccess : 'selected',
+      previousRole: user?.role,
+      permissionChanges: permissionsApply && draft.wanted ? draft.changes() : undefined,
     }
     if (isEdit && user) {
       update.mutate({ id: user.id, ...payload }, { onSuccess: onClose })
@@ -62,12 +100,12 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
 
   return (
     <Drawer
-      eyebrow="Users"
-      title={isEdit ? 'Edit user' : 'New user'}
+      eyebrow="Employees"
+      title={isEdit ? 'Edit employee' : 'New employee'}
       description={
         isEdit
           ? 'The password is only changed when you fill it in.'
-          : 'An employee works only at the locations you assign. Owners work everywhere.'
+          : 'Set a password now. They cannot sign in until it is saved.'
       }
       onClose={onClose}
       onSubmit={submit}
@@ -76,8 +114,8 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
           <button type="button" className="btn btn-secondary" onClick={onClose} disabled={pending}>
             Cancel
           </button>
-          <button type="submit" className="btn btn-primary" disabled={pending || branchesLoading}>
-            {pending ? 'Saving…' : isEdit ? 'Save changes' : 'Create user'}
+          <button type="submit" className="btn btn-primary" disabled={pending || branchesLoading || !accessReady || waitingOnPermissions}>
+            {pending ? 'Saving…' : isEdit ? 'Save changes' : 'Create employee'}
           </button>
         </>
       }
@@ -99,7 +137,7 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
         </Field>
 
         {isSelf ? (
-          <p className="full text-sm text-muted-foreground">You cannot change your own role or locations.</p>
+          <p className="full text-sm text-muted-foreground">You cannot change your own role, branches, or permissions.</p>
         ) : (
           <>
             <Controller
@@ -109,7 +147,7 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
                 <Field
                   label="Role"
                   error={errors.role?.message}
-                  hint={mayChangeRoles ? undefined : 'Only a super admin can create managers or super admins.'}
+                  hint={mayChangeRoles ? undefined : 'Only an admin can create managers or admins.'}
                   className="full"
                 >
                   <SelectInput
@@ -121,7 +159,33 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
                 </Field>
               )}
             />
-            {role === 'employee' && (
+
+            {superAdmin && role === 'manager' && !isApiFeatureMissing('branchAccess') && (
+              <Controller
+                control={control}
+                name="branchAccess"
+                render={({ field }) => (
+                  <div className="field full">
+                    <p className="eyebrow">Branch access</p>
+                    <FilterChips
+                      label="Branch access"
+                      options={[
+                        { value: 'all', label: 'All branches' },
+                        { value: 'selected', label: 'Selected branches' },
+                      ]}
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                    <p className="field-hint">
+                      All branches covers every shop, including ones opened later. It does not include the warehouse.
+                      Choose selected branches and tick the warehouse if this manager should send stock.
+                    </p>
+                  </div>
+                )}
+              />
+            )}
+
+            {(role === 'employee' || (role === 'manager' && watch('branchAccess') === 'selected')) && (
               <Controller
                 control={control}
                 name="locations"
@@ -132,8 +196,18 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
                     onChange={field.onChange}
                     disabled={branchesLoading}
                     error={errors.locations?.message}
+                    showAccess={role === 'employee'}
                   />
                 )}
+              />
+            )}
+
+            {permissionsApply && !isApiFeatureMissing('permissions') && (
+              <UserPermissionFields
+                role={role}
+                wanted={draft.wanted}
+                disabled={pending}
+                onChange={(key, allowed) => draft.setWanted((current) => ({ ...(current ?? {}), [key]: allowed }))}
               />
             )}
           </>

@@ -5,17 +5,19 @@ import { toast } from 'sonner'
 import { usePermission } from '@/hooks/use-permission'
 import { ApiError } from '@/lib/api'
 import { branchHref } from '@/lib/branch-slug'
+import { invalidateStockQueries } from '@/lib/invalidate-stock'
 import { queryKeys } from '@/lib/query-keys'
 import type { UpdateBranchInput } from '@/lib/api'
 import {
   createBranch,
   deactivateBranch,
+  deleteBranch,
   getBranch,
   listBranches,
   updateBranch,
   type BranchInput,
 } from '@/services/branches.service'
-import { ALL_BRANCHES, type BranchScope } from '@/types'
+import { ALL_BRANCHES, type Branch, type BranchScope } from '@/types'
 
 /** The branches the current user is allowed to see at all. */
 export function useBranchAccessScope(): BranchScope {
@@ -28,6 +30,7 @@ export function useBranches() {
   return useQuery({
     queryKey: queryKeys.branches.list(scope),
     queryFn: () => listBranches(scope),
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -57,7 +60,8 @@ function useBranchMutationCallbacks() {
   return {
     invalidate: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.branches.all })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stock.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.locations.warehouse() })
+      invalidateStockQueries(queryClient)
     },
     reportError: (error: Error) => toast.error(error.message),
   }
@@ -81,11 +85,15 @@ export function useCreateBranch() {
 }
 
 export function useUpdateBranch() {
+  const queryClient = useQueryClient()
   const { invalidate, reportError } = useBranchMutationCallbacks()
   return useMutation({
     mutationFn: ({ id, changes }: { id: string; changes: UpdateBranchInput }) =>
       updateBranch(id, changes),
     onSuccess: (branch) => {
+      queryClient.setQueriesData<Branch[]>({ queryKey: queryKeys.branches.all }, (previous) =>
+        previous?.map((candidate) => (candidate.id === branch.id ? branch : candidate)),
+      )
       invalidate()
       toast.success(`${branch.name} updated`)
     },
@@ -105,6 +113,19 @@ export function useDeactivateBranch() {
   })
 }
 
-/** @deprecated Use useDeactivateBranch — branches are not hard-deleted. */
-export const useDeleteBranch = useDeactivateBranch
+export function useDeleteBranch() {
+  const queryClient = useQueryClient()
+  const { invalidate, reportError } = useBranchMutationCallbacks()
+  return useMutation({
+    mutationFn: ({ id }: { id: string; name: string }) => deleteBranch(id),
+    onSuccess: (_result, { id, name }) => {
+      queryClient.setQueriesData<Branch[]>({ queryKey: queryKeys.branches.all }, (previous) =>
+        previous?.filter((candidate) => candidate.id !== id),
+      )
+      invalidate()
+      toast.success(`${name} deleted`)
+    },
+    onError: reportError,
+  })
+}
 

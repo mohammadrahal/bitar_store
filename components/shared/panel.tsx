@@ -9,18 +9,22 @@ export function Panel({
   actions,
   children,
   className,
+  headingLevel = 2,
 }: {
   title: string
   description?: string
   actions?: React.ReactNode
   children: React.ReactNode
   className?: string
+  /** 3 when the panel sits under a section heading of its own. */
+  headingLevel?: 2 | 3
 }) {
+  const Heading = headingLevel === 3 ? 'h3' : 'h2'
   return (
     <motion.section className={`panel ${className ?? ''}`} {...useFadeInProps(0.1)}>
       <div className="panel-heading">
         <div>
-          <h2>{title}</h2>
+          <Heading>{title}</Heading>
           {description && <p>{description}</p>}
         </div>
         {actions}

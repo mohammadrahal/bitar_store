@@ -1,34 +1,57 @@
+import { formatNumber } from '@/lib/format'
 import type { InventoryRow, InventoryStatus } from '@/types'
 
 const TONES: Record<InventoryStatus, string> = {
-  in_stock: 'pill-healthy',
+  in_stock: 'pill-in-stock',
+  low: 'pill-low',
   out: 'pill-out',
   on_hold: 'pill-hold',
   in_transit: 'pill-transit',
   archived: 'pill-archived',
 }
 
-function labelFor(row: Pick<InventoryRow, 'status' | 'nonSellable' | 'inTransit'>) {
+const LABELS: Record<InventoryStatus, string> = {
+  in_stock: 'In stock',
+  low: 'Low',
+  out: 'Out',
+  on_hold: 'On hold',
+  in_transit: 'In transit',
+  archived: 'Archived',
+}
+
+type BadgeRow = Pick<InventoryRow, 'status' | 'nonSellable' | 'inTransit'> &
+  Partial<Pick<InventoryRow, 'available' | 'minQuantity' | 'reserved' | 'onHold'>>
+
+/**
+ * The chip carries the word as well as the colour, so the state survives a
+ * monochrome print and colour blindness. The figures behind it go in the title
+ * rather than the label: the label has to stay the same width in every row for
+ * a column of them to be scannable.
+ */
+function detailFor(row: BadgeRow): string | undefined {
   switch (row.status) {
-    case 'in_stock':
-      return 'In stock'
-    case 'out':
-      return 'Out of stock'
+    case 'low':
+      return row.minQuantity != null && row.available != null
+        ? `${formatNumber(row.available)} available, minimum ${formatNumber(row.minQuantity)}`
+        : undefined
     case 'on_hold':
-      return `${row.nonSellable} non-sellable`
+      return `${formatNumber(row.onHold ?? row.nonSellable)} on hold`
     case 'in_transit':
-      return `${row.inTransit} in transit`
-    case 'archived':
-      return 'Archived'
+      return `${formatNumber(row.inTransit)} on the way`
+    default:
+      return undefined
   }
 }
 
 /** The one status a variant row leads with; the five numbers sit beside it. */
-export function StockBadge({ row }: { row: Pick<InventoryRow, 'status' | 'nonSellable' | 'inTransit'> }) {
+export function StockBadge({ row }: { row: BadgeRow }) {
+  const detail = detailFor(row)
+  const label = LABELS[row.status]
   return (
-    <span className={`pill ${TONES[row.status]}`}>
+    <span className={`pill ${TONES[row.status]}`} title={detail}>
       <span className="pill-dot" aria-hidden="true" />
-      {labelFor(row)}
+      {label}
+      {detail && <span className="sr-only">. {detail}</span>}
     </span>
   )
 }

@@ -1,5 +1,6 @@
-import { getApiClient } from '@/lib/api'
-import type { ApiUser } from '@/lib/api'
+import { ApiError, getApiClient } from '@/lib/api'
+import { apiFeatureHint, isApiFeatureMissing, noteMissingApiFeature } from '@/lib/api/capabilities'
+import type { ApiBranchAccess, ApiUser } from '@/lib/api'
 import { DEFAULT_EMPLOYEE_PERMISSIONS, PLATFORM_SCOPE, splitByScope } from '@/lib/permission-keys'
 import {
   assignmentsFor,
@@ -17,6 +18,10 @@ import type { LocationAssignment, Role } from '@/types'
 export interface StaffUser extends Omit<ApiUser, 'role'> {
   role: Role
   locations: LocationAssignment[]
+  /** Branch ids this person may use. Managers appointed to every branch leave this empty. */
+  branchIds: string[]
+  /** Set for managers. `all` includes shops opened later and never the warehouse. */
+  branchAccessMode?: 'all' | 'selected'
 }
 
 export interface SaveUserInput {
@@ -26,23 +31,53 @@ export interface SaveUserInput {
   /** Required on create; blank on edit keeps the current one. */
   password?: string
   locations: LocationAssignment[]
+  /** Managers only. Employees are always `selected`. */
+  branchAccess?: 'all' | 'selected'
+  /** Role before this save, so leaving "all branches" happens while they are still a manager. */
+  previousRole?: Role
+  /** Keys whose allowed state differs from what is already saved. */
+  permissionChanges?: Record<string, boolean>
 }
 
-function toStaffUser(user: ApiUser): StaffUser {
-  return { ...user, role: toRole(user.role), locations: assignmentsFor(user.id, []) }
+function toStaffUser(user: ApiUser, branchIds: string[] = [], branchAccessMode?: 'all' | 'selected'): StaffUser {
+  return { ...user, role: toRole(user.role), locations: assignmentsFor(user.id, branchIds), branchIds, branchAccessMode }
+}
+
+function staffUserFromLocal(user: ApiUser): StaffUser {
+  const role = toRole(user.role)
+  if (role === 'super_admin') return toStaffUser(user, [])
+
+  const stored = getUserAccess(user.id)
+  if (role === 'manager') {
+    const mode = stored.branchAccessMode ?? 'selected'
+    if (mode === 'all') return toStaffUser(user, [], 'all')
+    const branchIds = stored.locations.map((entry) => entry.locationId)
+    return toStaffUser(user, branchIds, 'selected')
+  }
+
+  const branchIds = stored.locations.map((entry) => entry.locationId)
+  return toStaffUser(user, branchIds)
+}
+
+/** Keeps the employee list in sync after `GET /users/:id/branch-access` (edit form only). */
+export function mirrorManagerBranchAccess(userId: string, access: ApiBranchAccess) {
+  const current = getUserAccess(userId)
+  setUserAccess(userId, {
+    ...current,
+    branchAccessMode: access.mode,
+    locations:
+      access.mode === 'all'
+        ? []
+        : access.branchIds.map((locationId) => ({ locationId, access: 'full' as const })),
+  })
 }
 
 export async function listUsers(): Promise<StaffUser[]> {
   const users = await getApiClient().listUsers()
-  return users.map(toStaffUser)
+  return users.map(staffUserFromLocal)
 }
 
-/**
- * The API has no endpoint that lists a user's locations, so the assignments
- * picked here are remembered in this browser: to prefill the form, to know
- * which grant to revoke when one is removed, and to hold the access level and
- * per-location keys the API cannot store yet.
- */
+/** Branch grants for one user from the server; view-only level is still local-only. */
 async function syncLocations(userId: string, role: Role, locations: LocationAssignment[]) {
   const api = getApiClient()
   const previous = getUserAccess(userId).locations
@@ -71,6 +106,73 @@ async function syncLocations(userId: string, role: Role, locations: LocationAssi
     grants[entry.locationId] = kept[entry.locationId] ?? [...defaults.perLocation]
   }
   setUserAccess(userId, { locations: wanted, grants })
+  await loadUserAccess(userId)
+}
+
+/** Branch access for one user in this browser (updated when an admin grants or revokes). */
+export async function loadUserAccess(userId: string): Promise<StoredUserAccess> {
+  return getUserAccess(userId)
+}
+
+async function syncSelectedBranches(userId: string, wantedIds: string[]) {
+  const api = getApiClient()
+  let current: string[] = []
+  try {
+    current = (await api.getBranchAccess(userId)).branchIds
+  } catch {
+    current = getUserAccess(userId).locations.map((entry) => entry.locationId)
+  }
+  for (const id of current) {
+    if (!wantedIds.includes(id)) await api.revokeBranchAccess(userId, id)
+  }
+  for (const id of wantedIds) {
+    if (!current.includes(id)) await api.grantBranchAccess(userId, id)
+  }
+  const kept = getUserAccess(userId).grants
+  setUserAccess(userId, {
+    locations: wantedIds.map((locationId) => ({ locationId, access: 'full' as const })),
+    grants: kept,
+    branchAccessMode: 'selected',
+  })
+}
+
+async function applyBranchAccess(id: string, input: SaveUserInput) {
+  const api = getApiClient()
+  const mode = input.branchAccess ?? 'selected'
+  const branchAccessApi = !isApiFeatureMissing('branchAccess')
+  if (branchAccessApi && input.previousRole === 'manager' && input.role === 'employee') {
+    try {
+      await api.setBranchAccess(id, 'selected')
+    } catch (error) {
+      noteMissingApiFeature(error, 'branchAccess')
+    }
+  }
+  if (input.role === 'manager' && branchAccessApi) {
+    try {
+      await api.setBranchAccess(id, mode)
+    } catch (error) {
+      noteMissingApiFeature(error, 'branchAccess')
+    }
+    if (mode === 'all') {
+      const kept = getUserAccess(id).grants
+      setUserAccess(id, { locations: [], grants: kept, branchAccessMode: 'all' })
+    } else {
+      await syncSelectedBranches(id, input.locations.map((entry) => entry.locationId))
+    }
+    return
+  }
+  if (input.role === 'employee') await syncLocations(id, input.role, input.locations)
+}
+
+async function applyPermissionChanges(id: string, changes: Record<string, boolean> | undefined) {
+  if (!changes || Object.keys(changes).length === 0) return
+  if (isApiFeatureMissing('permissions')) return
+  try {
+    await getApiClient().setUserPermissions(id, changes)
+  } catch (error) {
+    noteMissingApiFeature(error, 'permissions')
+    if (error instanceof ApiError && error.status !== 404) throw error
+  }
 }
 
 export async function createUser(input: SaveUserInput): Promise<StaffUser> {
@@ -81,14 +183,28 @@ export async function createUser(input: SaveUserInput): Promise<StaffUser> {
     role: toApiRole(input.role),
   })
   if (input.password) await api.setPassword(user.id, input.password)
-  await syncLocations(user.id, input.role, input.locations)
-  return toStaffUser(user)
+  await applyBranchAccess(user.id, input)
+  await applyPermissionChanges(user.id, input.permissionChanges)
+  const branchIds =
+    input.role === 'manager' && input.branchAccess === 'all'
+      ? []
+      : input.role === 'super_admin'
+        ? []
+        : input.locations.map((entry) => entry.locationId)
+  return toStaffUser(user, branchIds, input.role === 'manager' ? (input.branchAccess ?? 'selected') : undefined)
 }
 
 export async function updateUser(id: string, input: SaveUserInput): Promise<StaffUser> {
   const api = getApiClient()
   const isSelf = useUserStore.getState().user?.id === id
-  /* Nobody edits their own role. */
+  /* Leave "all branches" while they are still a manager. An employee cannot be appointed to all. */
+  if (!isSelf && !isApiFeatureMissing('branchAccess') && input.previousRole === 'manager' && input.role !== 'manager') {
+    try {
+      await api.setBranchAccess(id, 'selected')
+    } catch (error) {
+      noteMissingApiFeature(error, 'branchAccess')
+    }
+  }
   const user = await api.updateUser(
     id,
     isSelf
@@ -96,15 +212,76 @@ export async function updateUser(id: string, input: SaveUserInput): Promise<Staf
       : { email: input.email, fullName: input.fullName, role: toApiRole(input.role) },
   )
   if (input.password) await api.setPassword(id, input.password)
-  if (!isSelf) await syncLocations(id, input.role, input.locations)
-  return toStaffUser(user)
+  if (!isSelf && input.role === 'manager' && !isApiFeatureMissing('branchAccess')) {
+    const mode = input.branchAccess ?? 'selected'
+    try {
+      await api.setBranchAccess(id, mode)
+    } catch (error) {
+      noteMissingApiFeature(error, 'branchAccess')
+    }
+    if (mode === 'all') {
+      const kept = getUserAccess(id).grants
+      setUserAccess(id, { locations: [], grants: kept, branchAccessMode: 'all' })
+    } else {
+      await syncSelectedBranches(id, input.locations.map((entry) => entry.locationId))
+    }
+  } else if (!isSelf && input.role === 'employee') {
+    await syncLocations(id, input.role, input.locations)
+  }
+  if (!isSelf) await applyPermissionChanges(id, input.permissionChanges)
+  const branchIds =
+    input.role === 'manager' && (input.branchAccess ?? 'selected') === 'all'
+      ? []
+      : input.role === 'super_admin'
+        ? []
+        : input.role === 'employee'
+          ? (await loadUserAccess(id)).locations.map((entry) => entry.locationId)
+          : input.locations.map((entry) => entry.locationId)
+  return toStaffUser(user, branchIds, input.role === 'manager' ? (input.branchAccess ?? 'selected') : undefined)
 }
 
-/**
- * Accounts are never removed: history has to keep pointing at whoever rang up
- * a sale. Deactivating blocks sign-in and keeps the record, and the stored
- * access stays put so reactivating restores the same locations.
- */
+export async function deleteUserAccount(id: string): Promise<void> {
+  await getApiClient().deleteUser(id)
+  forgetUserAccess(id)
+}
+
+export async function getBranchAccess(userId: string): Promise<ApiBranchAccess | null> {
+  if (isApiFeatureMissing('branchAccess')) return null
+  try {
+    const access = await getApiClient().getBranchAccess(userId)
+    mirrorManagerBranchAccess(userId, access)
+    return access
+  } catch (error) {
+    noteMissingApiFeature(error, 'branchAccess')
+    if (error instanceof ApiError && error.status === 404) return null
+    throw error
+  }
+}
+
+export async function getPermissionCatalog() {
+  if (isApiFeatureMissing('permissions')) {
+    throw new Error(apiFeatureHint('permissions'))
+  }
+  try {
+    return await getApiClient().getPermissionCatalog()
+  } catch (error) {
+    noteMissingApiFeature(error, 'permissions')
+    throw error
+  }
+}
+
+export async function getUserPermissions(userId: string) {
+  if (isApiFeatureMissing('permissions')) {
+    throw new Error(apiFeatureHint('permissions'))
+  }
+  return getApiClient().getUserPermissions(userId)
+}
+
+export async function setUserPermissions(userId: string, permissions: Record<string, boolean>) {
+  return getApiClient().setUserPermissions(userId, permissions)
+}
+
+/** Deactivating blocks sign-in and can be turned back on. The stored access stays. */
 export async function setUserActive(id: string, isActive: boolean): Promise<StaffUser> {
   return toStaffUser(await getApiClient().updateUser(id, { isActive }))
 }
@@ -124,8 +301,6 @@ export function getUserGrants(userId: string): Record<string, string[]> {
 
 export async function saveUserGrants(userId: string, grants: Record<string, string[]>): Promise<void> {
   for (const [scope, keys] of Object.entries(grants)) setGrants(userId, scope, keys)
-  /* Keys live in this browser until the API can store them; nothing to call. */
-  return Promise.resolve()
 }
 
 /**

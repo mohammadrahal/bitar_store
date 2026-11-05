@@ -28,8 +28,10 @@ const PAGE_SIZE = 12
 
 const FILTERS: ChipOption<InventoryFilter>[] = [
   { value: 'all', label: 'All' },
+  { value: 'low', label: 'Low stock' },
   { value: 'out', label: 'Out of stock' },
-  { value: 'on_hold', label: 'Non-sellable' },
+  { value: 'on_hold', label: 'On hold' },
+  { value: 'reserved', label: 'Reserved' },
   { value: 'in_transit', label: 'In transit' },
   { value: 'archived', label: 'Archived' },
 ]
@@ -70,7 +72,7 @@ function exportRows(rows: InventoryRow[]) {
 export function InventoryView() {
   const scope = useBranchScope()
   const searchParams = useSearchParams()
-  const [searchInput, setSearchInput] = useState('')
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('search') ?? '')
   const search = useDebouncedValue(searchInput)
   const [filter, setFilter] = useState<InventoryFilter>(() => parseInventoryFilter(searchParams.get('filter')))
   const [page, setPage] = useState(1)
@@ -78,6 +80,8 @@ export function InventoryView() {
 
   useEffect(() => {
     setFilter(parseInventoryFilter(searchParams.get('filter')))
+    const fromUrl = searchParams.get('search')
+    if (fromUrl !== null) setSearchInput(fromUrl)
     setPage(1)
   }, [searchParams])
 
@@ -88,7 +92,7 @@ export function InventoryView() {
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
   const visible = rows?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE) ?? []
-  const selected = selectedId ?? visible[0]?.variantId ?? null
+  const highlightedId = selectedId ?? visible[0]?.variantId ?? null
   const filtered = filter !== 'all' || search.trim() !== ''
 
   return (
@@ -141,14 +145,14 @@ export function InventoryView() {
                   rows={visible}
                   dataset={`${scope}-${currentPage}`}
                   totals={totals}
-                  selectedId={selected}
+                  selectedId={highlightedId}
                   onSelect={(row) => setSelectedId(row.variantId)}
                   filtered={filtered}
                 />
                 <Pagination page={currentPage} pageCount={pageCount} total={total} pageSize={PAGE_SIZE} onPage={setPage} />
               </Panel>
               <aside className="split-aside" aria-label="Selected variant">
-                {selected && <SelectedVariantCard variantId={selected} />}
+                {selectedId && <SelectedVariantCard variantId={selectedId} />}
               </aside>
             </div>
           </div>

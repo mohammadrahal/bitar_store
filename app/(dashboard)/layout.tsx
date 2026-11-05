@@ -1,3 +1,4 @@
+import { CatalogPrefetch } from '@/components/shared/catalog-prefetch'
 import { ActiveLocationGate } from '@/components/shared/active-location-gate'
 import { AppShell } from '@/components/dashboard/app-shell'
 import { AuthGate } from '@/components/shared/auth-gate'
@@ -8,6 +9,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <HydrationGate>
       <AuthGate>
+        <CatalogPrefetch />
         <AppShell>
           <ActiveLocationGate>
             <BranchGuard>{children}</BranchGuard>

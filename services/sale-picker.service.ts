@@ -1,11 +1,11 @@
 import { syncCatalog } from '@/services/catalog-sync.service'
-import { branchSellableMapForStyle } from '@/services/stock-api.service'
+import { branchSellableMapForStyle, listBranchStockFromApi } from '@/services/stock-api.service'
 import { isRetired, readDb } from '@/mocks/store'
 import type { SaleModelOption, VariantOption } from '@/types'
 
 /** Active styles for the till model row — from the API catalog, not a variant page slice. */
 export async function listSaleModels(search: string, limit = 24): Promise<SaleModelOption[]> {
-  await syncCatalog()
+  if (!readDb().catalogSynced) await syncCatalog()
   const term = search.trim().toLowerCase()
   const db = readDb()
 
@@ -29,16 +29,30 @@ export async function listSaleModels(search: string, limit = 24): Promise<SaleMo
       productId: product.id,
       productCode: product.code,
       productName: product.name,
+      variantCount: db.variants.filter((variant) => variant.productId === product.id && !isRetired(db, variant)).length,
     }))
 }
 
 /** Every sellable SKU on a style at this branch, with sellable counts from the API. */
 export async function listSaleVariants(branchId: string, productId: string): Promise<VariantOption[]> {
-  await syncCatalog()
+  if (!readDb().catalogSynced) await syncCatalog()
   const sellable = await branchSellableMapForStyle(branchId, productId)
   const db = readDb()
   const product = db.products.find((candidate) => candidate.id === productId)
   if (!product || product.archived) return []
+
+  const resolveAvailable = (variant: (typeof db.variants)[number]) => {
+    const byId = sellable.bySkuId.get(variant.id)
+    if (byId !== undefined) return byId
+    const byCode = sellable.bySkuCode.get(variant.sku)
+    if (byCode !== undefined) return byCode
+    /* Same style may be keyed by API style id while the mirror still holds an older product id. */
+    for (const [skuId, qty] of sellable.bySkuId) {
+      const mirrored = db.variants.find((row) => row.id === skuId)
+      if (mirrored?.sku === variant.sku) return qty
+    }
+    return 0
+  }
 
   return db.variants
     .filter((variant) => variant.productId === productId && !isRetired(db, variant))
@@ -52,10 +66,64 @@ export async function listSaleVariants(branchId: string, productId: string): Pro
       size: variant.size,
       color: variant.color,
       sellPrice: variant.sellPrice,
-      available:
-        sellable.bySkuId.get(variant.id) ??
-        sellable.bySkuCode.get(variant.sku) ??
-        0,
+      available: resolveAvailable(variant),
+    }))
+    .sort((a, b) => a.color.localeCompare(b.color) || a.size.localeCompare(b.size) || a.sku.localeCompare(b.sku))
+}
+
+/** Models that currently hold stock at one branch (`GET /stock`), not the whole catalog. */
+export async function listSaleModelsAtBranch(
+  branchId: string,
+  search: string,
+  limit = 500,
+): Promise<SaleModelOption[]> {
+  const rows = await listBranchStockFromApi(branchId, search)
+  const db = readDb()
+  const byProduct = new Map<string, SaleModelOption & { count: number }>()
+
+  for (const row of rows) {
+    const product = db.products.find((candidate) => candidate.id === row.productId)
+    if (product?.archived) continue
+    const existing = byProduct.get(row.productId)
+    if (existing) {
+      existing.count += 1
+      existing.variantCount = existing.count
+      continue
+    }
+    byProduct.set(row.productId, {
+      productId: row.productId,
+      productCode: product?.code ?? row.sku.split('-')[0] ?? '—',
+      productName: row.productName,
+      variantCount: 1,
+      count: 1,
+    })
+  }
+
+  return [...byProduct.values()]
+    .map(({ count: _count, ...option }) => option)
+    .sort((a, b) => a.productName.localeCompare(b.productName) || a.productCode.localeCompare(b.productCode))
+    .slice(0, limit)
+}
+
+/** SKUs with on-hand stock at this branch for one model. */
+export async function listSaleVariantsAtBranch(branchId: string, productId: string): Promise<VariantOption[]> {
+  const rows = await listBranchStockFromApi(branchId, '')
+  const db = readDb()
+  const product = db.products.find((candidate) => candidate.id === productId)
+
+  return rows
+    .filter((row) => row.productId === productId)
+    .map((row) => ({
+      variantId: row.variantId,
+      sku: row.sku,
+      barcode: row.barcode,
+      productId: row.productId,
+      productName: row.productName,
+      productCode: product?.code ?? '',
+      size: row.size,
+      color: row.color,
+      sellPrice: row.sellPrice,
+      available: row.available,
     }))
     .sort((a, b) => a.color.localeCompare(b.color) || a.size.localeCompare(b.size) || a.sku.localeCompare(b.sku))
 }

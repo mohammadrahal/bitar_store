@@ -30,11 +30,7 @@ export function normalizeStockItem(raw: unknown): ApiStockItem | null {
   }
 }
 
-/**
- * `GET /stock/movements` rows, reduced to the SKU ids they name. The payload
- * is not in the API document yet, so every shape the server might use for the
- * id is accepted; `rows` is the page size, which is what paging reads.
- */
+/** `GET /stock/movements` rows, reduced to the SKU ids they name. */
 export function parseMovementSkuIds(payload: unknown): { rows: number; skuIds: string[] } {
   const list = Array.isArray(payload)
     ? payload

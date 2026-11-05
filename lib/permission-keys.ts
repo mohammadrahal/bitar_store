@@ -39,6 +39,10 @@ export const MANAGER_PERMISSIONS = [
   'users.manage',
   'reports.view_all',
   'opening_stock.post',
+  /* `POST /stock/adjustments` is the only way to change a balance once a SKU
+     has been opened, and it writes a note into the audit log under the caller's
+     name. That is a correction, which this tier already reserves. */
+  'stock.adjust',
 ] as const
 
 export const SUPER_ADMIN_PERMISSIONS = ['settings.manage', 'users.deactivate', 'users.role.change'] as const

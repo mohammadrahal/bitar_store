@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { UserForm } from '@/components/users/user-form'
 import { UserPermissionsForm } from '@/components/users/user-permissions-form'
@@ -9,10 +9,11 @@ import { MotionSwap } from '@/components/motion/motion-swap'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
+import { LocationSelect } from '@/components/shared/location-select'
 import { Panel } from '@/components/shared/panel'
-import { PreviewBadge } from '@/components/shared/preview-badge'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useSetUserActive, useUsers } from '@/hooks/use-users'
+import { useBranches } from '@/hooks/use-branches'
+import { useDeleteUser, useSetUserActive, useUsers } from '@/hooks/use-users'
 import { isOnlyActiveSuperAdmin, type StaffUser } from '@/services/users.service'
 import { useCurrentUser } from '@/store/user-store'
 
@@ -21,13 +22,23 @@ type Dialog =
   | { kind: 'edit'; user: StaffUser }
   | { kind: 'permissions'; user: StaffUser }
   | { kind: 'deactivate'; user: StaffUser }
+  | { kind: 'delete'; user: StaffUser }
 
 export function UsersView() {
   const currentUser = useCurrentUser()
   const { data: users, isPending, isError, error, refetch } = useUsers()
+  const { data: branches } = useBranches()
   const setActive = useSetUserActive()
+  const remove = useDeleteUser()
   const [dialog, setDialog] = useState<Dialog | null>(null)
+  const [branchFilter, setBranchFilter] = useState('')
   const close = () => setDialog(null)
+
+  const visibleUsers = useMemo(() => {
+    if (!users) return []
+    if (!branchFilter) return users
+    return users.filter((user) => user.branchIds.includes(branchFilter))
+  }, [users, branchFilter])
 
   const lastSuperAdminId = users?.find((user) => isOnlyActiveSuperAdmin(users, user.id))?.id ?? null
 
@@ -43,37 +54,64 @@ export function UsersView() {
     <>
       <PageHeader
         eyebrow="Administration"
-        title="Users"
-        description="Accounts are never deleted. Deactivating blocks sign-in and keeps every record the account is named on."
+        title="Employees"
+        description="Deactivating blocks sign-in and can be undone. Deleting removes the account; sales they rang up keep their name."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
             <Plus size={16} aria-hidden="true" />
-            Add user
+            Add employee
           </button>
         }
       />
-
-      <PreviewBadge feature="Location assignments and employee permission keys" />
 
       <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
         {isPending ? (
           <Skeleton rows={1} stats={0} />
         ) : isError ? (
-          <Panel title="All users">
+          <Panel title="All employees">
             <div className="panel-body">
-              <ErrorState title="Could not load users" error={error} onRetry={() => void refetch()} />
+              <ErrorState title="Could not load employees" error={error} onRetry={() => void refetch()} />
             </div>
           </Panel>
         ) : (
-          <Panel title="All users" description={`${users.length} ${users.length === 1 ? 'account' : 'accounts'}`}>
+          <Panel
+            title="All employees"
+            description={
+              branchFilter
+                ? `${visibleUsers.length} of ${users.length} at ${branches?.find((b) => b.id === branchFilter)?.name ?? 'branch'}`
+                : `${users.length} ${users.length === 1 ? 'employee' : 'employees'}`
+            }
+          >
+            <div className="toolbar toolbar--align-center">
+              <div className="toolbar-inline" role="group" aria-label="Filter by branch">
+                <span className="toolbar-inline-label">Branch</span>
+                <LocationSelect
+                  value={branchFilter}
+                  onChange={setBranchFilter}
+                  placeholder="All branches"
+                  variant="inline"
+                  size="sm"
+                  className="btn btn-secondary toolbar-branch-trigger"
+                  aria-label="Filter employees by branch"
+                />
+                {branchFilter && (
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => setBranchFilter('')}>
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
             <UserTable
-              users={users}
+              users={visibleUsers}
+              branches={branches}
+              branchFilter={branchFilter}
               currentUserId={currentUser.id}
               lastSuperAdminId={lastSuperAdminId}
               pendingUserId={setActive.isPending ? setActive.variables?.id : null}
               onCreate={() => setDialog({ kind: 'create' })}
               onEdit={(user) => setDialog({ kind: 'edit', user })}
               onPermissions={(user) => setDialog({ kind: 'permissions', user })}
+              onDelete={(user) => setDialog({ kind: 'delete', user })}
               onActiveChange={handleActiveChange}
             />
           </Panel>
@@ -83,6 +121,20 @@ export function UsersView() {
       {dialog?.kind === 'create' && <UserForm onClose={close} />}
       {dialog?.kind === 'edit' && <UserForm user={dialog.user} onClose={close} />}
       {dialog?.kind === 'permissions' && <UserPermissionsForm user={dialog.user} onClose={close} />}
+
+      {dialog?.kind === 'delete' && (
+        <ConfirmDialog
+          title={`Delete ${dialog.user.fullName}?`}
+          description="They disappear from the list and cannot sign in. Sales, transfers and stock movements keep their name. You cannot delete yourself or the last admin."
+          confirmLabel="Delete account"
+          tone="danger"
+          onResolve={(confirmed) => {
+            const target = dialog.user
+            close()
+            if (confirmed) remove.mutate(target.id)
+          }}
+        />
+      )}
 
       {dialog?.kind === 'deactivate' && (
         <ConfirmDialog

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef } from 'react'
+
 import { useRouter } from 'next/navigation'
 import { useForm, useWatch, type Control, type UseFormRegister } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,15 +10,19 @@ import { VariantPricesTable } from '@/components/products/variant-prices-table'
 import { ColorPicker } from '@/components/products/color-picker'
 import { NewProductSummary } from '@/components/products/new-product-summary'
 import { Section } from '@/components/products/form-section'
-import { NewProductOpening } from '@/components/products/new-product-opening'
+
 import { ProductDetailsFields } from '@/components/products/product-details-fields'
 import { SizePicker } from '@/components/products/size-picker'
 import { Field } from '@/components/shared/field'
-import { usePermission } from '@/hooks/use-permission'
+
 import { VariantGrid } from '@/components/products/variant-grid'
+import { VariantOpeningQuantities } from '@/components/products/variant-opening-quantities'
+import { Can } from '@/components/shared/can'
+import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
-import { useWarehouseId } from '@/hooks/use-inventory'
+
 import { useCreateProduct } from '@/hooks/use-products'
+import { useCurrentUser } from '@/store/user-store'
 import {
   combinationsOf,
   comboKey,
@@ -31,8 +35,8 @@ import {
 export function NewProductView() {
   const router = useRouter()
   const create = useCreateProduct()
-  const { data: warehouseId } = useWarehouseId()
-  const { can } = usePermission()
+  const showCost = useCurrentUser().canViewCosts
+
   const { register, handleSubmit, control, setValue, formState: { errors, isSubmitted } } = useForm<NewProductFormValues>({
     resolver: zodResolver(newProductSchema),
     defaultValues: emptyNewProductValues,
@@ -42,44 +46,32 @@ export function NewProductView() {
   const sizes = values.sizes ?? []
   const excluded = values.excluded ?? []
   const combos = combinationsOf({ colors, sizes, excluded })
-  const openingBranchId = values.openingBranchId ?? ''
-  const openingQuantities = (values.openingQuantities ?? {}) as Record<string, number>
-  /* Only someone who may post an opening count is offered one. */
-  const mayOpen = can('opening_stock.post', openingBranchId || undefined)
   const revalidate = { shouldValidate: isSubmitted }
 
-  /* Stock usually starts at the warehouse, so the opening count is offered
-     there once — the first time it is known — and never over a hand-picked one. */
-  const defaulted = useRef(false)
-  useEffect(() => {
-    if (defaulted.current || !warehouseId) return
-    defaulted.current = true
-    setValue('openingBranchId', warehouseId)
-  }, [warehouseId, setValue])
-
   const submit = handleSubmit((form) => {
-    const { code, name, category, sellPrice } = form
+    const { code, name, category, unitCost, sellPrice } = form
     create.mutate(
       {
         code,
         name,
         category,
+        unitCost: showCost ? unitCost : 0,
         sellPrice,
-        opening: form.openingBranchId
-          ? { branchId: form.openingBranchId, quantities: form.openingQuantities }
-          : undefined,
+        costs: showCost ? form.costs : {},
         variants: combinationsOf(form).map(({ color, size }) => ({
           color,
           size,
           sellPrice: form.prices[comboKey(color, size)] ?? form.sellPrice,
         })),
+        initialBranchId: form.initialBranchId?.trim() || undefined,
+        openingQuantities: form.openingQuantities,
       },
-      { onSuccess: ({ product }) => router.push(`/products/${product.id}`) },
+      { onSuccess: ({ product }) => router.push(`/products/${product.id}?created=1`) },
     )
   })
 
   const pricesError = typeof errors.prices?.message === 'string' ? errors.prices.message : undefined
-  const firstError = [errors.code, errors.name, errors.category, errors.sellPrice, errors.colors, errors.sizes, errors.excluded, errors.openingBranchId]
+  const firstError = [errors.code, errors.name, errors.category, errors.unitCost, errors.sellPrice, errors.colors, errors.sizes, errors.excluded]
     .find(Boolean)?.message ?? pricesError
 
   return (
@@ -91,7 +83,7 @@ export function NewProductView() {
       <PageHeader eyebrow="Catalog" title="New model" description="Describe the model once, then pick its colors and sizes." />
       <form className="split" onSubmit={submit} noValidate>
         <div className="panel">
-          <Section number={1} title="Details" hint="What the model is called and what it sells for.">
+          <Section number={1} title="Details" hint="Name, category, what you pay and what you charge.">
             <div className="form-grid">
               <Field
                 label="Style code"
@@ -106,6 +98,8 @@ export function NewProductView() {
               register={register as unknown as UseFormRegister<ProductDetailsFormValues>}
               control={control as unknown as Control<ProductDetailsFormValues>}
               errors={errors}
+              showCost={showCost}
+              costHint="What you pay the supplier. Saved on this device until the catalog API stores cost."
               priceHint="The default for every variant. Override a single one under Prices."
             />
           </Section>
@@ -132,40 +126,52 @@ export function NewProductView() {
               }}
             />
           </Section>
+          <Can permission="opening_stock.post">
+            <Section
+              number={5}
+              title="First stock (optional)"
+              hint="Choose one location and enter units. Other branches stay at zero — the catalog never copies stock everywhere."
+              error={errors.initialBranchId?.message}
+            >
+              <Field label="Location" error={errors.initialBranchId?.message}>
+                <LocationSelect
+                  value={values.initialBranchId ?? ''}
+                  onChange={(next) => setValue('initialBranchId', next, revalidate)}
+                  onlyAccessible
+                  onlyFullAccess
+                  placeholder="None — save without placing stock"
+                />
+              </Field>
+              <VariantOpeningQuantities
+                combos={combos}
+                quantities={(values.openingQuantities ?? {}) as Record<string, number>}
+                onChange={(next) => setValue('openingQuantities', next, revalidate)}
+              />
+            </Section>
+          </Can>
           <Section
-            number={5}
+            number={6}
             title="Prices"
-            hint="Override any variant that does not sell for the model price."
+            hint={showCost ? 'Override sell price or unit cost for any variant.' : 'Override any variant that does not sell for the model price.'}
             error={isSubmitted ? pricesError : undefined}
           >
             <VariantPricesTable
               combos={combos}
               prices={(values.prices ?? {}) as Record<string, number>}
+              costs={showCost ? ((values.costs ?? {}) as Record<string, number>) : undefined}
               defaultPrice={values.sellPrice ?? 0}
+              defaultCost={showCost ? (values.unitCost ?? 0) : undefined}
               onPriceChange={(next) => setValue('prices', next, revalidate)}
+              onCostChange={showCost ? (next) => setValue('costs', next, revalidate) : undefined}
             />
           </Section>
-          {mayOpen && (
-            <Section
-              number={6}
-              title="Opening stock"
-              hint="Count the first units in as the model is saved. Leave it blank and the model starts at zero everywhere."
-              error={isSubmitted ? errors.openingBranchId?.message : undefined}
-            >
-              <NewProductOpening
-                combos={combos}
-                branchId={openingBranchId}
-                quantities={openingQuantities}
-                onBranchChange={(next) => setValue('openingBranchId', next, revalidate)}
-                onQuantitiesChange={(next) => setValue('openingQuantities', next, revalidate)}
-              />
-            </Section>
-          )}
+
         </div>
         <aside className="split-aside">
           <NewProductSummary
             name={values.name ?? ''}
             combos={combos}
+            unitCost={showCost ? (values.unitCost ?? 0) : undefined}
             sellPrice={values.sellPrice ?? 0}
             prices={(values.prices ?? {}) as Record<string, number>}
             pending={create.isPending}

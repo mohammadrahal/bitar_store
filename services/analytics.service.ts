@@ -1,14 +1,14 @@
+import { priceOf } from '@/lib/api/map-catalog'
+import type { DateRange } from '@/lib/dashboard-range'
 import { readDb } from '@/mocks/store'
-import { listSales } from '@/services/sales.service'
-import { visibleBranchIds, visibleScope } from '@/services/mock-ledger'
+import { fetchSalesSummary, fetchTopSkus } from '@/services/reports-api.service'
+import { fetchTodayBranchSales } from '@/services/today-branch-sales.service'
 import { ALL_BRANCHES, type BranchScope, type SalesAnalytics, type SalesSeries, type TopSellerRow } from '@/types'
 
 /** Beyond this many branches the chart folds the tail into one "Other" series. */
 const MAX_BRANCH_SERIES = 5
 const TOP_PRODUCTS = 8
 const OTHER_BRANCH_ID = 'other'
-const SALES_PAGE = 200
-
 interface Tally {
   units: number
   revenue: number
@@ -18,50 +18,113 @@ function money(value: number) {
   return Math.round(value * 100) / 100
 }
 
+function seriesFromBranches(
+  named: { branchId: string; branchName: string; units: number; revenue: number }[],
+): SalesSeries[] {
+  const byName = [...named].sort((a, b) => a.branchName.localeCompare(b.branchName))
+  const kept = byName.slice(0, MAX_BRANCH_SERIES)
+  const folded = byName.slice(MAX_BRANCH_SERIES)
+  const series: SalesSeries[] = kept.map((branch) => ({ id: branch.branchId, name: branch.branchName }))
+  if (folded.length > 0) series.push({ id: OTHER_BRANCH_ID, name: 'Other locations' })
+  return series
+}
+
 /**
- * What sold, read from `GET /sales` — the completed POS sales the server holds,
- * not the local document ledger. The endpoint answers one business date at a
- * time per branch, so these figures cover the current business date; a period
- * needs an analytics endpoint, which is listed in ARCHITECTURE.md section 9.
+ * Admin/manager charts: two report calls instead of one `GET /sales` per
+ * branch. Both take the window the page is showing — without `from` and `to`
+ * the server answers for today alone, which made "best sellers over 90 days"
+ * a list of whatever happened to sell this morning.
  */
-export async function getSalesAnalytics(scope: BranchScope = ALL_BRANCHES): Promise<SalesAnalytics> {
+export async function getSalesAnalyticsFromReports(
+  scope: BranchScope = ALL_BRANCHES,
+  range?: DateRange,
+): Promise<SalesAnalytics> {
+  const window = range ? { from: range.from, to: range.to } : {}
+  const params = { ...(scope === ALL_BRANCHES ? {} : { branchId: scope }), ...window }
+  const [summary, topSkus] = await Promise.all([
+    fetchSalesSummary(params),
+    fetchTopSkus({ ...params, limit: TOP_PRODUCTS }),
+  ])
+
+  const named = summary.rows
+    .map((row) => ({
+      branchId: row.branch.id,
+      branchName: 'name' in row.branch ? row.branch.name : row.branch.id,
+      units: row.items,
+      revenue: priceOf(row.revenue),
+    }))
+    .sort((a, b) => b.revenue - a.revenue || a.branchName.localeCompare(b.branchName))
+
+  const series = seriesFromBranches(named)
+  const bucketId = series[0]?.id ?? OTHER_BRANCH_ID
+
+  const topProducts: TopSellerRow[] = topSkus.rows.map((row) => ({
+    variantId: row.sku.id,
+    productName: row.sku.styleName,
+    color: row.sku.color,
+    size: row.sku.size,
+    sku: row.sku.code,
+    units: row.quantity,
+    revenue: priceOf(row.revenue),
+    /* Top-skus are scoped totals; branch split is not on the API yet. */
+    byBranch: { [bucketId]: row.quantity },
+  }))
+
+  return {
+    businessDate: summary.from,
+    series,
+    topProducts,
+    byBranch: named,
+    documentCount: summary.totals.salesCount,
+    totalUnits: named.reduce((sum, branch) => sum + branch.units, 0),
+    totalRevenue: priceOf(summary.totals.revenue),
+  }
+}
+
+/**
+ * What sold, read from `GET /sales` per branch — used when the caller lacks
+ * `reports.financial`.
+ */
+export async function getSalesAnalyticsFromBranchSales(scope: BranchScope = ALL_BRANCHES): Promise<SalesAnalytics> {
   const db = readDb()
-  const wanted = visibleScope(scope)
-  const visible = new Set(visibleBranchIds(db))
-  const branches = db.branches.filter(
-    (branch) => visible.has(branch.id) && (wanted === ALL_BRANCHES || branch.id === wanted),
-  )
+  const snapshot = await fetchTodayBranchSales(scope)
+  const businessDate = snapshot.businessDate
 
   const branchTotals = new Map<string, Tally>()
-  const productTotals = new Map<string, Tally & { productName: string; byBranch: Map<string, number> }>()
+  /* Keyed by variant, not by model: two sizes of the same dress are two things
+     to restock, and a list that merges them cannot be acted on. */
+  const variantTotals = new Map<
+    string,
+    Tally & { variantId: string; productName: string; color: string; size: string; sku: string; byBranch: Map<string, number> }
+  >()
   let documentCount = 0
-  let businessDate = ''
 
-  for (const branch of branches) {
-    const result = await listSales({ branchId: branch.id, limit: SALES_PAGE })
-    businessDate = businessDate || result.businessDate
-
-    for (const sale of result.sales) {
+  for (const { branchId, sales } of snapshot.byBranch) {
+    for (const sale of sales) {
       documentCount += 1
       for (const line of sale.lines) {
         const revenue = Number(line.lineTotal)
         const units = line.quantity
 
-        const tally = branchTotals.get(branch.id) ?? { units: 0, revenue: 0 }
+        const tally = branchTotals.get(branchId) ?? { units: 0, revenue: 0 }
         tally.units += units
         tally.revenue += revenue
-        branchTotals.set(branch.id, tally)
+        branchTotals.set(branchId, tally)
 
-        const product = productTotals.get(line.styleName) ?? {
+        const variant = variantTotals.get(line.skuId) ?? {
           units: 0,
           revenue: 0,
+          variantId: line.skuId,
           productName: line.styleName,
+          color: line.color,
+          size: line.size,
+          sku: line.skuCode,
           byBranch: new Map<string, number>(),
         }
-        product.units += units
-        product.revenue += revenue
-        product.byBranch.set(branch.id, (product.byBranch.get(branch.id) ?? 0) + units)
-        productTotals.set(line.styleName, product)
+        variant.units += units
+        variant.revenue += revenue
+        variant.byBranch.set(branchId, (variant.byBranch.get(branchId) ?? 0) + units)
+        variantTotals.set(line.skuId, variant)
       }
     }
   }
@@ -81,27 +144,26 @@ export async function getSalesAnalytics(scope: BranchScope = ALL_BRANCHES): Prom
    * revenue for reading — that is ordering, not recolouring. The same rule
    * decides which branches keep a hue when the tail folds.
    */
-  const byName = [...named].sort((a, b) => a.branchName.localeCompare(b.branchName))
-  const kept = byName.slice(0, MAX_BRANCH_SERIES)
-  const folded = byName.slice(MAX_BRANCH_SERIES)
-  const series: SalesSeries[] = kept.map((branch) => ({ id: branch.branchId, name: branch.branchName }))
-  if (folded.length > 0) series.push({ id: OTHER_BRANCH_ID, name: 'Other locations' })
-
-  const keptIds = new Set(kept.map((branch) => branch.branchId))
-  const topProducts: TopSellerRow[] = [...productTotals.values()]
-    .filter((product) => product.units > 0)
+  const series = seriesFromBranches(named)
+  const keptIds = new Set(series.filter((entry) => entry.id !== OTHER_BRANCH_ID).map((entry) => entry.id))
+  const topProducts: TopSellerRow[] = [...variantTotals.values()]
+    .filter((variant) => variant.units > 0)
     .sort((a, b) => b.units - a.units || b.revenue - a.revenue)
     .slice(0, TOP_PRODUCTS)
-    .map((product) => {
+    .map((variant) => {
       const byBranch: Record<string, number> = {}
-      for (const [branchId, units] of product.byBranch) {
+      for (const [branchId, units] of variant.byBranch) {
         const key = keptIds.has(branchId) ? branchId : OTHER_BRANCH_ID
         byBranch[key] = (byBranch[key] ?? 0) + units
       }
       return {
-        productName: product.productName,
-        units: product.units,
-        revenue: money(product.revenue),
+        variantId: variant.variantId,
+        productName: variant.productName,
+        color: variant.color,
+        size: variant.size,
+        sku: variant.sku,
+        units: variant.units,
+        revenue: money(variant.revenue),
         byBranch,
       }
     })

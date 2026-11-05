@@ -2,31 +2,37 @@
 
 import { useEffect } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { useUserPreferences } from '@/hooks/use-user-preferences'
+import { applyResolvedTheme } from '@/lib/theme'
 import { useUIStore } from '@/store/ui-store'
 
 /** Keeps the document in step with the stored theme after the head script ran. */
 export function useThemeEffect() {
   const theme = useUIStore((state) => state.theme)
-
   useEffect(() => {
-    const element = document.documentElement
-    element.classList.toggle('dark', theme === 'dark')
-    element.style.colorScheme = theme
+    applyResolvedTheme(theme)
   }, [theme])
 }
 
 export function ThemeToggle() {
   const theme = useUIStore((state) => state.theme)
-  const toggleTheme = useUIStore((state) => state.toggleTheme)
+  const setTheme = useUIStore((state) => state.setTheme)
+  const { update } = useUserPreferences()
   useThemeEffect()
 
   const nextTheme = theme === 'dark' ? 'light' : 'dark'
+
+  const toggle = () => {
+    update({ theme: nextTheme })
+    setTheme(nextTheme)
+    applyResolvedTheme(nextTheme)
+  }
 
   return (
     <button
       type="button"
       className="icon-btn"
-      onClick={toggleTheme}
+      onClick={toggle}
       aria-label={`Switch to ${nextTheme} theme`}
       title={`Switch to ${nextTheme} theme`}
     >

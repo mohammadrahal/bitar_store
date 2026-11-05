@@ -1,13 +1,43 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { ChevronLeft, X } from 'lucide-react'
-import { BrandLogo, NavLinks, SidebarFooter } from '@/components/dashboard/sidebar-nav'
+import { BrandLogo, NavLinks } from '@/components/dashboard/sidebar-nav'
 import { Topbar } from '@/components/dashboard/topbar'
 import { NoBranchBanner } from '@/components/shared/no-branch-banner'
 import { OfflineBanner } from '@/components/shared/offline-banner'
+import { useModalBehavior } from '@/hooks/use-modal-behavior'
 import { useUIStore } from '@/store/ui-store'
+
+/**
+ * Split from MobileNav so the panel only exists while the menu is open, which
+ * is what useModalBehavior needs: it runs its focus trap, scroll lock and
+ * focus restore on mount and unwinds them on unmount.
+ */
+function MobileNavPanel({ onClose }: { onClose: () => void }) {
+  const ref = useRef<HTMLElement>(null)
+  const titleId = useId()
+  useModalBehavior(ref, onClose)
+
+  return (
+    <div className="overlay">
+      <div className="overlay-backdrop" onClick={onClose} aria-hidden="true" />
+      <aside ref={ref} className="mobile-nav" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+        <h2 id={titleId} className="sr-only">
+          Navigation
+        </h2>
+        <div className="brand">
+          <BrandLogo onNavigate={onClose} />
+          <button type="button" className="icon-btn collapse-btn" onClick={onClose} aria-label="Close menu" data-autofocus>
+            <X size={18} />
+          </button>
+        </div>
+        <NavLinks collapsed={false} onNavigate={onClose} />
+      </aside>
+    </div>
+  )
+}
 
 function MobileNav() {
   const open = useUIStore((state) => state.mobileNavOpen)
@@ -18,37 +48,23 @@ function MobileNav() {
     setOpen(false)
   }, [pathname, setOpen])
 
-  useEffect(() => {
-    if (!open) return
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, setOpen])
-
   if (!open) return null
-
-  return (
-    <div className="overlay">
-      <div className="overlay-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
-      <aside className="mobile-nav" aria-label="Mobile navigation">
-        <div className="brand">
-          <BrandLogo onNavigate={() => setOpen(false)} />
-          <button type="button" className="icon-btn collapse-btn" onClick={() => setOpen(false)} aria-label="Close menu">
-            <X size={18} />
-          </button>
-        </div>
-        <NavLinks collapsed={false} onNavigate={() => setOpen(false)} />
-        <SidebarFooter onNavigate={() => setOpen(false)} />
-      </aside>
-    </div>
-  )
+  return <MobileNavPanel onClose={() => setOpen(false)} />
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const collapsed = useUIStore((state) => state.sidebarCollapsed)
   const toggleSidebar = useUIStore((state) => state.toggleSidebar)
+  const pathname = usePathname()
+  const mainRef = useRef<HTMLElement>(null)
+
+  /* The shell scrolls this column rather than the document, and the router's
+     own scroll restoration only ever touches the document scroller. Without
+     this, opening a record from halfway down a table lands on a detail page
+     that is already scrolled past its heading. */
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 })
+  }, [pathname])
 
   return (
     <div className="app-shell">
@@ -70,14 +86,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLogo compact={collapsed} />
         </div>
         <NavLinks collapsed={collapsed} />
-        <SidebarFooter compact={collapsed} />
       </aside>
 
       <MobileNav />
 
       <div className="main-content">
         <Topbar />
-        <main id="main" className="page-scroll" tabIndex={-1}>
+        <main id="main" ref={mainRef} className="page-scroll" tabIndex={-1}>
           <div className="page-content">
             <NoBranchBanner />
             <OfflineBanner />

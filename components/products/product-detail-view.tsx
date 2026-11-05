@@ -2,12 +2,15 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Archive, ArchiveRestore, ArrowLeft, Pencil, Plus } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { Archive, ArchiveRestore, ArrowLeft, Pencil, Plus, Printer } from 'lucide-react'
+import { printBarcodeLabels } from '@/components/products/barcode-print'
 import { AddVariantsDrawer } from '@/components/products/add-variants-drawer'
 import { ArchiveProductDialog } from '@/components/products/archive-product-dialog'
 import { ProductForm } from '@/components/products/product-form'
 import { SkuBarcodesDialog } from '@/components/products/sku-barcodes-dialog'
 import { SkuPriceDialog } from '@/components/products/sku-price-dialog'
+import { ProductStockHint } from '@/components/products/product-stock-hint'
 import { SkuTable } from '@/components/products/sku-table'
 import { Can } from '@/components/shared/can'
 import { ErrorState } from '@/components/shared/error-state'
@@ -24,6 +27,9 @@ type Dialog =
   | { kind: 'price' | 'barcodes'; variantId: string }
 
 export function ProductDetailView({ productId }: { productId: string }) {
+  /* `?created=1` is set by the new-model form. It only changes the wording and
+     which button is dark — the page is the same page either way. */
+  const justCreated = useSearchParams().get('created') === '1'
   const { can } = usePermission()
   const { data: product, isPending, isError, error, refetch } = useProduct(productId)
   const [dialog, setDialog] = useState<Dialog | null>(null)
@@ -78,7 +84,37 @@ export function ProductDetailView({ productId }: { productId: string }) {
         </p>
       )}
 
-      <Panel title={`${count} ${count === 1 ? 'variant' : 'variants'}`} description={count ? prices : undefined}>
+      {count > 0 && !product.archived && (
+        <ProductStockHint productCode={product.code} justCreated={justCreated} />
+      )}
+
+      <Panel
+        title={`${count} ${count === 1 ? 'variant' : 'variants'}`}
+        description={count ? `${prices} · Available stock for the location in the header` : undefined}
+        actions={
+          count > 0 ? (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                const labels = product.variants.flatMap((variant) => {
+                  const codes = product.barcodes[variant.id] ?? []
+                  return codes.map((row) => ({
+                    productName: product.name,
+                    variantLabel: `${variant.color} / ${variant.size}`,
+                    sku: variant.sku,
+                    code: row.code,
+                  }))
+                })
+                printBarcodeLabels(labels)
+              }}
+            >
+              <Printer size={16} aria-hidden="true" />
+              Print all barcodes
+            </button>
+          ) : undefined
+        }
+      >
         {count === 0 ? (
           <div className="panel-body">
             <p className="subtitle">No variants on this model yet.</p>

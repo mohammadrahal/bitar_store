@@ -1,29 +1,10 @@
 import { writeDb, type MockDb } from '@/mocks/store'
 import type { Branch, Product, Variant } from '@/types'
 
-const WAREHOUSE_PATTERN = /warehouse|depot|\bwh\b|^wh[-_]?|main|hub/i
-
-/**
- * `GET /branches` carries `kind`, so the warehouse is whatever the server says
- * it is. The name pattern stays as the fallback for a server that predates the
- * field, and for a network where nobody has marked one yet.
- */
-function detectWarehouse(branches: Branch[]): string | null {
-  const marked = branches.find((branch) => branch.kind === 'warehouse')
-  if (marked) return marked.id
-  const match = branches.find((branch) => WAREHOUSE_PATTERN.test(branch.name) || WAREHOUSE_PATTERN.test(branch.code ?? ''))
-  return match?.id ?? null
-}
-
-/** Runs after either mirror, so the warehouse is known as soon as branches are. */
+/** Runs after either mirror. Only `kind: "warehouse"` counts — names are not a guess. */
 function settle(db: MockDb) {
-  /* A location marked on the server outranks an older local pick. */
   const marked = db.branches.find((branch) => branch.kind === 'warehouse')
-  if (marked) {
-    db.warehouseId = marked.id
-    return
-  }
-  if (!db.warehouseId) db.warehouseId = detectWarehouse(db.branches)
+  if (marked) db.warehouseId = marked.id
 }
 
 /**

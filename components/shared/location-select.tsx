@@ -12,7 +12,13 @@ export function LocationSelect({
   exclude,
   onlyAccessible = false,
   onlyFullAccess = false,
+  /** Prepends an empty value meaning every accessible location (admin history). */
+  allowAll = false,
+  allLabel = 'All locations',
   placeholder = 'Select',
+  variant,
+  size,
+  className,
   ...aria
 }: {
   value: string
@@ -21,7 +27,12 @@ export function LocationSelect({
   onlyAccessible?: boolean
   /** Leaves out view-only assignments, which may be looked at but not acted on. */
   onlyFullAccess?: boolean
+  allowAll?: boolean
+  allLabel?: string
   placeholder?: string
+  variant?: 'field' | 'inline'
+  size?: 'default' | 'sm'
+  className?: string
   id?: string
   'aria-label'?: string
   'aria-invalid'?: boolean
@@ -31,7 +42,7 @@ export function LocationSelect({
   const { data: warehouseId } = useWarehouseId()
   const { canAccessLocation, locationAccess } = usePermission()
 
-  const options = (branches ?? [])
+  const branchOptions = (branches ?? [])
     .filter((branch) => branch.id !== exclude && branch.isActive)
     .filter((branch) => !onlyAccessible || canAccessLocation(branch.id))
     .filter((branch) => !onlyFullAccess || locationAccess(branch.id) === 'full')
@@ -39,6 +50,7 @@ export function LocationSelect({
       value: branch.id,
       label: branch.id === warehouseId ? `${branch.name} (warehouse)` : branch.name,
     }))
+  const options = allowAll ? [{ value: '', label: allLabel }, ...branchOptions] : branchOptions
 
   return (
     <SelectInput
@@ -47,6 +59,9 @@ export function LocationSelect({
       options={options}
       placeholder={placeholder}
       disabled={isPending || options.length === 0}
+      variant={variant}
+      size={size}
+      className={className}
       {...aria}
     />
   )

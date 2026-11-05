@@ -15,6 +15,8 @@ export interface StoredUserAccess {
   locations: LocationAssignment[]
   /** Keys per location id, plus the platform-wide ones under `*`. */
   grants: Record<string, string[]>
+  /** Managers only — mirrors `GET /users/:id/branch-access` for the employee list. */
+  branchAccessMode?: 'all' | 'selected'
 }
 
 type AccessMap = Record<string, StoredUserAccess>
@@ -50,19 +52,31 @@ export function clearUserAccess(userId: string) {
   writeMap(map)
 }
 
-/** The locations this user may work in, with the access level remembered here. */
-export function assignmentsFor(userId: string, branchIds: string[]): LocationAssignment[] {
+/** Live branch ids from `GET /auth/me` — the only source of truth for a signed-in session. */
+export function assignmentsFromBranchIds(branchIds: string[]): LocationAssignment[] {
+  return branchIds.map((locationId) => ({ locationId, access: 'full' as LocationAccess }))
+}
+
+/** Admin UI: branch ids from grant/revoke in this app; view-only level stays local-only. */
+export function assignmentsForAdmin(userId: string, branchIds: string[]): LocationAssignment[] {
   const stored = getUserAccess(userId).locations
   const levels = new Map(stored.map((entry) => [entry.locationId, entry.access]))
-  const assignments = branchIds.map((locationId) => ({
+  return branchIds.map((locationId) => ({
     locationId,
     access: levels.get(locationId) ?? ('full' as LocationAccess),
   }))
-  /* Keep a stored assignment the API has not caught up with yet. */
-  for (const entry of stored) {
-    if (!branchIds.includes(entry.locationId)) assignments.push(entry)
-  }
-  return assignments
+}
+
+/** @deprecated Use {@link assignmentsFromBranchIds} for sessions or {@link assignmentsForAdmin} in Users admin. */
+export function assignmentsFor(userId: string, branchIds: string[]): LocationAssignment[] {
+  return assignmentsForAdmin(userId, branchIds)
+}
+
+export function mirrorSessionBranchAccess(userId: string, branchIds: string[]) {
+  setUserAccess(userId, {
+    locations: assignmentsFromBranchIds(branchIds),
+    grants: getUserAccess(userId).grants,
+  })
 }
 
 export function setLocationAccess(userId: string, locationId: string, access: LocationAccess) {

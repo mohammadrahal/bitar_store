@@ -1,4 +1,5 @@
 import type { RequestFn } from '@/lib/api/client'
+import { queryOf } from '@/lib/api/query'
 import type {
   ApiBarcode,
   ApiPriceChange,
@@ -15,15 +16,6 @@ import type {
   UpdateStyleInput,
 } from '@/lib/api/types'
 
-function queryOf(params: Record<string, string | number | boolean | undefined>): string {
-  const query = new URLSearchParams()
-  for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== '') query.set(key, String(value))
-  }
-  const text = query.toString()
-  return text ? `?${text}` : ''
-}
-
 export function createCatalogApi(request: RequestFn) {
   return {
     listStyles: (params: CatalogListParams = {}) => request<ApiStyle[]>(`/styles${queryOf({ ...params })}`),
@@ -37,12 +29,14 @@ export function createCatalogApi(request: RequestFn) {
     getSku: (id: string) => request<ApiSkuDetail>(`/skus/${id}`),
     createSku: (input: CreateSkuInput) => request<ApiSku>('/skus', 'POST', input),
     updateSku: (id: string, changes: UpdateSkuInput) => request<ApiSku>(`/skus/${id}`, 'PATCH', changes),
-    setSkuPrice: (id: string, price: string) => request<ApiSku>(`/skus/${id}/price`, 'PUT', { price }),
+    setSkuPrice: (id: string, price: string | number) => request<ApiSku>(`/skus/${id}/price`, 'PUT', { price }),
     getPriceHistory: (id: string, limit?: number) =>
       request<ApiPriceChange[]>(`/skus/${id}/price-history${queryOf({ limit })}`),
 
     addBarcode: (skuId: string, code: string) => request<ApiBarcode>(`/skus/${skuId}/barcodes`, 'POST', { code }),
     deleteBarcode: (id: string) => request<void>(`/barcodes/${id}`, 'DELETE'),
+    deleteStyle: (id: string) => request<void>(`/styles/${id}`, 'DELETE'),
+    deleteSku: (id: string) => request<void>(`/skus/${id}`, 'DELETE'),
   }
 }
 

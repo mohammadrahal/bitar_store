@@ -1,13 +1,17 @@
 'use client'
 
 import Link from 'next/link'
-import { Barcode, CircleOff, RotateCcw, Tag } from 'lucide-react'
+import { Barcode, CircleOff, Printer, RotateCcw, Tag } from 'lucide-react'
+import { printBarcodeLabels } from '@/components/products/barcode-print'
 import { Can } from '@/components/shared/can'
 import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useSetVariantActive } from '@/hooks/use-skus'
 import { useVariantUnits } from '@/hooks/use-stock'
 import { formatBarcode } from '@/lib/barcode'
 import { formatNumber, formatPrice } from '@/lib/format'
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
+import { useCurrentUser } from '@/store/user-store'
 import type { ProductDetail, Variant } from '@/types'
 
 /** One row per SKU: its own price, barcodes and on-sale status. */
@@ -21,11 +25,14 @@ export function SkuTable({
   onBarcodes: (variant: Variant) => void
 }) {
   const setActive = useSetVariantActive()
+  const showCost = useCurrentUser().canViewCosts
   const scope = useBranchScope()
   const { data: units } = useVariantUnits(product.id, scope)
   const editable = !product.archived
+  const { visible, page, pageCount, total, pageSize, setPage } = usePagination(product.variants, 15, product.id)
 
   return (
+    <>
     <div className="table-wrap">
       <table className="card-table">
         <caption className="sr-only">Color and size variants for {product.name}</caption>
@@ -34,8 +41,9 @@ export function SkuTable({
             <th scope="col">Variant</th>
             <th scope="col">SKU</th>
             <th scope="col">Barcodes</th>
-            <th scope="col" className="num">Price</th>
-            <th scope="col" className="num">Stock</th>
+            {showCost ? <th scope="col" className="num">Cost</th> : null}
+            <th scope="col" className="num">Sell price</th>
+            <th scope="col" className="num">Available</th>
             <th scope="col">Status</th>
             <th scope="col">
               <span className="sr-only">Actions</span>
@@ -43,7 +51,7 @@ export function SkuTable({
           </tr>
         </thead>
         <tbody>
-          {product.variants.map((variant) => {
+          {visible.map((variant) => {
             const barcodes = product.barcodes[variant.id] ?? []
             const busy = setActive.isPending && setActive.variables?.variantId === variant.id
             return (
@@ -58,12 +66,24 @@ export function SkuTable({
                   {barcodes.length === 0 ? '—' : formatBarcode(barcodes[0].code)}
                   {barcodes.length > 1 && <small> +{barcodes.length - 1}</small>}
                 </td>
-                <td className="num tabular" data-label="Price">{formatPrice(variant.sellPrice)}</td>
-                <td className="num tabular" data-label="Stock">
+                {showCost ? (
+                  <td className="num tabular" data-label="Cost">
+                    {variant.unitCost != null && variant.unitCost > 0 ? formatPrice(variant.unitCost) : '—'}
+                  </td>
+                ) : null}
+                <td className="num tabular" data-label="Sell price">{formatPrice(variant.sellPrice)}</td>
+                <td className="num tabular" data-label="Available">
                   {units === undefined ? (
                     <span className="muted">…</span>
                   ) : (
-                    formatNumber(units[variant.id]?.available ?? 0)
+                    <Link href={`/inventory/${variant.id}`} className="link-cell tabular" title="View stock by location">
+                      {formatNumber(units[variant.id]?.available ?? 0)}
+                      {(units[variant.id]?.onHand ?? 0) !== (units[variant.id]?.available ?? 0) && (
+                        <small className="block muted">
+                          {formatNumber(units[variant.id]?.onHand ?? 0)} on hand
+                        </small>
+                      )}
+                    </Link>
                   )}
                 </td>
                 <td data-label="Status">
@@ -80,6 +100,25 @@ export function SkuTable({
                         </button>
                         <button type="button" className="icon-btn" onClick={() => onBarcodes(variant)} aria-label={`Barcodes of ${variant.sku}`} title="Barcodes">
                           <Barcode size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-btn"
+                          disabled={barcodes.length === 0}
+                          onClick={() =>
+                            printBarcodeLabels(
+                              barcodes.map((row) => ({
+                                productName: product.name,
+                                variantLabel: `${variant.color} / ${variant.size}`,
+                                sku: variant.sku,
+                                code: row.code,
+                              })),
+                            )
+                          }
+                          aria-label={`Print barcodes for ${variant.sku}`}
+                          title="Print barcode"
+                        >
+                          <Printer size={16} />
                         </button>
                         <button
                           type="button"
@@ -101,5 +140,7 @@ export function SkuTable({
         </tbody>
       </table>
     </div>
+    <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} onPage={setPage} />
+    </>
   )
 }

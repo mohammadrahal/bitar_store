@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { useMirroredBranches } from '@/hooks/use-stock'
+import { useBranchesKey, useCatalogSync } from '@/hooks/use-stock'
+import { invalidateStockQueries } from '@/lib/invalidate-stock'
 import { queryKeys, type ProductFilters } from '@/lib/query-keys'
 import { setProductArchived } from '@/services/product-lifecycle.service'
 import {
@@ -18,32 +19,38 @@ import {
 } from '@/services/products.service'
 import { getProductDetail } from '@/services/skus.service'
 
-/* Reads wait for the catalog and branches to be mirrored, so stock figures beside them are real. */
+/** One catalog sync shared across product screens; stock units use their own queries. */
+function useCatalogReady(): boolean {
+  const catalog = useCatalogSync()
+  const branches = useBranchesKey()
+  return catalog.data !== undefined && branches !== null
+}
+
 export function useProducts(filters: ProductFilters) {
-  const mirrored = useMirroredBranches()
+  const ready = useCatalogReady()
   return useQuery({
     queryKey: queryKeys.products.list(filters),
     queryFn: () => listProducts(filters),
-    enabled: mirrored !== null,
+    enabled: ready,
+    staleTime: 60_000,
   })
 }
 
 /** The model with every SKU's barcodes. */
 export function useProduct(productId: string) {
-  const mirrored = useMirroredBranches()
+  const ready = useCatalogReady()
   return useQuery({
     queryKey: queryKeys.products.detail(productId),
     queryFn: () => getProductDetail(productId),
-    enabled: mirrored !== null && Boolean(productId),
+    enabled: ready && Boolean(productId),
   })
 }
 
 export function useCategories() {
-  const mirrored = useMirroredBranches()
   return useQuery({
     queryKey: queryKeys.products.categories(),
     queryFn: listCategories,
-    enabled: mirrored !== null,
+    staleTime: 60_000,
   })
 }
 
@@ -52,17 +59,14 @@ export function useProductMutationCallbacks() {
   return {
     invalidate: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.products.all })
-      void queryClient.invalidateQueries({ queryKey: queryKeys.stock.all })
+      invalidateStockQueries(queryClient)
     },
     reportError: (error: Error) => toast.error(error.message),
   }
 }
 
 /** The model was saved even when some combinations were refused, so those are a warning, not a failure. */
-function reportSkipped({ skipped, unbarcoded, openingFailed }: CreatedProduct) {
-  if (openingFailed) {
-    toast.warning('The model was saved, but its opening count did not post', { description: openingFailed })
-  }
+function reportSkipped({ skipped, unbarcoded }: CreatedProduct) {
   if (skipped.length > 0) {
     toast.warning(`${skipped.length} ${skipped.length === 1 ? 'variant was' : 'variants were'} not added`, {
       description: skipped.join('\n'),
@@ -81,13 +85,16 @@ export function useCreateProduct() {
     mutationFn: (input: ProductInput) => createProduct(input),
     onSuccess: (result) => {
       invalidate()
-      const { product } = result
+      const { product, openingLines } = result
       const count = product.variants.length
-      const placed = result.opened
-        ? ` · ${result.opened.lines} ${result.opened.lines === 1 ? 'line' : 'lines'} counted in`
-        : ''
       toast.success(
-        `${product.name} saved as ${product.code} with ${count} ${count === 1 ? 'variant' : 'variants'}${placed}`,
+        `${product.name} saved as ${product.code} with ${count} ${count === 1 ? 'variant' : 'variants'}`,
+        {
+          description:
+            openingLines > 0
+              ? `Opening stock posted for ${openingLines} ${openingLines === 1 ? 'SKU' : 'SKUs'} at the location you chose. Other branches were not changed.`
+              : 'No units were placed. Stock stays zero until you receive a delivery or post an opening count at a location.',
+        },
       )
       reportSkipped(result)
     },

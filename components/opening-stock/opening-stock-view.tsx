@@ -12,9 +12,11 @@ import { Panel } from '@/components/shared/panel'
 import { SearchInput } from '@/components/shared/search-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { useOpeningState, usePostOpeningStock } from '@/hooks/use-opening-stock'
 import { usePermission } from '@/hooks/use-permission'
+import { Pagination } from '@/components/shared/pagination'
+import { usePagination } from '@/hooks/use-pagination'
 import { useStockPicker } from '@/hooks/use-inventory'
 
 const LIMIT = 60
@@ -26,10 +28,10 @@ const SEARCH_DEBOUNCE_MS = 250
  * Creating a model never places stock, so this is how a location starts.
  */
 export function OpeningStockView() {
-  const { can, locationScoped } = usePermission()
-  const defaultBranch = useDefaultBranchId()
-  const [branchChoice, setBranchChoice] = useState('')
-  const branchId = locationScoped ? defaultBranch : branchChoice
+  const { can } = usePermission()
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
   const mayPost = can('opening_stock.post', branchId || undefined)
 
   const [search, setSearch] = useState('')
@@ -50,6 +52,7 @@ export function OpeningStockView() {
      leaves it out: what is left is whatever the catalog gained since. */
   const moved = new Set(opening.data?.movedSkuIds ?? [])
   const openable = (variants.data ?? []).filter((option) => !moved.has(option.variantId))
+  const pagination = usePagination(openable, 20, `${branchId}:${term}`)
 
   return (
     <>
@@ -59,11 +62,11 @@ export function OpeningStockView() {
         description="Count what is physically at a location and post it. A SKU is opened once; after that its differences are settled by a physical count."
       />
 
-      {!locationScoped && (
+      {allowPageBranchFilter && (
         <Field label="Location">
           <LocationSelect
-            value={branchChoice}
-            onChange={setBranchChoice}
+            value={pageBranchId}
+            onChange={setPageBranchId}
             onlyAccessible
             onlyFullAccess
             placeholder="Select a location"
@@ -133,7 +136,7 @@ export function OpeningStockView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {openable.map((option) => (
+                    {pagination.visible.map((option) => (
                       <tr key={option.variantId}>
                         <td className="card-title" data-label="Variant">
                           {option.productName} — {option.color} / {option.size}
@@ -165,6 +168,13 @@ export function OpeningStockView() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={pagination.page}
+                pageCount={pagination.pageCount}
+                total={pagination.total}
+                pageSize={pagination.pageSize}
+                onPage={pagination.setPage}
+              />
               <div className="panel-body action-bar">
                 {mayPost ? (
                   <button

@@ -1,3 +1,4 @@
+import { MAX_CASH_TENDERED, MAX_LINE_MONEY } from '@/lib/input-limits'
 import { fromCents, toCents } from '@/lib/money'
 
 export type PaymentMode = 'cash' | 'whish' | 'split'
@@ -40,7 +41,10 @@ export function paymentProblem(draft: PaymentDraft, total: number): string | nul
   const totalCents = toCents(total)
 
   if (totalCents <= 0) return 'Add an item before taking payment.'
+  if (total > MAX_LINE_MONEY) return `Sale total cannot exceed ${MAX_LINE_MONEY.toFixed(2)}.`
   if (cash < 0 || whish < 0) return 'A payment cannot be negative.'
+  if (cash > MAX_LINE_MONEY || whish > MAX_LINE_MONEY) return 'A single payment part is too large.'
+  if (draft.tendered > MAX_CASH_TENDERED) return 'Cash received is above the allowed maximum.'
   if (toCents(cash) + toCents(whish) !== totalCents) {
     return `The payments must add up to ${fromCents(totalCents).toFixed(2)}.`
   }
@@ -94,4 +98,16 @@ export function salePaymentKind(payments: readonly SalePayment[]): 'cash' | 'whi
   const whish = paymentCents(payments, 'whish')
   if (cash > 0 && whish > 0) return 'split'
   return whish > 0 ? 'whish' : 'cash'
+}
+
+/** Short label for lists: Cash, Whish, Cash + Whish, or — when nothing is stored. */
+export function paymentMethodLabel(draft: PaymentDraft | undefined, total: number): string {
+  if (!draft || toCents(total) <= 0) return '—'
+  const { cash, whish } = amountsOf(draft, total)
+  const cashC = toCents(cash)
+  const whishC = toCents(whish)
+  if (cashC > 0 && whishC > 0) return 'Cash + Whish'
+  if (whishC > 0) return 'Whish'
+  if (cashC > 0) return 'Cash'
+  return '—'
 }

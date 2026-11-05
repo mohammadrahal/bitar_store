@@ -1,4 +1,3 @@
-import { delay } from '@/lib/delay'
 import type { StockOverview } from '@/services/stock-stats.service'
 import { ALL_BRANCHES, type BranchScope, type BranchStockRow, type StockStatus } from '@/types'
 
@@ -9,7 +8,7 @@ export function statusOf(available: number): StockStatus {
 /** Total units a branch currently holds, used to guard branch deletion. */
 export async function getBranchStockUnits(branchId: string): Promise<number> {
   const { branchStockUnitsFromApi } = await import('@/services/stock-api.service')
-  return delay(await branchStockUnitsFromApi(branchId))
+  return branchStockUnitsFromApi(branchId)
 }
 
 /*
@@ -25,12 +24,12 @@ export async function getStockOverview(scope: BranchScope = ALL_BRANCHES): Promi
 /** Everything a branch holds, emptiest first, for the branch stock list. */
 export async function listBranchStock(branchId: string): Promise<BranchStockRow[]> {
   const { listBranchStockFromApi } = await import('@/services/stock-api.service')
-  return delay(await listBranchStockFromApi(branchId))
+  return listBranchStockFromApi(branchId)
 }
 
 /** Available quantity per variant at one branch, keyed by variant id. */
 export async function getBranchStockMap(branchId: string): Promise<Record<string, number>> {
   const { branchSellableMap } = await import('@/services/stock-api.service')
   const map = await branchSellableMap(branchId)
-  return delay(Object.fromEntries(map))
+  return Object.fromEntries(map)
 }

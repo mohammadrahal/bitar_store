@@ -27,7 +27,10 @@ export function ProfilePasswordForm() {
   })
 
   const submit = handleSubmit((values) =>
-    change.mutate(values.password, { onSuccess: () => reset(emptyPasswordChange) }),
+    change.mutate(
+      { password: values.password, currentPassword: '' },
+      { onSuccess: () => reset(emptyPasswordChange) },
+    ),
   )
 
   return (

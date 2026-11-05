@@ -1,14 +1,19 @@
 import { getApiClient } from '@/lib/api'
-import { mapApiBarcode, mapApiPriceChange, mapApiSku, priceText } from '@/lib/api/map-catalog'
+import { mapApiBarcode, mapApiPriceChange, mapApiSku, mapApiStyle, priceText } from '@/lib/api/map-catalog'
 import { mirrorCatalog } from '@/mocks/mirror'
-import { getProduct } from '@/services/products.service'
+import { toCatalog } from '@/services/catalog-sync.service'
 import type { Barcode, PriceChange, ProductDetail } from '@/types'
 
 /** The model with every SKU's barcodes, which only the single-SKU endpoint returns. */
 export async function getProductDetail(productId: string): Promise<ProductDetail> {
-  const product = await getProduct(productId)
   const api = getApiClient()
-  const details = await Promise.all(product.variants.map((variant) => api.getSku(variant.id)))
+  const { skus, ...style } = await api.getStyle(productId)
+  const { products, variants: mirrored } = toCatalog([style], skus)
+  mirrorCatalog(products, mirrored)
+  const product = products[0]
+  if (!product) throw new Error('Product not found')
+
+  const details = await Promise.all(skus.map((sku) => api.getSku(sku.id)))
   const barcodes: Record<string, Barcode[]> = {}
   for (const sku of details) barcodes[sku.id] = sku.barcodes.map(mapApiBarcode)
 
@@ -16,9 +21,9 @@ export async function getProductDetail(productId: string): Promise<ProductDetail
   mirrorCatalog([], variants)
   const livePrices = variants.filter((variant) => !variant.archived).map((variant) => variant.sellPrice)
   return {
-    ...product,
-    sellPrice: livePrices.length ? Math.min(...livePrices) : product.sellPrice,
+    ...mapApiStyle(style, variants),
     variants,
+    sellPrice: livePrices.length ? Math.min(...livePrices) : product.sellPrice,
     barcodes,
   }
 }

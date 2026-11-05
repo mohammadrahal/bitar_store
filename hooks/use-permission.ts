@@ -2,6 +2,17 @@
 
 import { useMemo } from 'react'
 import {
+  canDispatchTransfers,
+  canManageMinimums,
+  canReceiveTransfers,
+  canRequestTransfer,
+  canSeeTransfers,
+  canViewAdminWarehouseTools,
+  canViewFinancialReports,
+  hasApiPermission,
+  type ApiPermission,
+} from '@/lib/api-access'
+import {
   can,
   canAccessLocation,
   canAny,
@@ -38,6 +49,14 @@ export function usePermission() {
       canAccessLocation: (locationId: string) => canAccessLocation(user, locationId),
       locationAccess: (locationId: string) => locationAccess(user, locationId),
       isViewOnlyAt: (locationId: string) => isViewOnlyAt(user, locationId),
+      apiCan: (permission: ApiPermission | string) => hasApiPermission(user, permission),
+      canSeeTransfers: () => canSeeTransfers(user),
+      canDispatchTransfers: () => canDispatchTransfers(user),
+      canReceiveTransfers: () => canReceiveTransfers(user),
+      canRequestTransfer: () => canRequestTransfer(user),
+      canManageMinimums: () => canManageMinimums(user),
+      canViewFinancialReports: () => canViewFinancialReports(user),
+      canViewAdminWarehouseTools: () => canViewAdminWarehouseTools(user),
     }),
     [user, activeLocationId],
   )

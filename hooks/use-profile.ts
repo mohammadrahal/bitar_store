@@ -27,7 +27,7 @@ export function useUpdateOwnName() {
 
 export function useChangeOwnPassword() {
   return useMutation({
-    mutationFn: (password: string) => changeOwnPassword(password),
+    mutationFn: (input: { password: string; currentPassword: string }) => changeOwnPassword(input),
     onSuccess: () => toast.success('Password changed'),
   })
 }

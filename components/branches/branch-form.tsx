@@ -7,6 +7,8 @@ import { Drawer } from '@/components/shared/drawer'
 import { Field } from '@/components/shared/field'
 import { Switch } from '@/components/shared/switch'
 import { useBranches, useCreateBranch, useUpdateBranch } from '@/hooks/use-branches'
+import type { UpdateBranchInput } from '@/lib/api/types'
+import { setWarehouse } from '@/services/locations.service'
 import { isConflict } from '@/lib/errors'
 import { buildBranchCode } from '@/lib/branch-code'
 import {
@@ -68,17 +70,26 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
   const nameTaken = name.trim() ? taken.names.has(name.trim().toLowerCase()) : false
   const clashes = Boolean(codeOwner) || nameTaken
 
-  const submit = handleSubmit((values) => {
+  const submit = handleSubmit(async (values) => {
     if (clashes) return
     if (branch) {
       const editValues = values as BranchEditFormValues
-      update.mutate(
-        {
-          id: branch.id,
-          changes: { name: editValues.name, isActive: editValues.isActive },
-        },
-        { onSuccess: onClose },
-      )
+      try {
+        const changes: UpdateBranchInput = {
+          name: editValues.name,
+          isActive: editValues.isActive,
+        }
+        if (editValues.kind === 'warehouse' && branch.kind !== 'warehouse') {
+          await setWarehouse(branch.id)
+          await update.mutateAsync({ id: branch.id, changes })
+        } else {
+          if (editValues.kind !== branch.kind) changes.kind = editValues.kind
+          await update.mutateAsync({ id: branch.id, changes })
+        }
+        onClose()
+      } catch (error) {
+        if (error instanceof Error) setError('root', { message: error.message })
+      }
       return
     }
     create.mutate(values as BranchCreateFormValues, {
@@ -98,7 +109,7 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
       title={isEdit ? `Edit ${branch?.name}` : 'New branch'}
       description={
         isEdit
-          ? 'The code is fixed after creation. You can change the display name and whether the branch is active.'
+          ? 'The code is fixed after creation. You can change the name, whether it is active, and which location is the main warehouse.'
           : 'The code is taken from the name, stored in upper case, and must be unique across the network. Edit it if you need something different.'
       }
       onClose={onClose}
@@ -115,29 +126,40 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
       }
     >
       <div className="form-grid">
-        {!isEdit && (
-          <Controller
-            control={control}
-            name="kind"
-            render={({ field }) => (
-              <Field label="Kind" hint="A warehouse holds stock for the branches. It cannot be changed later." className="full">
-                <div className="segmented" role="radiogroup" aria-label="Kind">
-                  {(['branch', 'warehouse'] as const).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      role="radio"
-                      aria-checked={field.value === option}
-                      className={field.value === option ? 'active' : ''}
-                      onClick={() => field.onChange(option)}
-                    >
-                      {option === 'branch' ? 'Branch' : 'Warehouse'}
-                    </button>
-                  ))}
-                </div>
-              </Field>
-            )}
-          />
+        <Controller
+          control={control}
+          name="kind"
+          render={({ field }) => (
+            <Field
+              label="Role"
+              hint={
+                isEdit
+                  ? 'Only one warehouse. Choosing warehouse replaces the current one. A warehouse supplies branches and cannot sell at the till.'
+                  : 'A warehouse holds stock for the whole network. You can also pick one later from the branch list.'
+              }
+              className="full"
+            >
+              <div className="segmented" role="radiogroup" aria-label="Role">
+                {(['branch', 'warehouse'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={field.value === option}
+                    className={field.value === option ? 'active' : ''}
+                    onClick={() => field.onChange(option)}
+                  >
+                    {option === 'branch' ? 'Branch' : 'Warehouse'}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
+        />
+        {errors.root?.message && (
+          <p className="field-error full" role="alert">
+            {errors.root.message}
+          </p>
         )}
         <Field
           label="Display name"
