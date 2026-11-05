@@ -8,9 +8,8 @@ import { Can } from '@/components/shared/can'
 import { FilterChips, type ChipOption } from '@/components/shared/filter-chips'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { useWholesaleInvoices } from '@/hooks/use-wholesale-invoices'
-import { usePermission } from '@/hooks/use-permission'
 import type { WholesaleInvoiceStatus } from '@/services/wholesale-invoices.service'
 
 type InvoiceTab = 'drafts' | 'issued'
@@ -23,13 +22,12 @@ const TAB_OPTIONS: ChipOption<InvoiceTab>[] = [
 export function InvoicesView() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { locationScoped } = usePermission()
-  const defaultBranchId = useDefaultBranchId()
+  const allowPageBranchFilter = useAllowPageBranchFilter()
 
   const tabParam = searchParams.get('tab')
   const [tab, setTab] = useState<InvoiceTab>(tabParam === 'drafts' ? 'drafts' : 'issued')
-  const [branchChoice, setBranchChoice] = useState('')
-  const branchId = locationScoped ? defaultBranchId : branchChoice
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
 
   useEffect(() => {
     if (tabParam === 'drafts') setTab('drafts')
@@ -85,8 +83,8 @@ export function InvoicesView() {
           branchId={branchId}
           status={status}
           onCreate={startInvoice}
-          allowAllBranches={!locationScoped}
-          onBranchChange={setBranchChoice}
+          allowAllBranches={allowPageBranchFilter}
+          onBranchChange={setPageBranchId}
         />
       </Panel>
     </>

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { ProfileAccountForm } from '@/components/profile/profile-account-form'
 import { ProfileLocations } from '@/components/profile/profile-locations'
 import { ProfilePasswordForm } from '@/components/profile/profile-password-form'
@@ -9,7 +10,7 @@ import { usePermission } from '@/hooks/use-permission'
 import { ROLE_LABELS } from '@/lib/permissions'
 
 export function ProfileView() {
-  const { user, locationScoped } = usePermission()
+  const { user, locationScoped, superAdmin, can } = usePermission()
 
   return (
     <>
@@ -43,6 +44,16 @@ export function ProfileView() {
       <Panel title="Security" description="Sets the password you sign in with, on every device.">
         <ProfilePasswordForm />
       </Panel>
+
+      {(superAdmin || can('settings.manage')) && (
+        <Panel title="Store settings" description="Rates and options that every branch uses on the till.">
+          <div className="panel-body">
+            <Link href="/settings/exchange" className="btn btn-secondary">
+              USD / LBP exchange rate
+            </Link>
+          </div>
+        </Panel>
+      )}
     </>
   )
 }

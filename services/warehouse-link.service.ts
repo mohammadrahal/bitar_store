@@ -1,4 +1,10 @@
-import { getApiClient } from '@/lib/api'
+import { ApiError, getApiClient } from '@/lib/api'
+import {
+  isApiFeatureAvailable,
+  isApiFeatureMissing,
+  noteMissingApiFeature,
+  probedWarehouse,
+} from '@/lib/api/capabilities'
 import { mapApiBranch } from '@/lib/api/map-branch'
 import type { ApiLocation, ApiTransfer } from '@/lib/api/types'
 import { readDb, writeDb } from '@/mocks/store'
@@ -8,18 +14,25 @@ import { seesWholeNetwork } from '@/services/branches.service'
 import { useUserStore } from '@/store/user-store'
 import type { Branch, User } from '@/types'
 
-const WAREHOUSE_PATTERN = /warehouse|depot|\bwh\b|^wh[-_]?|main|hub/i
+/** Set after a successful warehouse lookup. There is only one warehouse. */
+let cachedWarehouseId: string | null = null
 
-function warehouseFromBranches(branches: Branch[]): string | null {
-  const marked = branches.find((branch) => branch.kind === 'warehouse')
-  if (marked) return marked.id
-  const match = branches.find(
-    (branch) => WAREHOUSE_PATTERN.test(branch.name) || WAREHOUSE_PATTERN.test(branch.code ?? ''),
-  )
-  return match?.id ?? null
+export function clearWarehouseCache() {
+  cachedWarehouseId = null
+  writeDb((db) => {
+    db.warehouseId = null
+  })
+}
+
+/** Keep the in-memory warehouse id aligned with `GET /branches` after a role change. */
+export function syncWarehouseFromBranchList(branches: Branch[]) {
+  const warehouse = branches.find((branch) => branch.kind === 'warehouse')
+  if (warehouse) rememberWarehouse(warehouse)
+  else clearWarehouseCache()
 }
 
 export function rememberWarehouse(location: ApiLocation | Branch) {
+  cachedWarehouseId = location.id
   writeDb((db) => {
     db.warehouseId = location.id
     const existing = db.branches.find((branch) => branch.id === location.id)
@@ -41,9 +54,9 @@ export function rememberWarehouse(location: ApiLocation | Branch) {
   })
 }
 
-function fromMirror(): string | null {
-  const db = readDb()
-  return warehouseFromBranches(db.branches) ?? db.warehouseId
+function warehouseMarkedLocally(): string | null {
+  const marked = readDb().branches.find((branch) => branch.kind === 'warehouse')
+  return marked?.id ?? readDb().warehouseId ?? null
 }
 
 function hasSessionToken(): boolean {
@@ -51,12 +64,13 @@ function hasSessionToken(): boolean {
 }
 
 async function fromWarehouseEndpoint(): Promise<string | null> {
-  if (!hasSessionToken()) return null
+  if (!hasSessionToken() || isApiFeatureMissing('warehouse')) return null
   try {
     const warehouse = await getApiClient().getWarehouse()
     rememberWarehouse({ ...warehouse, kind: 'warehouse' })
     return warehouse.id
-  } catch {
+  } catch (error) {
+    noteMissingApiFeature(error, 'warehouse')
     return null
   }
 }
@@ -64,29 +78,12 @@ async function fromWarehouseEndpoint(): Promise<string | null> {
 async function syncBranchesFromApi(): Promise<string | null> {
   if (!hasSessionToken()) return null
   try {
-    const api = getApiClient()
-    const branches = (await api.listBranches()).map(mapApiBranch)
+    const branches = (await getApiClient().listBranches()).map(mapApiBranch)
     mirrorBranches(branches, { prune: seesWholeNetwork() })
-    return warehouseFromBranches(readDb().branches) ?? readDb().warehouseId
+    return warehouseMarkedLocally()
   } catch {
     return null
   }
-}
-
-/** Warehouse branch id among locations this user was granted (`GET /auth/me` → branchIds). */
-function warehouseFromGrantedBranches(): string | null {
-  const user = useUserStore.getState().user
-  if (!user) return null
-  const db = readDb()
-  for (const id of user.branchIds) {
-    const branch = db.branches.find((candidate) => candidate.id === id)
-    if (!branch) continue
-    if (branch.kind === 'warehouse' || WAREHOUSE_PATTERN.test(branch.name) || WAREHOUSE_PATTERN.test(branch.code ?? '')) {
-      rememberWarehouse(branch)
-      return branch.id
-    }
-  }
-  return null
 }
 
 async function fromReplenishment(branchId?: string): Promise<string | null> {
@@ -100,7 +97,7 @@ async function fromReplenishment(branchId?: string): Promise<string | null> {
         return suggestions.warehouse.id
       }
     } catch {
-      /* Branch staff often cannot read suggestions; try the next params. */
+      /* Branch staff often cannot read suggestions. */
     }
   }
   return null
@@ -135,21 +132,28 @@ async function fromTransfers(branchId?: string): Promise<string | null> {
   return null
 }
 
-function fromEnv(): string | null {
-  const envId = process.env.NEXT_PUBLIC_WAREHOUSE_BRANCH_ID?.trim()
-  if (!envId) return null
-  rememberWarehouse({ id: envId, code: 'WAREHOUSE', name: 'Main warehouse', kind: 'warehouse' })
-  return envId
+async function fromStockOverview(): Promise<string | null> {
+  if (!hasSessionToken()) return null
+  try {
+    const overview = await getApiClient().getStockOverview({ limit: 1 })
+    const warehouse = overview.locations.find((location) => location.kind === 'warehouse')
+    if (warehouse) {
+      rememberWarehouse(warehouse)
+      return warehouse.id
+    }
+  } catch {
+    /* Admin-only; branch users skip. */
+  }
+  return null
 }
 
 export interface ResolveWarehouseOptions {
-  /** Branch the replenishment is for (Saida, etc.). Used for scoped API reads. */
   branchId?: string
 }
 
 /**
- * Finds the main warehouse branch id from the mirror, branch list, replenishment,
- * past transfers, or env. Safe to call often (login, form open, submit).
+ * Resolves the warehouse id: `GET /warehouse` when the server has it, otherwise
+ * branches with `kind: "warehouse"`, replenishment, transfers, or stock overview.
  */
 export async function resolveWarehouseId(options: ResolveWarehouseOptions = {}): Promise<string | null> {
   const branchId =
@@ -158,21 +162,32 @@ export async function resolveWarehouseId(options: ResolveWarehouseOptions = {}):
     useUserStore.getState().user?.branchIds[0] ??
     undefined
 
-  const cached = fromMirror()
-  if (cached) return cached
+  const cached = cachedWarehouseId ?? warehouseMarkedLocally()
+  if (cached) {
+    const stillWarehouse = readDb().branches.some(
+      (branch) => branch.id === cached && branch.kind === 'warehouse',
+    )
+    if (stillWarehouse) return cached
+    clearWarehouseCache()
+  }
 
-  if (!hasSessionToken()) return fromEnv()
+  if (!hasSessionToken()) return null
 
-  /* Prefer the branch list (warehouse has kind `warehouse`). GET /warehouse is
-     optional on the server; calling it first caused 404 noise on older APIs. */
+  /* The capability probe already read `GET /warehouse` for this token. Asking
+     again would send the same request a second time on every first load. */
+  const probed = probedWarehouse()
+  if (probed) {
+    rememberWarehouse({ ...probed, kind: 'warehouse' })
+    return probed.id
+  }
+
+  if (isApiFeatureAvailable('warehouse') || !isApiFeatureMissing('warehouse')) {
+    const fromEndpoint = await fromWarehouseEndpoint()
+    if (fromEndpoint) return fromEndpoint
+  }
+
   const fromList = await syncBranchesFromApi()
   if (fromList) return fromList
-
-  const fromGrant = warehouseFromGrantedBranches()
-  if (fromGrant) return fromGrant
-
-  const fromEndpoint = await fromWarehouseEndpoint()
-  if (fromEndpoint) return fromEndpoint
 
   const fromSuggest = await fromReplenishment(branchId)
   if (fromSuggest) return fromSuggest
@@ -180,10 +195,13 @@ export async function resolveWarehouseId(options: ResolveWarehouseOptions = {}):
   const fromXfer = await fromTransfers(branchId)
   if (fromXfer) return fromXfer
 
-  return fromEnv()
+  const fromOverview = await fromStockOverview()
+  if (fromOverview) return fromOverview
+
+  return null
 }
 
-/** After login, prefetch the warehouse into the local mirror when this user cares about transfers. */
+/** After login, prefetch the warehouse when this user works with transfers. */
 export function warmWarehouseLink(user: User): void {
   if (!canSeeTransfers(user)) return
   const branchId = user.branchId ?? user.branchIds[0]

@@ -30,7 +30,6 @@ export function createCatalogApi(request: RequestFn) {
     createSku: (input: CreateSkuInput) => request<ApiSku>('/skus', 'POST', input),
     updateSku: (id: string, changes: UpdateSkuInput) => request<ApiSku>(`/skus/${id}`, 'PATCH', changes),
     setSkuPrice: (id: string, price: string | number) => request<ApiSku>(`/skus/${id}/price`, 'PUT', { price }),
-    changeSkuPrice: (id: string, price: string | number) => request<ApiSku>(`/skus/${id}/price`, 'PUT', { price }),
     getPriceHistory: (id: string, limit?: number) =>
       request<ApiPriceChange[]>(`/skus/${id}/price-history${queryOf({ limit })}`),
 

@@ -7,6 +7,7 @@ import { buildVariantCode } from '@/lib/sku'
 export function NewProductSummary({
   name,
   combos,
+  unitCost,
   sellPrice,
   prices = {},
   pending,
@@ -14,6 +15,7 @@ export function NewProductSummary({
 }: {
   name: string
   combos: { color: string; size: string }[]
+  unitCost?: number
   sellPrice: number
   prices?: Record<string, number>
   pending: boolean
@@ -28,6 +30,12 @@ export function NewProductSummary({
           <dd>{name.trim() || '—'}</dd>
           <dt>Code</dt>
           <dd className="muted">Assigned on save</dd>
+          {unitCost !== undefined ? (
+            <>
+              <dt>Unit cost</dt>
+              <dd className="tabular">{Number.isFinite(unitCost) ? formatPrice(unitCost) : '—'}</dd>
+            </>
+          ) : null}
           <dt>Sell price</dt>
           <dd className="tabular">{Number.isFinite(sellPrice) ? formatPrice(sellPrice) : '—'}</dd>
           <dt>Variants</dt>

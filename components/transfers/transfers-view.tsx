@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { ArrowLeftRight, Plus } from 'lucide-react'
 import { TransferStatusPill } from '@/components/transfers/transfer-status-pill'
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
@@ -13,7 +14,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Pagination } from '@/components/shared/pagination'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { usePermission } from '@/hooks/use-permission'
 import { useTransfersList } from '@/hooks/use-transfers'
 import type { TransferStatus } from '@/lib/api/types'
@@ -27,14 +28,28 @@ const STATUSES: ChipOption<TransferStatus | 'all'>[] = [
   { value: 'closed', label: 'Closed' },
 ]
 
+const STATUS_VALUES = STATUSES.map((option) => option.value)
+
+/** `?status=draft` so a count elsewhere can open the list already filtered. */
+function parseStatus(value: string | null): TransferStatus | 'all' {
+  return STATUS_VALUES.includes(value as TransferStatus) ? (value as TransferStatus) : 'all'
+}
+
 export function TransfersView() {
-  const { canDispatchTransfers, canRequestTransfer, locationScoped } = usePermission()
+  const { canDispatchTransfers, canRequestTransfer } = usePermission()
   const requestOnly = canRequestTransfer() && !canDispatchTransfers()
-  const defaultBranch = useDefaultBranchId()
-  const [branchId, setBranchId] = useState(locationScoped ? defaultBranch : '')
-  const [status, setStatus] = useState<TransferStatus | 'all'>('all')
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const searchParams = useSearchParams()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
+  const [status, setStatus] = useState<TransferStatus | 'all'>(() => parseStatus(searchParams.get('status')))
   const [page, setPage] = useState(1)
   const offset = (page - 1) * 20
+
+  useEffect(() => {
+    setStatus(parseStatus(searchParams.get('status')))
+    setPage(1)
+  }, [searchParams])
 
   const query = useTransfersList(branchId, status === 'all' ? '' : status, offset)
   const total = query.data?.total ?? 0
@@ -63,12 +78,12 @@ export function TransfersView() {
 
       <Panel title="Transfer list" description={query.isPending ? undefined : `${total} transfers`}>
         <div className="toolbar">
-          {!locationScoped && (
+          {allowPageBranchFilter && (
             <div className="toolbar-field">
               <LocationSelect
-                value={branchId}
+                value={pageBranchId}
                 onChange={(value) => {
-                  setBranchId(value)
+                  setPageBranchId(value)
                   setPage(1)
                 }}
                 onlyAccessible
@@ -113,7 +128,33 @@ export function TransfersView() {
           </div>
         ) : (
           <>
-            <div className="table-wrap">
+            <ul className="doc-feed transfers-list-mobile panel-body" aria-label="Stock transfers">
+              {items.map((transfer) => {
+                const pieces = transfer.totals.dispatched || transfer.totals.requested
+                return (
+                  <li key={transfer.id} className="doc-feed-row">
+                    <div className="doc-feed-head">
+                      <Link href={`/transfers/${transfer.id}`} className="doc-feed-ref link-cell">
+                        {transfer.reference}
+                      </Link>
+                      <span className="doc-feed-figure tabular">{pieces} pcs</span>
+                    </div>
+                    <p className="doc-feed-meta">
+                      <span>
+                        {transfer.from.name} → {transfer.to.name}
+                      </span>
+                      <span>
+                        <TransferStatusPill status={transfer.status} />
+                      </span>
+                      {transfer.totals.onTheRoad > 0 && (
+                        <span>{transfer.totals.onTheRoad} on the road</span>
+                      )}
+                    </p>
+                  </li>
+                )
+              })}
+            </ul>
+            <div className="table-wrap transfers-table-desktop">
               <table className="card-table">
                 <caption className="sr-only">Stock transfers</caption>
                 <thead>

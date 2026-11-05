@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
+import { PreferenceEffects } from '@/components/shared/preference-effects'
 import { QueryProvider } from '@/providers/query-provider'
 import { useUIStore } from '@/store/ui-store'
 
@@ -20,6 +21,7 @@ function ThemedToaster() {
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryProvider>
+      <PreferenceEffects />
       {children}
       <ThemedToaster />
     </QueryProvider>

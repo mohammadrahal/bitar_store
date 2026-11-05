@@ -13,12 +13,15 @@ export function LocationAssignmentsField({
   onChange,
   disabled,
   error,
+  showAccess = true,
 }: {
   branches: Branch[] | undefined
   value: LocationAssignment[]
   onChange: (next: LocationAssignment[]) => void
   disabled?: boolean
   error?: string
+  /** Employees can be view-only. A manager's branch list is membership only. */
+  showAccess?: boolean
 }) {
   const accessOf = (locationId: string) => value.find((entry) => entry.locationId === locationId)?.access
 
@@ -34,8 +37,6 @@ export function LocationAssignmentsField({
     onChange(value.map((entry) => (entry.locationId === locationId ? { ...entry, access } : entry)))
   }
 
-  const warehouseBranch = branches?.find((branch) => branch.kind === 'warehouse')
-
   if (!branches?.length) {
     return (
       <div className="field full">
@@ -47,12 +48,7 @@ export function LocationAssignmentsField({
   return (
     <fieldset className="field full">
       <legend>Locations</legend>
-      {warehouseBranch && (
-        <p className="field-hint assignment-warehouse-hint">
-          For replenishment requests, also assign <strong>{warehouseBranch.name}</strong> (the warehouse branch) so the
-          app can link the main inventory.
-        </p>
-      )}
+      {error ? <p className="field-error">{error}</p> : null}
       <ul className="assignment-list">
         {branches.map((branch) => {
           const access = accessOf(branch.id)
@@ -70,7 +66,7 @@ export function LocationAssignmentsField({
                   {branch.name} <span className="muted">{branch.code ?? branch.location}</span>
                 </span>
               </label>
-              {assigned && (
+              {showAccess && assigned && (
                 <div className="assignment-access" role="radiogroup" aria-label={`Access at ${branch.name}`}>
                   {(['full', 'view_only'] as LocationAccess[]).map((option) => (
                     <label key={option}>

@@ -61,11 +61,17 @@ export async function fetchAllStockOverviewCached(params: OverviewParams = {}): 
 
   let pending = overviewInflight.get(key)
   if (!pending) {
-    pending = fetchAllStockOverviewPages(params).then((data) => {
-      overviewCache.set(key, { data, at: Date.now() })
-      overviewInflight.delete(key)
-      return data
-    })
+    pending = fetchAllStockOverviewPages(params)
+      .then((data) => {
+        overviewCache.set(key, { data, at: Date.now() })
+        return data
+      })
+      /* Released whether the fetch resolved or threw. A rejected promise left
+         in the map is handed to every later caller, so a retry would answer
+         with the first failure instead of reaching the server again. */
+      .finally(() => {
+        overviewInflight.delete(key)
+      })
     overviewInflight.set(key, pending)
   }
   return pending

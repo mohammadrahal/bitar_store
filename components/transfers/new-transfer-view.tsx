@@ -1,8 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCatalogSync } from '@/hooks/use-stock'
 import { PackageSearch } from 'lucide-react'
 import { toast } from 'sonner'
@@ -32,45 +32,79 @@ export function NewTransferView() {
   const router = useRouter()
   const create = useCreateTransfer()
   const idempotency = useIdempotencyKey()
-  const { user, canDispatchTransfers, canReceiveTransfers, locationScoped } = usePermission()
+  const { user, canDispatchTransfers, canReceiveTransfers, locationScoped, activeLocationId } = usePermission()
   const requestMode = canReceiveTransfers() && !canDispatchTransfers()
   const defaultBranch = useDefaultBranchId()
-  const receivingBranchId = user.branchId ?? user.branchIds[0] ?? defaultBranch
+  const assignedBranchId =
+    (locationScoped ? activeLocationId : null) ?? user.branchIds[0] ?? user.branchId ?? defaultBranch
   const { data: branches } = useBranches()
 
   const [sourceBranchId, setSource] = useState('')
   const [destinationBranchId, setDestination] = useState(
-    requestMode ? receivingBranchId : locationScoped ? defaultBranch : '',
+    requestMode ? assignedBranchId : locationScoped ? defaultBranch : '',
   )
+  const warehouseLookupBranch = requestMode ? destinationBranchId || assignedBranchId : undefined
   const {
     data: warehouseId,
     isPending: warehousePending,
     refetch: refetchWarehouse,
-  } = useWarehouseId(destinationBranchId || receivingBranchId)
+  } = useWarehouseId(warehouseLookupBranch)
   const [note, setNote] = useState('')
   const [pickerLines, setPickerLines] = useState<TransferLineDraft[]>([])
   const catalog = useCatalogSync()
   const catalogReady = catalog.data !== undefined
 
   useEffect(() => {
-    if (branches) void refetchWarehouse()
-  }, [branches, refetchWarehouse])
+    if (requestMode && branches) void refetchWarehouse()
+  }, [requestMode, branches, refetchWarehouse])
+
+  /* Replenishment requests always ship from the warehouse. Prepare-transfer
+     must not auto-fill From — that was overwriting the manager's pick and
+     showing warehouse availability (often 0 while stock sits at branches). */
+  useEffect(() => {
+    if (requestMode && warehouseId) setSource(warehouseId)
+  }, [requestMode, warehouseId])
+
+  /**
+   * `?from=<branchId>` fills in the source once.
+   *
+   * It is how a just-posted receipt hands off: the stock arrived at the
+   * warehouse and the next thing anyone does is send some of it to a shop, so
+   * arriving here with From already set saves re-picking the location you were
+   * looking at a moment ago. It runs once and never in request mode, where the
+   * source is the warehouse by rule and not the caller's to choose.
+   */
+  const requestedSource = useSearchParams().get('from') ?? ''
+  const sourceFromUrl = useRef(false)
+  useEffect(() => {
+    if (sourceFromUrl.current || requestMode || !requestedSource || sourceBranchId) return
+    if (branches && !branches.some((branch) => branch.id === requestedSource)) return
+    sourceFromUrl.current = true
+    setSource(requestedSource)
+  }, [requestedSource, requestMode, sourceBranchId, branches])
 
   useEffect(() => {
-    if (warehouseId) setSource(warehouseId)
-  }, [warehouseId])
-
-  useEffect(() => {
-    if (requestMode && receivingBranchId) setDestination(receivingBranchId)
-  }, [requestMode, receivingBranchId])
+    if (!requestMode || !assignedBranchId) return
+    if (!user.branchIds.includes(destinationBranchId)) setDestination(assignedBranchId)
+  }, [requestMode, assignedBranchId, destinationBranchId, user.branchIds])
 
   const findBranch = (branchId: string): Branch | undefined =>
     branches?.find((branch) => branch.id === branchId) ??
     readDb().branches.find((branch) => branch.id === branchId)
 
   const destinationBranch = useMemo(() => findBranch(destinationBranchId), [branches, destinationBranchId])
+  const sourceBranch = useMemo(() => findBranch(sourceBranchId), [branches, sourceBranchId])
 
   const destinationLabel = destinationBranch?.name ?? (defaultBranch ? '…' : 'Your branch')
+
+  const linePickerBranchId = requestMode ? destinationBranchId : sourceBranchId
+  const stockBranch = requestMode ? destinationBranch : sourceBranch
+  const catalogGateId = requestMode ? destinationBranchId : sourceBranchId
+
+  useEffect(() => {
+    if (requestMode) return
+    setPickerLines([])
+  }, [sourceBranchId, requestMode])
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -109,8 +143,6 @@ export function NewTransferView() {
     )
   }
 
-  const linePickerBranchId = requestMode ? destinationBranchId : sourceBranchId
-
   const submitBlocked =
     create.isPending || !destinationBranchId || !linePickerBranchId || pickerLines.length === 0
 
@@ -141,19 +173,33 @@ export function NewTransferView() {
           <div className="panel-body">
             {requestMode ? (
               <>
-                <dl className="route-summary route-summary--single">
-                  <div>
-                    <dt>Restock at</dt>
-                    <dd>{destinationLabel}</dd>
-                  </div>
-                </dl>
+                {user.branchIds.length > 1 ? (
+                  <Field label="Restock at" hint="The warehouse sends to this branch. Must be a location you work at.">
+                    <LocationSelect
+                      value={destinationBranchId}
+                      onChange={setDestination}
+                      onlyAccessible
+                      onlyFullAccess
+                    />
+                  </Field>
+                ) : (
+                  <dl className="route-summary route-summary--single">
+                    <div>
+                      <dt>Restock at</dt>
+                      <dd>{destinationLabel}</dd>
+                    </div>
+                  </dl>
+                )}
                 <p className="muted field-hint replenishment-hint">
                   Availability in the picker reflects what you have on hand now — use it to spot sizes that are low.
                 </p>
               </>
             ) : (
               <div className="form-grid">
-                <Field label="From">
+                <Field
+                  label="From"
+                  hint="Available quantities in the list below are sellable stock at this location."
+                >
                   <LocationSelect
                     value={sourceBranchId}
                     onChange={setSource}
@@ -211,21 +257,38 @@ export function NewTransferView() {
               ? transferLinesSummary(pickerLines)
               : requestMode
                 ? 'Search the catalog and add every variant that needs more units.'
-                : 'Search the catalog and add each variant to ship. Pick the source location first so availability matches the warehouse.'
+                : 'Only products with stock at the From location appear below. Pick source first, then search or open a model.'
           }
         >
-          {!destinationBranchId ? (
+          {!catalogGateId ? (
             <div className="panel-body">
               <EmptyState
                 icon={PackageSearch}
-                title="Branch required"
-                description="Your account is not linked to a branch yet. Ask a manager to assign you to a store."
+                title={requestMode ? 'Branch required' : 'Source location required'}
+                description={
+                  requestMode
+                    ? 'Your account is not linked to a branch yet. Ask a manager to assign you to a store.'
+                    : 'Choose the From location in Route first. Availability is read from that branch’s stock.'
+                }
               />
             </div>
           ) : !catalogReady ? (
             <div className="panel-body muted">Loading catalog…</div>
           ) : (
             <div className="panel-body transfer-picker-panel">
+              {stockBranch?.name && (
+                <p className="invoice-picker-hint" role="status">
+                  {requestMode
+                    ? `On hand at ${stockBranch.name} (to spot sizes that are low).`
+                    : `Showing only variants with stock at ${stockBranch.name}. Available counts are sellable units there.`}
+                </p>
+              )}
+              {!requestMode && (
+                <p className="invoice-picker-hint muted">
+                  Nothing at this location yet? Stock arrives through <strong>Opening stock</strong> for a first
+                  count, or <strong>Receive stock</strong> for a delivery.
+                </p>
+              )}
               <TransferLinePicker
                 branchId={linePickerBranchId}
                 lines={pickerLines}

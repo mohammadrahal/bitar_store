@@ -14,10 +14,16 @@ import type { BranchScope } from '@/types'
 
 export function useInventory(query: InventoryQuery) {
   const branches = useBranchesKey()
+  const mirrored = useMirroredBranches()
+  /* "Out of stock" and "low" are answered over the whole catalog, so those two
+     wait for the mirror; the rest only need what the locations report and would
+     otherwise sit behind a full catalog sweep for no gain. */
+  const wholeCatalog = query.filter === 'out' || query.filter === 'low'
+  const ready = wholeCatalog ? mirrored !== null : branches !== null
   return useQuery({
     queryKey: [...queryKeys.stock.inventory(query.scope, query.filter, query.search), branches ?? ''],
     queryFn: () => listInventory(query),
-    enabled: branches !== null,
+    enabled: ready,
     staleTime: 30_000,
   })
 }

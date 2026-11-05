@@ -1,3 +1,4 @@
+import type { PaymentDraft } from '@/lib/sale-payments'
 import { readPersistentJson, writePersistentJson } from '@/lib/session-storage'
 
 export interface WholesaleInvoiceLine {
@@ -19,6 +20,8 @@ export interface WholesaleInvoice {
   createdAt: string
   issuedAt?: string
   lines: WholesaleInvoiceLine[]
+  /** Cash / Whish / split — same shape as the till (BL-04). */
+  payment?: PaymentDraft
 }
 
 const STORAGE_KEY = 'bitar:wholesale-invoices:v1'
@@ -57,6 +60,7 @@ export function saveWholesaleInvoice(
     createdAt: existing?.createdAt ?? createdAt,
     issuedAt: input.status === 'issued' ? (input.issuedAt ?? new Date().toISOString()) : undefined,
     lines: input.lines,
+    payment: input.payment,
   }
   const next = all.filter((row) => row.id !== invoice.id)
   next.unshift(invoice)

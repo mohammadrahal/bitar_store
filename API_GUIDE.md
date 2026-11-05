@@ -1,6 +1,6 @@
 # Bitar Fashion API: guide for the frontend developer
 
-Version 0.10: **login**, **users**, **branches**, **branch access**, **catalog**, **stock and sales**, the **warehouse view** (every place at once, minimums, what to send, reports, audit log) and **transfers** (the warehouse sends to a branch, a branch confirms what arrived). Every example below is a real response from the running server.
+Version 0.15: **login**, **users**, **branches**, **branch access**, **catalog**, **stock and sales**, the **warehouse view** (every place at once, minimums, what to send, reports, audit log) and **transfers** (the warehouse sends to a branch, a branch confirms what arrived). Every example below is a real response from the running server.
 
 | Area | Status |
 |---|---|
@@ -584,7 +584,13 @@ In one step the pieces leave the sender and go on the road. If the sender does n
 ```json
 { "lines": [ { "skuId": "<sku id>", "accepted": 8, "damaged": 1 } ] }
 ```
-`accepted` goes on sale, `damaged` goes **on hold**. You can receive in several rounds. You cannot receive more than is still on the road (`409`, "Only N are still on the way for this sku"). Each line must say at least one piece.
+`accepted` and `damaged` both go **on hold** at the destination (`non_sellable`) until someone accepts the good units for sale. You can receive in several rounds. You cannot receive more than is still on the road (`409`, "Only N are still on the way for this sku"). Each line must say at least one piece.
+
+#### `POST /transfers/:id/accept`: release inspected stock to the sellable shelf
+```json
+{ "lines": [ { "skuId": "<sku id>", "quantity": 8 } ] }
+```
+`transfers.receive` required (employees at the destination). Moves good received units from **on hold** to **sellable**. `quantity` cannot exceed `onHold` for that line (good received minus already released, excluding damaged). Idempotency-Key required.
 
 #### `POST /transfers/:id/resolve`: confirm what never arrived is lost
 ```json
@@ -606,11 +612,11 @@ No body, no key needed. Asking again changes nothing. After dispatch it is `409`
   "requestedBy": { "id": "58365707-...", "name": "Admin" }, "requestedAt": "2026-10-31T02:04:49.707Z",
   "dispatchedBy": { "id": "58365707-...", "name": "Admin" }, "dispatchedAt": "2026-10-31T02:04:49.924Z",
   "lines": [ { "sku": { "id": "2dae6572-...", "code": "JEAN-SLIM-32-BLUE", "styleName": "Slim Jeans", "size": "32", "color": "Blue" },
-               "requested": 10, "dispatched": 10, "received": 9, "lost": 1, "onTheRoad": 0 } ],
-  "totals": { "requested": 10, "dispatched": 10, "received": 9, "lost": 1, "onTheRoad": 0 }
+               "requested": 10, "dispatched": 10, "received": 9, "damaged": 1, "releasedToSellable": 8, "onHold": 0, "lost": 1, "onTheRoad": 0 } ],
+  "totals": { "requested": 10, "dispatched": 10, "received": 9, "damaged": 1, "releasedToSellable": 8, "onHold": 0, "lost": 1, "onTheRoad": 0 }
 }
 ```
-**For the screens.** Warehouse: a "Prepare transfer" form (the suggestions list can fill it: "Hamra needs 12"), then a "Send" button, and a list filtered by `status=dispatched`. Branch: a list of what is **coming** (`status=dispatched` or `partially_received`), and a "Receive" screen with, per line, how many are good and how many are damaged. Show `onTheRoad` as "still on the way". A branch manager sees "Confirm lost" only when `onTheRoad > 0`.
+**For the screens.** Warehouse: a "Prepare transfer" form (the suggestions list can fill it: "Hamra needs 12"), then a "Send" button, and a list filtered by `status=dispatched`. Branch: a list of what is **coming** (`status=dispatched` or `partially_received`), **Receive** (good/damaged counts → on hold), then **Accept for sale** when `onHold > 0`. Show `onTheRoad` as "still on the way". Admin inventory **on hold** includes received transfer stock until accept. A branch manager sees "Confirm lost" only when `onTheRoad > 0`.
 
 ## What the owner manages: categories, deleting, sales history, restock requests
 
@@ -635,18 +641,45 @@ To archive instead: `PATCH` with `isActive: false` (styles, skus, branches, user
 #### Sales history of any period
 `GET /sales/history?branchId=&from=&to=&limit=&offset=` returns `{ from, to, sales: [ { id, reference, branch, soldAt, businessDate, soldBy, status, channel, items, total, discounts, cash, whish } ] }`, newest first, and the whole count in `X-Total-Count`. Dates are `YYYY-MM-DD` (the Lebanese shop day, at most 366 days; with only `from` you get that one day). The admin sees every branch, anyone else only their own. For totals and charts use `GET /reports/sales-summary`. `api.ts`: `getSalesHistory`.
 
+#### The places of a transfer
+`GET /places` (anyone with `transfers.dispatch` or `transfers.receive`): every active place as `{ id, code, name, kind }`, the warehouse first, nothing about stock. A branch user sees only their own branch in `GET /branches`, so this is the list for the **"to"** of the form. **From** = your places (`GET /branches`; the admin: all). Someone with only `transfers.receive` (a normal employee) has no choice: from = the warehouse (`GET /warehouse`), to = their branch (a restock request). `api.ts`: `listPlaces`.
+
 #### A branch asks the warehouse to restock it
 1. `GET /warehouse` (anyone): `{ id, code, name }`. Nothing about its stock. (A branch user does not see the warehouse in `GET /branches`.)
 2. `POST /transfers` with `sourceBranchId` = the warehouse id and `destinationBranchId` = the user's own branch: a **draft** (a request). Employees and managers can do it. Nothing moves.
 3. The warehouse (admin, or the warehouse's manager) reviews it and **sends** it (`/dispatch`) or **cancels** it. The branch then **receives** it.
 The one who asked can **cancel** their own request while it is a draft, but cannot send it. A transfer between two places that are not yours is still `403`.
 
-#### Permissions of one user (admin only)
-Give one user a **specific permission** on top of their role, or take one away: say an **employee who may create products**.
+#### Permissions of one user
+Give a user a **specific permission** on top of their role, or take one away: say an **employee who may create products**. The **admin** does it for managers and employees; a **manager** does it for the **employees of their own branches**, with permissions the manager has too.
 - `GET /permissions`: every permission with `label`, `description`, `grantable`, and what each role has by default (to build the checkboxes).
 - `GET /users/:id/permissions`: `permissions: [ { key, label, description, allowed, source } ]` with `source` = `role` / `granted` / `denied` / `none`.
 - `PUT /users/:id/permissions` `{ "permissions": { "catalog.create": true } }`: the state you want (`true` can, `false` cannot) for the ones you list; the server keeps only what differs from the role. Takes effect on the user's **next request**.
-`409` for yourself and for an admin (an admin has everything). `400` for an unknown key, for `users.administer` (admin only, never granted) or a value that is not true or false. New user: `POST /users`, then `PUT .../permissions`. `api.ts`: `getPermissionCatalog`, `getUserPermissions`, `setUserPermissions`.
+`409` for yourself and for an admin (an admin has everything). `403` for a manager on a manager or an admin, or giving what the manager lacks. `404` for an employee of other branches. `400` for an unknown key, for `users.administer` (admin only, never granted) or a value that is not true or false. New user: `POST /users`, then `PUT .../permissions`. `api.ts`: `getPermissionCatalog`, `getUserPermissions`, `setUserPermissions`.
+
+#### A manager appointed to every branch (admin only)
+`PUT /users/:id/branch-access` `{ "mode": "all" }` appoints a manager to **every branch** (never the warehouse), including branches opened later; `{ "mode": "selected" }` goes back to the list granted with `PUT /users/:id/branches/:branchId`. `GET` returns `{ userId, mode, branchIds }`. `409` for an employee or an admin. The real branches of the user are always in `GET /auth/me` (`branchIds`). `api.ts`: `getBranchAccess`, `setBranchAccess`.
+
+#### Stock adjustments
+Correct the stock of one sku at one place without a sale or a transfer (manager for their branches, admin anywhere; an employee only with the permission `adjustments.create`).
+- `POST /stock/adjustments` `{ "branchId", "skuId", "bucket"?: "sellable" | "non_sellable", "quantityDelta": -2, "reason", "note" }` with the header `Idempotency-Key`. **A reason and a note (5 to 200 characters) are required.** `+` adds, `-` takes out. Reasons: `count_correction`, `data_entry_error`, `other` (both signs), `found` (adds only), `loss` (removes only), `damage` (removes only: the pieces **go on hold**, they are not deleted; written off when taken from `non_sellable`). The pieces on the road cannot be adjusted (`400`). More than there is: `409` with `details` and nothing changes. An adjustment cannot be edited or deleted. `201` returns `{ id, reference, branch, sku, bucket, quantityDelta, reason, note, by, createdAt, balanceAfter }`.
+- `GET /stock/adjustments?branchId=&skuId=&reason=&from=&to=&limit=&offset=`: the history, newest first, the whole count in `X-Total-Count`.
+`api.ts`: `adjustStock`, `listAdjustmentsPage`.
+
+#### Goods receipt: a delivery from a supplier
+The delivery comes into the **warehouse** as one document: **supplier name**, the **supplier's invoice number**, its **date**, and for each product the **quantity** and the **price paid per piece**. The warehouse stock grows from it in the same transaction (for sale), and it is written to the ledger (`goods_receipt`) and the audit log. It cannot be edited or deleted: a mistake is corrected with a stock adjustment. **Opening stock stays for the first count only.**
+- `POST /goods-receipts` with `Idempotency-Key`: `{ "supplierName", "supplierInvoiceNumber", "invoiceDate"?, "currency"?, "note"?, "lines": [ { "skuId", "quantity", "unitCost" } ] }`. 1 to 200 products, each once, quantity 1 to 10000, `unitCost` up to 2 decimals (0 allowed). The server computes `totalCost`. The same supplier + invoice number twice (any letter case) is `409` and names the first receipt; the same number from another supplier is fine. An archived product is `409`, an unknown one `404`. Admin, or a manager who reaches the warehouse; a branch manager or an employee is `403`.
+- `GET /goods-receipts?supplier=&invoiceNumber=&skuId=&from=&to=&limit=&offset=`: summaries, newest first, the whole count in `X-Total-Count`. `GET /goods-receipts/:id`: one document with its lines.
+`api.ts`: `receiveGoods`, `listGoodsReceiptsPage`, `getGoodsReceipt`.
+
+#### Invoices: the supply invoice (B2B) and the invoice of a sale (B2C)
+- **Supply invoice (b2b):** `POST /invoices` `{ "transferId" }` (a transfer that was **sent** and **leaves the warehouse**; admin or a manager who reaches the warehouse). It is a **draft** (no number): its lines are what was **sent**, priced from the catalog. `PATCH /invoices/:id` `{ "lines": [ { "skuId", "unitPrice" } ], "note" }` adjusts the prices (the catalog does not change). `POST /invoices/:id/finalize` gives it the number `B2B-00000001` and **locks it for ever**. `DELETE /invoices/:id` deletes a draft.
+- **Invoice of a sale (b2c):** `POST /invoices` `{ "saleId", "customerName"?, "customerPhone"?, "note"? }` by anyone with `sales.create` at the branch. **Final at once** (`B2C-00000001`). The name (Arabic or Latin) and the phone are both optional.
+- **Void:** `POST /invoices/:id/void` `{ "reason" }` (admin or manager) cancels a final invoice (it stays, marked VOID, with the reason); then a new invoice can be made for the same transfer or sale. **One live invoice per transfer and per sale** (`409` otherwise; the message says what to do).
+- **Read:** `GET /invoices?kind=&status=&branchId=&search=&from=&to=&limit=&offset=` (summaries, newest first, the whole count in `X-Total-Count`), `GET /invoices/:id` (with the lines, and the payments for a b2c). Anyone who reaches the place that issued it or the place it is addressed to; the admin sees all.
+- **PDF:** `GET /invoices/:id/pdf` (`application/pdf`), made when asked. A draft is marked DRAFT and a void one VOID. It needs the token: fetch it and show or save the blob (`downloadInvoicePdf` in `api.ts`).
+The names and descriptions are **copied onto the invoice** when it is made, so renaming a product or a branch later never changes an invoice already issued.
+`api.ts`: `createInvoice`, `listInvoicesPage`, `getInvoice`, `updateInvoicePrices`, `finalizeInvoice`, `voidInvoice`, `deleteInvoice`, `downloadInvoicePdf`.
 
 ---
 
@@ -1133,6 +1166,113 @@ export interface UserPermissions {
     overrides: { permission: string; effect: 'allow' | 'deny' }[];
 }
 
+export interface BranchAccess {
+    userId: string;
+    mode: 'all' | 'selected';   // all: every branch (never the warehouse), also the ones opened later · selected: the branches granted one by one
+    branchIds: string[];        // the ones granted one by one (the real list of the user is in /auth/me)
+}
+
+// ---- stock adjustments: correct the stock without a sale or a transfer ----------------------------------------------
+export type AdjustmentReason = 'count_correction' | 'damage' | 'loss' | 'found' | 'data_entry_error' | 'other';
+// count_correction, data_entry_error, other: + or - · found: + only · loss: - only · damage: - only (the pieces go ON HOLD)
+
+export interface AdjustStockInput {
+    branchId: string;
+    skuId: string;
+    bucket?: 'sellable' | 'non_sellable';   // default sellable. The pieces on the road belong to a transfer
+    quantityDelta: number;                  // a whole number other than 0: + adds, - takes out
+    reason: AdjustmentReason;
+    note: string;                           // 5 to 200 characters, required
+}
+
+export interface StockAdjustment {
+    id: string;
+    reference: string;                      // "A-00000001"
+    branch: { id: string; code: string; name: string };
+    sku: { id: string; code: string; styleName: string; size: string; color: string };
+    bucket: string;
+    quantityDelta: number;
+    reason: AdjustmentReason;
+    note: string;
+    by: { id: string; name: string | null };
+    createdAt: string;
+    balanceAfter: number | null;            // the balance of that bucket right after
+}
+
+export interface ListAdjustmentsParams { branchId?: string; skuId?: string; reason?: AdjustmentReason; from?: string; to?: string; limit?: number; offset?: number }
+
+// ---- goods receipts: a delivery from a supplier into the warehouse ----------------------------------------------------
+export interface GoodsReceiptLineInput { skuId: string; quantity: number; unitCost: string | number }   // quantity 1..10000, unitCost the price paid per piece (0 allowed)
+
+export interface CreateGoodsReceiptInput {
+    supplierName: string;              // 2..100 characters, free text
+    supplierInvoiceNumber: string;     // the number on the supplier's invoice, 1..50
+    invoiceDate?: string;              // YYYY-MM-DD, default today, not in the future
+    currency?: string;                 // default USD
+    note?: string;                     // up to 200
+    lines: GoodsReceiptLineInput[];    // 1..200 products, each once
+}
+
+export interface GoodsReceiptSummary {
+    id: string;
+    reference: string;                 // "GR-00000001"
+    warehouse: { id: string; code: string; name: string };
+    supplierName: string;
+    supplierInvoiceNumber: string;
+    invoiceDate: string;
+    currency: string;
+    note: string | null;
+    totalCost: string;                 // computed by the server
+    receivedBy: { id: string; name: string | null };
+    createdAt: string;
+    lineCount: number;
+    totalQuantity: number;
+}
+
+export interface GoodsReceipt extends GoodsReceiptSummary {
+    lines: { sku: { id: string; code: string; styleName: string; size: string; color: string }; quantity: number; unitCost: string; lineTotal: string }[];
+}
+
+export interface ListGoodsReceiptsParams { supplier?: string; invoiceNumber?: string; skuId?: string; from?: string; to?: string; limit?: number; offset?: number }
+
+// ---- invoices: the supply invoice (b2b, warehouse to branch, from a transfer) and the invoice of a sale (b2c) ------------
+export type InvoiceKind = 'b2b' | 'b2c';
+export type InvoiceStatus = 'draft' | 'final' | 'void';   // draft: no number, prices can change · final: numbered and locked · void: cancelled, stays with the reason
+
+export type CreateInvoiceInput =
+    | { transferId: string; note?: string }                                                    // a supply invoice (the transfer must be sent and leave the warehouse)
+    | { saleId: string; customerName?: string; customerPhone?: string; note?: string };        // the invoice of a sale: final at once, the customer is optional
+
+export interface InvoiceSummary {
+    id: string;
+    kind: InvoiceKind;
+    status: InvoiceStatus;
+    reference: string | null;           // "B2B-00000001" / "B2C-00000001": given when it becomes final (a draft has none)
+    issuer: { id: string; name: string };
+    recipient: { branchId: string | null; name: string | null; phone: string | null };   // b2b: the branch · b2c: the customer (may be empty = walk-in)
+    transfer: { id: string; reference: string } | null;
+    sale: { id: string; reference: string } | null;
+    currency: string;
+    subtotal: string;
+    discountTotal: string;
+    total: string;
+    note: string | null;
+    issuedBy: { id: string; name: string | null };
+    createdAt: string;
+    finalizedAt: string | null;
+    voided: { at: string; by: { id: string; name: string | null }; reason: string } | null;
+    lineCount: number;
+}
+
+export interface InvoiceLine { lineNo: number; sku: { id: string; code: string }; description: string; quantity: number; unitPrice: string; discount: string; lineTotal: string }
+
+export interface Invoice extends InvoiceSummary {
+    lines: InvoiceLine[];
+    payments: { method: string; amount: string; reference: string | null }[];   // the payments of the sale (b2c)
+}
+
+export interface ListInvoicesParams { kind?: InvoiceKind; status?: InvoiceStatus; branchId?: string; search?: string; from?: string; to?: string; limit?: number; offset?: number }
+
 export interface CreateUserInput {   // a user is created WITHOUT a password: set it afterwards with setUserPassword
     email: string;
     fullName: string;
@@ -1295,6 +1435,35 @@ export const createApi = (token: string) => ({
     // the state you WANT for the permissions you list (true can, false cannot); send only what changed. Takes effect on the user's next request.
     setUserPermissions: (id: string, permissions: Record<string, boolean>) => request<UserPermissions>(`/users/${id}/permissions`, token, 'PUT', { permissions }),
 
+    // ---- invoices. The supply invoice: createInvoice({ transferId }) -> updateInvoicePrices -> finalizeInvoice. The invoice of a sale: createInvoice({ saleId, customerName? }).
+    createInvoice: (input: CreateInvoiceInput) => request<Invoice>('/invoices', token, 'POST', input),
+    listInvoicesPage: (params: ListInvoicesParams = {}) => requestPage<InvoiceSummary>(`/invoices${query(params)}`, token),
+    getInvoice: (id: string) => request<Invoice>(`/invoices/${id}`, token),
+    updateInvoicePrices: (id: string, input: { lines?: { skuId: string; unitPrice: string | number }[]; note?: string }) => request<Invoice>(`/invoices/${id}`, token, 'PATCH', input),   // a draft only
+    finalizeInvoice: (id: string) => request<Invoice>(`/invoices/${id}/finalize`, token, 'POST'),
+    voidInvoice: (id: string, reason: string) => request<Invoice>(`/invoices/${id}/void`, token, 'POST', { reason }),
+    deleteInvoice: (id: string) => request<void>(`/invoices/${id}`, token, 'DELETE'),                    // a draft only
+    // the PDF needs the token, so a plain link does not work: fetch it, then show or save the blob (window.open(URL.createObjectURL(blob)))
+    downloadInvoicePdf: async (id: string): Promise<Blob> => {
+        const response = await fetch(`${BASE_URL}/invoices/${id}/pdf`, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+        if (!response.ok) throw new ApiError(response.status, ((await response.json().catch(() => null)) as { message?: string } | null)?.message ?? 'Could not load the invoice');
+        return response.blob();
+    },
+
+    // ---- goods receipts (admin, or a manager who reaches the warehouse). Needs an idempotencyKey: once per click.
+    // 409 "This supplier invoice was already received as GR-..." is a double entry.
+    receiveGoods: (input: CreateGoodsReceiptInput, idempotencyKey: string) => request<GoodsReceipt>('/goods-receipts', token, 'POST', input, { 'Idempotency-Key': idempotencyKey }),
+    listGoodsReceiptsPage: (params: ListGoodsReceiptsParams = {}) => requestPage<GoodsReceiptSummary>(`/goods-receipts${query(params)}`, token),
+    getGoodsReceipt: (id: string) => request<GoodsReceipt>(`/goods-receipts/${id}`, token),
+
+    // ---- stock adjustments (manager for their branches, admin anywhere). Needs an idempotencyKey: newIdempotencyKey() once per click.
+    adjustStock: (input: AdjustStockInput, idempotencyKey: string) => request<StockAdjustment>('/stock/adjustments', token, 'POST', input, { 'Idempotency-Key': idempotencyKey }),
+    listAdjustmentsPage: (params: ListAdjustmentsParams = {}) => requestPage<StockAdjustment>(`/stock/adjustments${query(params)}`, token),
+
+    // ---- which branches a user reaches (admin only): a manager can be appointed to ALL branches
+    getBranchAccess: (id: string) => request<BranchAccess>(`/users/${id}/branch-access`, token),
+    setBranchAccess: (id: string, mode: 'all' | 'selected') => request<BranchAccess>(`/users/${id}/branch-access`, token, 'PUT', { mode }),
+
     // ---- categories (a list the owner manages: a product can only use a category that exists)
     listCategories: (params: { activeOnly?: boolean } = {}) => request<Category[]>(`/categories${query(params)}`, token),
     createCategory: (name: string) => request<Category>('/categories', token, 'POST', { name }),
@@ -1313,6 +1482,8 @@ export const createApi = (token: string) => ({
     },
 
     // ---- which place is the warehouse (anyone may ask), to ask it to restock the user's branch with createTransfer({ sourceBranchId: warehouse.id, destinationBranchId: myBranch, ... })
+    // every active place (id, code, name, kind), the warehouse first: the "to" of the transfer form (GET /branches shows a branch user only their own)
+    listPlaces: () => request<{ id: string; code: string; name: string; kind: 'branch' | 'warehouse' }[]>('/places', token),
     getWarehouse: () => request<{ id: string; code: string; name: string }>('/warehouse', token),
 
     getReplenishmentSuggestions: (params: { branchId?: string } = {}) => request<ReplenishmentSuggestions>(`/replenishment/suggestions${query(params)}`, token),

@@ -1,5 +1,7 @@
-import { formatDocumentDate, formatPrice } from '@/lib/format'
+import { formatDocumentDate, formatLbp, formatPrice } from '@/lib/format'
 import { printHtmlDocument } from '@/lib/print-document'
+import { getExchangeRate, usdToLbpAmount } from '@/services/exchange-rate.service'
+import type { ReceiptPaymentLine } from '@/components/sales/sale-receipt-build'
 
 export interface ReceiptLine {
   label: string
@@ -18,7 +20,7 @@ export interface ReceiptPrintInput {
   note?: string | null
   lines: ReceiptLine[]
   total: number
-  payments?: { method: string; amount: number }[]
+  payments?: ReceiptPaymentLine[]
 }
 
 function escapeHtml(value: string) {
@@ -38,12 +40,41 @@ const STYLES = `
   th { text-align: left; border-bottom: 1px solid #ccc; font-size: 11px; }
   td.num { text-align: right; white-space: nowrap; }
   .total { font-weight: 700; font-size: 14px; border-top: 1px solid #000; padding-top: 8px; }
+  .total-lbp { font-size: 12px; font-weight: 500; color: #333; margin-top: 4px; }
   .note { margin-top: 12px; font-style: italic; }
+  .pay-row { margin: 4px 0; }
+  .pay-change { font-weight: 700; margin-top: 8px; }
 `
+
+function paymentsBlock(payments: ReceiptPaymentLine[] | undefined, status: ReceiptPrintInput['status']) {
+  if (payments && payments.length > 0) {
+    const rows = payments
+      .map((payment) => {
+        const parts = [`<div class="pay-row"><strong>${escapeHtml(payment.method)}</strong> — ${formatPrice(payment.amount)}`]
+        if (payment.reference) parts.push(` · ref ${escapeHtml(payment.reference)}`)
+        parts.push('</div>')
+        if (payment.method === 'cash' && payment.tendered != null && payment.tendered > 0) {
+          parts.push(`<div class="pay-row">Tendered: ${formatPrice(payment.tendered)}</div>`)
+        }
+        if (payment.method === 'cash' && payment.change != null && Number(payment.change) > 0) {
+          parts.push(`<div class="pay-row pay-change">Change: ${formatPrice(Number(payment.change))}</div>`)
+        }
+        return parts.join('')
+      })
+      .join('')
+    return `<section><h2 style="font-size:13px;margin:16px 0 6px">Payment</h2>${rows}</section>`
+  }
+  if (status === 'pending') {
+    return '<p><em>Payment not recorded — complete the sale at the till when the customer pays.</em></p>'
+  }
+  return ''
+}
 
 export function printSaleReceipt(input: ReceiptPrintInput) {
   const statusClass = input.status === 'pending' ? 'status-pending' : 'status-completed'
   const statusLabel = input.status === 'pending' ? 'Pending payment' : 'Paid'
+  const rate = getExchangeRate()
+  const totalLbp = usdToLbpAmount(input.total, rate)
   const linesHtml = input.lines
     .map(
       (line) => `
@@ -55,14 +86,6 @@ export function printSaleReceipt(input: ReceiptPrintInput) {
     </tr>`,
     )
     .join('')
-  const paymentsHtml =
-    input.payments && input.payments.length > 0
-      ? `<section><h2 style="font-size:13px;margin:16px 0 6px">Payment</h2><ul style="margin:0;padding-left:18px">${input.payments
-          .map((p) => `<li>${escapeHtml(p.method)} — ${formatPrice(p.amount)}</li>`)
-          .join('')}</ul></section>`
-      : input.status === 'pending'
-        ? '<p><em>Payment not recorded — complete the sale at the till when the customer pays.</em></p>'
-        : ''
 
   const body = `
     <style>${STYLES}</style>
@@ -79,7 +102,8 @@ export function printSaleReceipt(input: ReceiptPrintInput) {
       <tbody>${linesHtml}</tbody>
     </table>
     <p class="total">Total: ${formatPrice(input.total)}</p>
-    ${paymentsHtml}
+    ${totalLbp != null ? `<p class="total-lbp">≈ ${formatLbp(totalLbp)}</p>` : ''}
+    ${paymentsBlock(input.payments, input.status)}
     ${input.note ? `<p class="note">${escapeHtml(input.note)}</p>` : ''}
   `
   printHtmlDocument(input.reference, body)
@@ -95,9 +119,10 @@ export interface WholesalePrintInput {
   note?: string | null
   lines: ReceiptLine[]
   total: number
+  payments?: ReceiptPaymentLine[]
 }
 
-/** B2B document — no till payment block; stock sync waits for the wholesale API. */
+/** B2B invoice print — includes payment when recorded on the document. */
 export function printWholesaleInvoice(input: WholesalePrintInput) {
   const statusClass = input.status === 'draft' ? 'status-pending' : 'status-completed'
   const statusLabel = input.status === 'draft' ? 'Draft' : 'Issued'
@@ -129,7 +154,8 @@ export function printWholesaleInvoice(input: WholesalePrintInput) {
       <tbody>${linesHtml}</tbody>
     </table>
     <p class="total">Total: ${formatPrice(input.total)}</p>
-    <p><em>This document is not a till sale. Stock and accounts sync when the wholesale API is connected.</em></p>
+    ${paymentsBlock(input.payments, input.payments?.length ? 'completed' : 'pending')}
+    <p><em>Wholesale document — stock and accounts sync when the wholesale API is connected.</em></p>
     ${input.note ? `<p class="note">${escapeHtml(input.note)}</p>` : ''}
   `
   printHtmlDocument(input.reference, body)

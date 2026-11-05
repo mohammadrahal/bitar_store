@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { InvoiceLinePicker } from '@/components/sales/invoice-line-picker'
+import { PaymentFields } from '@/components/sales/payment-fields'
 import { LocationSelect } from '@/components/shared/location-select'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useBranches } from '@/hooks/use-branches'
@@ -14,6 +15,7 @@ import { usePermission } from '@/hooks/use-permission'
 import { useCurrentUser } from '@/store/user-store'
 import { formatDocumentDate, formatPrice, todayAsDateInput } from '@/lib/format'
 import { fromCents, toCents } from '@/lib/money'
+import { emptyPayment, paymentProblem, syncTendered, type PaymentDraft } from '@/lib/sale-payments'
 import { getWholesaleInvoice } from '@/services/wholesale-invoices.service'
 import type { VariantOption } from '@/types'
 
@@ -53,6 +55,7 @@ export function NewWholesaleInvoiceView() {
   const [lines, setLines] = useState<CartLine[]>([])
   const [draftId, setDraftId] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [payment, setPayment] = useState<PaymentDraft>(emptyPayment)
   const branchId = locationScoped ? defaultBranch : branchChoice
   const branch = branches?.find((b) => b.id === branchId)
   const invoiceDate = todayAsDateInput()
@@ -67,9 +70,14 @@ export function NewWholesaleInvoiceView() {
     setCustomerName(draft.customerName)
     setNote(draft.note)
     setLines(draft.lines.map((line) => ({ option: optionFromLine(line), quantity: line.quantity })))
+    setPayment(draft.payment ?? emptyPayment())
   }, [searchParams, locationScoped])
 
   const subtotal = fromCents(lines.reduce((sum, line) => sum + line.quantity * toCents(line.option.sellPrice), 0))
+
+  useEffect(() => {
+    setPayment((current) => syncTendered(current, subtotal))
+  }, [subtotal])
   const units = lines.reduce((sum, line) => sum + line.quantity, 0)
   const inCart = Object.fromEntries(lines.map((line) => [line.option.variantId, line.quantity]))
   const referencePreview = draftId ? `DRAFT-${draftId.slice(0, 8).toUpperCase()}` : 'Draft'
@@ -86,6 +94,7 @@ export function NewWholesaleInvoiceView() {
       quantity: line.quantity,
       unitPrice: line.option.sellPrice,
     })),
+    payment,
   })
 
   const persist = (status: 'draft' | 'issued') => {
@@ -93,6 +102,13 @@ export function NewWholesaleInvoiceView() {
     if (!customerName.trim()) {
       toast.error('Enter the customer on the invoice')
       return
+    }
+    if (status === 'issued') {
+      const problem = paymentProblem(payment, subtotal)
+      if (problem) {
+        toast.error(problem)
+        return
+      }
     }
     save.mutate(toPayload(status), {
       onSuccess: (invoice) => {
@@ -316,22 +332,27 @@ export function NewWholesaleInvoiceView() {
               placeholder="Optional terms, PO reference, or delivery note"
             />
           </div>
-          <div className="invoice-totals">
-            <dl>
-              <div>
-                <dt>Items</dt>
-                <dd className="tabular">{units}</dd>
-              </div>
-              <div className="invoice-total-row">
-                <dt>Total due</dt>
-                <dd className="tabular">{formatPrice(subtotal)}</dd>
-              </div>
-            </dl>
+          <div className="invoice-sheet-aside">
+            <div className="invoice-totals">
+              <dl>
+                <div>
+                  <dt>Items</dt>
+                  <dd className="tabular">{units}</dd>
+                </div>
+                <div className="invoice-total-row">
+                  <dt>Total due</dt>
+                  <dd className="tabular">{formatPrice(subtotal)}</dd>
+                </div>
+              </dl>
+            </div>
+            <div className="invoice-payment-wrap">
+              <PaymentFields draft={payment} total={subtotal} onChange={setPayment} totalLabel="Invoice total" />
+            </div>
           </div>
         </footer>
 
         <p className="invoice-footnote">
-          Wholesale document only — not a till sale. Stock and accounts sync when the wholesale API is connected.
+          Wholesale document — stock and accounts sync when the wholesale API is connected.
         </p>
       </article>
     </div>

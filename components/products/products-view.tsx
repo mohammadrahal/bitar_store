@@ -15,12 +15,14 @@ import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
 import { SelectInput } from '@/components/shared/select-input'
 import { Skeleton } from '@/components/shared/skeleton'
+import { FilterChips } from '@/components/shared/filter-chips'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useBranches } from '@/hooks/use-branches'
 import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useCategories, useProducts } from '@/hooks/use-products'
 import { useProductUnits } from '@/hooks/use-stock'
 import { useUIStore } from '@/store/ui-store'
-import type { ProductWithVariants } from '@/types'
+import { ALL_BRANCHES, type ProductWithVariants } from '@/types'
 
 const PAGE_SIZE = 8
 
@@ -52,12 +54,44 @@ export function ProductsView() {
   const { data: categories } = useCategories()
   const scope = useBranchScope()
   const { data: units } = useProductUnits(scope)
+  const { data: branches } = useBranches()
 
-  const total = products?.length ?? 0
+  /**
+   * The catalog is network-wide — a model exists whether or not any one
+   * location holds it — so picking a location in the header narrows the Units
+   * column and nothing else. That left no way to ask the obvious question:
+   * which of these are actually on the shelf here?
+   *
+   * So it is a filter rather than a redefinition of the list. Hiding unstocked
+   * models outright would make a model unfindable from this screen at the exact
+   * moment someone needs to find it: to receive it, or to transfer it in.
+   */
+  const scopedBranch = scope !== ALL_BRANCHES ? scope : null
+  const scopedName = scopedBranch ? branches?.find((branch) => branch.id === scopedBranch)?.name : undefined
+  const [stockFilter, setStockFilter] = useState<'all' | 'stocked'>('all')
+
+  /* A location-specific filter has no meaning once the header moves off that
+     location, and leaving it on would silently hide rows. */
+  useEffect(() => {
+    setStockFilter('all')
+    setPage(1)
+  }, [scope])
+
+  const stockedCount = useMemo(
+    () => (products ?? []).filter((product) => (units?.[product.id]?.onHand ?? 0) > 0).length,
+    [products, units],
+  )
+
+  const rows = useMemo(() => {
+    if (!products || stockFilter === 'all') return products ?? []
+    return products.filter((product) => (units?.[product.id]?.onHand ?? 0) > 0)
+  }, [products, stockFilter, units])
+
+  const total = rows.length
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const currentPage = Math.min(page, pageCount)
-  const visible = products?.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE) ?? []
-  const isFiltered = search.trim() !== '' || category !== ''
+  const visible = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const isFiltered = search.trim() !== '' || category !== '' || stockFilter !== 'all'
 
   return (
     <>
@@ -77,7 +111,13 @@ export function ProductsView() {
 
       <Panel
         title={show === 'archived' ? 'Archived models' : 'Catalog'}
-        description={isPending ? 'Loading…' : `${total} ${total === 1 ? 'model' : 'models'}`}
+        description={
+          isPending
+            ? 'Loading…'
+            : stockFilter === 'stocked' && scopedName
+              ? `${total} of ${products?.length ?? 0} ${total === 1 ? 'model' : 'models'} stocked at ${scopedName}`
+              : `${total} ${total === 1 ? 'model' : 'models'}`
+        }
         actions={
           <div className="segmented compact" role="radiogroup" aria-label="Show">
             {(['active', 'archived'] as const).map((option) => (
@@ -112,6 +152,20 @@ export function ProductsView() {
               ...(categories?.map((option) => ({ value: option, label: option })) ?? []),
             ]}
           />
+          {scopedBranch && (
+            <FilterChips
+              label="Stock at this location"
+              value={stockFilter}
+              onChange={(next) => {
+                setStockFilter(next)
+                setPage(1)
+              }}
+              options={[
+                { value: 'all', label: 'All models', count: products?.length },
+                { value: 'stocked', label: `Stocked at ${scopedName ?? 'this location'}`, count: stockedCount },
+              ]}
+            />
+          )}
           {isFiltered && (
             <button
               type="button"
@@ -120,6 +174,7 @@ export function ProductsView() {
                 setSearchInput('')
                 setSearch('')
                 setCategory('')
+                setStockFilter('all')
               }}
             >
               Clear filters
@@ -141,7 +196,8 @@ export function ProductsView() {
               <ProductTable
                 products={visible}
                 units={units}
-                dataset={`${show}-${currentPage}`}
+                unitsScopeName={scopedName}
+                dataset={`${show}-${stockFilter}-${currentPage}`}
                 filtered={isFiltered}
                 archivedView={show === 'archived'}
                 onEdit={(product) => setDialog({ kind: 'edit', product })}

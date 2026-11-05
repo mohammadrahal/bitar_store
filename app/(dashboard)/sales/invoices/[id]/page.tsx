@@ -1,8 +1,8 @@
-import { WholesaleInvoiceDetailView } from '@/components/sales/wholesale-invoice-detail-view'
+import { InvoiceDetailPage } from '@/components/sales/invoice-detail-page'
 
-export const metadata = { title: 'Wholesale invoice' }
+export const metadata = { title: 'Invoice' }
 
-export default async function WholesaleInvoicePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  return <WholesaleInvoiceDetailView invoiceId={id} />
+  return <InvoiceDetailPage invoiceId={id} />
 }

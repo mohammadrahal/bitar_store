@@ -11,6 +11,7 @@ import { formatBarcode } from '@/lib/barcode'
 import { formatNumber, formatPrice } from '@/lib/format'
 import { Pagination } from '@/components/shared/pagination'
 import { usePagination } from '@/hooks/use-pagination'
+import { useCurrentUser } from '@/store/user-store'
 import type { ProductDetail, Variant } from '@/types'
 
 /** One row per SKU: its own price, barcodes and on-sale status. */
@@ -24,6 +25,7 @@ export function SkuTable({
   onBarcodes: (variant: Variant) => void
 }) {
   const setActive = useSetVariantActive()
+  const showCost = useCurrentUser().canViewCosts
   const scope = useBranchScope()
   const { data: units } = useVariantUnits(product.id, scope)
   const editable = !product.archived
@@ -39,8 +41,9 @@ export function SkuTable({
             <th scope="col">Variant</th>
             <th scope="col">SKU</th>
             <th scope="col">Barcodes</th>
-            <th scope="col" className="num">Price</th>
-            <th scope="col" className="num">Stock</th>
+            {showCost ? <th scope="col" className="num">Cost</th> : null}
+            <th scope="col" className="num">Sell price</th>
+            <th scope="col" className="num">Available</th>
             <th scope="col">Status</th>
             <th scope="col">
               <span className="sr-only">Actions</span>
@@ -63,12 +66,24 @@ export function SkuTable({
                   {barcodes.length === 0 ? '—' : formatBarcode(barcodes[0].code)}
                   {barcodes.length > 1 && <small> +{barcodes.length - 1}</small>}
                 </td>
-                <td className="num tabular" data-label="Price">{formatPrice(variant.sellPrice)}</td>
-                <td className="num tabular" data-label="Stock">
+                {showCost ? (
+                  <td className="num tabular" data-label="Cost">
+                    {variant.unitCost != null && variant.unitCost > 0 ? formatPrice(variant.unitCost) : '—'}
+                  </td>
+                ) : null}
+                <td className="num tabular" data-label="Sell price">{formatPrice(variant.sellPrice)}</td>
+                <td className="num tabular" data-label="Available">
                   {units === undefined ? (
                     <span className="muted">…</span>
                   ) : (
-                    formatNumber(units[variant.id]?.available ?? 0)
+                    <Link href={`/inventory/${variant.id}`} className="link-cell tabular" title="View stock by location">
+                      {formatNumber(units[variant.id]?.available ?? 0)}
+                      {(units[variant.id]?.onHand ?? 0) !== (units[variant.id]?.available ?? 0) && (
+                        <small className="block muted">
+                          {formatNumber(units[variant.id]?.onHand ?? 0)} on hand
+                        </small>
+                      )}
+                    </Link>
                   )}
                 </td>
                 <td data-label="Status">

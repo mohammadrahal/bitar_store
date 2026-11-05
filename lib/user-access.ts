@@ -15,6 +15,8 @@ export interface StoredUserAccess {
   locations: LocationAssignment[]
   /** Keys per location id, plus the platform-wide ones under `*`. */
   grants: Record<string, string[]>
+  /** Managers only — mirrors `GET /users/:id/branch-access` for the employee list. */
+  branchAccessMode?: 'all' | 'selected'
 }
 
 type AccessMap = Record<string, StoredUserAccess>

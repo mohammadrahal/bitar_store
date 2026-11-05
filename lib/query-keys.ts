@@ -31,6 +31,9 @@ export const queryKeys = {
     list: () => ['users', 'list'] as const,
     /** Locations and permission keys for one account. */
     access: (userId: string) => ['users', 'access', userId] as const,
+    permissionCatalog: () => ['users', 'permission-catalog'] as const,
+    permissions: (userId: string) => ['users', 'permissions', userId] as const,
+    branchAccess: (userId: string) => ['users', 'branch-access', userId] as const,
   },
   branches: {
     all: ['branches'] as const,
@@ -42,6 +45,7 @@ export const queryKeys = {
     list: (filters: ProductFilters) => ['products', 'list', filters] as const,
     detail: (productId: string) => ['products', 'detail', productId] as const,
     categories: () => ['products', 'categories'] as const,
+    categoryRecords: (activeOnly: boolean) => ['products', 'category-records', activeOnly] as const,
     /** The whole API catalog, mirrored so stock can point at real SKUs. */
     catalog: () => ['products', 'catalog'] as const,
     priceHistory: (variantId: string) => ['products', 'price-history', variantId] as const,
@@ -49,8 +53,10 @@ export const queryKeys = {
   },
   analytics: {
     all: ['analytics'] as const,
-    sales: (scope: BranchScope, source: 'reports' | 'sales' = 'sales') =>
-      ['analytics', 'sales', scope, source] as const,
+    /* `days` is part of the key: the same scope over 7 and over 90 days are two
+       different answers from the same endpoint. */
+    sales: (scope: BranchScope, source: 'reports' | 'sales' = 'sales', days?: number) =>
+      ['analytics', 'sales', scope, source, days ?? 'today'] as const,
   },
   sales: salesQueryKeys,
   stock: {
@@ -81,9 +87,25 @@ export const queryKeys = {
     countReports: (scope: BranchScope) => ['stock', 'count-reports', scope] as const,
     replenishment: (scope: BranchScope) => ['stock', 'replenishment', scope] as const,
     operations: (scope: BranchScope) => ['stock', 'operations', scope] as const,
+    /* What is empty or under its minimum, counted in variants rather than in
+       variant-and-location pairs. Keyed by the mirrored branch set, like the
+       other balance reads. */
+    health: (scope: BranchScope, branches: string) => ['stock', 'health', scope, branches] as const,
     picker: (branchId: string, search: string) => ['stock', 'picker', branchId, search] as const,
+    /** Corrections and receipts from `GET /stock/adjustments`. */
+    adjustments: (scope: BranchScope) => ['stock', 'adjustments', scope] as const,
+    /** Legacy receipt documents, still read from this device. */
+    receipts: (scope: BranchScope) => ['stock', 'receipts', scope] as const,
+    receipt: (id: string) => ['stock', 'receipt', id] as const,
+    /** Supplier deliveries from `GET /goods-receipts`. The shared record. */
+    goodsReceipts: (search: string, offset: number) => ['stock', 'goods-receipts', search, offset] as const,
+    goodsReceipt: (id: string) => ['stock', 'goods-receipt', id] as const,
     saleModels: (search: string) => ['stock', 'sale-models', search] as const,
+    saleModelsAtBranch: (branchId: string, search: string) =>
+      ['stock', 'sale-models-at-branch', branchId, search] as const,
     saleVariants: (branchId: string, productId: string) => ['stock', 'sale-variants', branchId, productId] as const,
+    saleVariantsAtBranch: (branchId: string, productId: string) =>
+      ['stock', 'sale-variants-at-branch', branchId, productId] as const,
   },
   locations: {
     warehouse: () => ['locations', 'warehouse'] as const,
@@ -99,16 +121,26 @@ export const queryKeys = {
     detail: (id: string) => ['transfers', 'detail', id] as const,
   },
   warehouse: {
+    all: ['warehouse'] as const,
     stockNetwork: (search: string, offset: number) => ['warehouse', 'overview', search, offset] as const,
     reorderLevels: (branchId: string, search: string) => ['warehouse', 'reorder-levels', branchId, search] as const,
     replenishment: (branchId: string) => ['warehouse', 'replenishment', branchId] as const,
   },
+  /** Server invoices from `GET /invoices`, not the device-local wholesale drafts. */
+  apiInvoices: {
+    all: ['api-invoices'] as const,
+    list: (kind: string, branchId: string, offset: number) =>
+      ['api-invoices', 'list', kind, branchId, offset] as const,
+    detail: (id: string) => ['api-invoices', 'detail', id] as const,
+  },
   reports: {
+    all: ['reports'] as const,
     summary: (branchId: string, from: string, to: string) => ['reports', 'summary', branchId, from, to] as const,
     topSkus: (branchId: string, from: string, to: string) => ['reports', 'top-skus', branchId, from, to] as const,
     audit: (offset: number) => ['reports', 'audit', offset] as const,
   },
   dashboard: {
+    all: ['dashboard'] as const,
     overview: (scope: BranchScope) => ['dashboard', 'overview', scope] as const,
     trend: (scope: BranchScope, days: number) => ['dashboard', 'trend', scope, days] as const,
     trendComparison: (scope: BranchScope, days: number) => ['dashboard', 'trend-previous', scope, days] as const,

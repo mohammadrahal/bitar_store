@@ -8,12 +8,13 @@ const priceField = z
 const detailsShape = {
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(120, 'Name is too long'),
   category: z.string().trim().min(2, 'Category must be at least 2 characters').max(60, 'Category is too long'),
+  unitCost: priceField,
   sellPrice: priceField,
 }
 
 /**
- * Editing a model changes its name, category and price; variants are added
- * separately and never renamed. There is no cost: the API has none.
+ * Editing a model changes its name, category and prices; variants are added
+ * separately and never renamed. Cost is kept on this device until the API has it.
  */
 export const productDetailsSchema = z.object(detailsShape)
 
@@ -34,20 +35,21 @@ export const newProductSchema = z
     excluded: z.array(z.string()),
     /** Per-variant sell prices keyed by `color|size`. Blank uses the default sell price. */
     prices: z.record(z.string(), priceField),
-    /** Where the first units are counted in. Blank places nothing. */
-    openingBranchId: z.string(),
-    /** Units per `color|size`, posted as opening stock once the SKUs exist. */
-    openingQuantities: z.record(z.string(), z.number().int('Whole units only').min(0, 'Must be 0 or more')),
+    /** Per-variant costs keyed by `color|size`. Blank uses the default unit cost. */
+    costs: z.record(z.string(), priceField),
+    /** When set with {@link openingQuantities}, `POST /stock/opening` runs once after create. */
+    initialBranchId: z.string().trim().optional(),
+    /** Units per `color|size` at {@link initialBranchId} only. Blank or zero skips. */
+    openingQuantities: z.record(z.string(), z.number().int().min(0).max(99_999)),
   })
   .refine((values) => combinationsOf(values).length > 0, {
     message: 'Keep at least one color and size combination',
     path: ['excluded'],
   })
   .superRefine((values, ctx) => {
-    /* Counted units have to belong somewhere. */
-    const counted = Object.values(values.openingQuantities).some((quantity) => quantity > 0)
-    if (counted && !values.openingBranchId) {
-      ctx.addIssue({ code: 'custom', message: 'Say where these units are', path: ['openingBranchId'] })
+    const hasUnits = Object.values(values.openingQuantities ?? {}).some((quantity) => quantity > 0)
+    if (hasUnits && !values.initialBranchId?.trim()) {
+      ctx.addIssue({ code: 'custom', message: 'Choose where to place the first units', path: ['initialBranchId'] })
     }
   })
 
@@ -69,16 +71,18 @@ export function combinationsOf(values: {
 
 export const emptyNewProductValues: NewProductFormValues = {
   code: '',
-  openingBranchId: '',
-  openingQuantities: {},
   name: '',
   category: '',
+  unitCost: 0,
   sellPrice: 0,
   colors: [],
   sizeSystem: 'letter',
   sizes: [],
   excluded: [],
   prices: {},
+  costs: {},
+  initialBranchId: '',
+  openingQuantities: {},
 }
 
 /** A new price for one SKU. */

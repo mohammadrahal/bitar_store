@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { ArrowLeft, Pencil, Plus, Printer } from 'lucide-react'
+import { InvoicePaymentReadout } from '@/components/sales/invoice-payment-readout'
+import { receiptPaymentsFromDraft } from '@/components/sales/sale-receipt-build'
 import { printWholesaleInvoice } from '@/components/sales/sale-receipt-print'
 import { ErrorState } from '@/components/shared/error-state'
 import { Skeleton } from '@/components/shared/skeleton'
@@ -43,6 +45,7 @@ export function WholesaleInvoiceDetailView({ invoiceId }: { invoiceId: string })
         unitPrice: line.unitPrice,
         lineTotal: line.quantity * line.unitPrice,
       })),
+      payments: invoice.payment ? receiptPaymentsFromDraft(invoice.payment, total) : undefined,
     })
   }
 
@@ -139,6 +142,8 @@ export function WholesaleInvoiceDetailView({ invoiceId }: { invoiceId: string })
             </tbody>
           </table>
         </div>
+
+        <InvoicePaymentReadout payment={invoice.payment} total={total} />
 
         <footer className="invoice-sheet-footer">
           {invoice.note ? (

@@ -51,6 +51,8 @@ export interface Product {
   category: string
   /** Lowest price among the active SKUs; each SKU carries its own. */
   sellPrice: number
+  /** Unit cost from this browser until the API stores it (`canViewCosts` only). */
+  unitCost?: number
   /** Archived models leave sale and transfer pickers but stay in history. */
   archived: boolean
   createdAt: string
@@ -69,6 +71,8 @@ export interface Variant {
   color: string
   /** Standard price of this SKU. */
   sellPrice: number
+  /** Unit cost from this browser until the API stores it. */
+  unitCost?: number
   currency: string
   /** Inactive SKUs leave sale and transfer pickers but stay in history. */
   archived: boolean
@@ -171,8 +175,20 @@ export interface SalesSeries {
   name: string
 }
 
+/**
+ * One variant's sales over the chosen window. Colour and size are part of the
+ * identity, not decoration: `GET /reports/top-skus` ranks per SKU, so a popular
+ * model fills the table with rows whose model name is identical and only the
+ * variant tells them apart.
+ */
 export interface TopSellerRow {
+  /** Variant id, so a row can link to the variant behind it. */
+  variantId: string
   productName: string
+  color: string
+  size: string
+  /** SKU code, shown small under the name. */
+  sku: string
   /** Net units: sales less returns, so this can fall. */
   units: number
   revenue: number

@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { ChevronLeft, X } from 'lucide-react'
-import { BrandLogo, NavLinks, SidebarFooter } from '@/components/dashboard/sidebar-nav'
+import { BrandLogo, NavLinks } from '@/components/dashboard/sidebar-nav'
 import { Topbar } from '@/components/dashboard/topbar'
 import { NoBranchBanner } from '@/components/shared/no-branch-banner'
 import { OfflineBanner } from '@/components/shared/offline-banner'
@@ -34,7 +34,6 @@ function MobileNavPanel({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <NavLinks collapsed={false} onNavigate={onClose} />
-        <SidebarFooter onNavigate={onClose} />
       </aside>
     </div>
   )
@@ -87,7 +86,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandLogo compact={collapsed} />
         </div>
         <NavLinks collapsed={collapsed} />
-        <SidebarFooter compact={collapsed} />
       </aside>
 
       <MobileNav />

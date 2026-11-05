@@ -5,13 +5,21 @@ import { mirrorBranches } from '@/mocks/mirror'
 import { useUserStore } from '@/store/user-store'
 import { getApiClient } from '@/lib/api'
 import type { CreateBranchInput, UpdateBranchInput } from '@/lib/api/types'
+import { syncWarehouseFromBranchList } from '@/services/warehouse-link.service'
 import { ALL_BRANCHES, type Branch, type BranchKind, type BranchScope } from '@/types'
 import { getBranchStockUnits } from '@/services/stock.service'
+
+async function refreshBranchesAfterWrite(): Promise<Branch[]> {
+  const api = getApiClient()
+  const branches = (await api.listBranches()).map(mapApiBranch).sort((a, b) => a.name.localeCompare(b.name))
+  mirrorBranches(branches, { prune: seesWholeNetwork() })
+  syncWarehouseFromBranchList(branches)
+  return branches
+}
 
 export interface BranchInput {
   code: string
   name: string
-  /** Set once, on creation: the API has no way to change it afterwards. */
   kind?: BranchKind
 }
 
@@ -32,6 +40,7 @@ async function fetchScopedBranches(scope: BranchScope): Promise<Branch[]> {
      a document or name a low-stock row. Mirror the full list, not the scoped
      one, so a scoped read never narrows what the catalog knows. */
   mirrorBranches(branches, { prune: seesWholeNetwork() })
+  syncWarehouseFromBranchList(branches)
   if (scope === ALL_BRANCHES) return branches
   return branches.filter((branch) => branch.id === scope)
 }
@@ -59,19 +68,35 @@ function normalizeCreate(input: BranchInput): CreateBranchInput {
 
 export async function createBranch(input: BranchInput): Promise<Branch> {
   const api = getApiClient()
-  const branch = await api.createBranch(normalizeCreate(input))
-  return mapApiBranch(branch)
+  const payload = normalizeCreate(input)
+  await api.createBranch(payload)
+  const branches = await refreshBranchesAfterWrite()
+  const code = payload.code.toUpperCase()
+  const created = branches.find((candidate) => candidate.code?.toUpperCase() === code)
+  if (!created) throw new Error('Branch was created but did not appear in the list.')
+  return created
 }
 
-/** Server supports PATCH (name, isActive). Branches are deactivated, not deleted. */
+/** Server supports PATCH (name, isActive, kind) and DELETE when the branch has no history. */
 export const BRANCH_WRITES = {
   update: true,
   deactivate: true,
+  delete: true,
 } as const
 
 export async function updateBranch(branchId: string, input: UpdateBranchInput): Promise<Branch> {
   if (!BRANCH_WRITES.update) throw new Error('Branch editing is not available.')
-  return mapApiBranch(await getApiClient().updateBranch(branchId, input))
+  const patched = mapApiBranch(await getApiClient().updateBranch(branchId, input))
+  let branches = await refreshBranchesAfterWrite()
+  /* Trust the PATCH body for fields we just sent — some list responses lag role changes. */
+  const index = branches.findIndex((candidate) => candidate.id === branchId)
+  if (index !== -1) {
+    branches = branches.map((candidate, i) => (i === index ? { ...candidate, ...patched } : candidate))
+    mirrorBranches(branches, { prune: seesWholeNetwork() })
+    syncWarehouseFromBranchList(branches)
+  }
+  const updated = branches.find((candidate) => candidate.id === branchId) ?? patched
+  return updated
 }
 
 export async function setBranchActive(branchId: string, isActive: boolean): Promise<Branch> {
@@ -89,4 +114,11 @@ export async function deactivateBranch(branchId: string): Promise<Branch> {
     )
   }
   return setBranchActive(branchId, false)
+}
+
+/** Removes the branch permanently. The server returns `409` when it has any history. */
+export async function deleteBranch(branchId: string): Promise<void> {
+  if (!BRANCH_WRITES.delete) throw new Error('Branch deletion is not available.')
+  await getApiClient().deleteBranch(branchId)
+  await refreshBranchesAfterWrite()
 }

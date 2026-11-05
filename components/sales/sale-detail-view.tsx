@@ -3,6 +3,8 @@
 import Link from 'next/link'
 import { ArrowLeft, Printer } from 'lucide-react'
 import { printSaleReceipt } from '@/components/sales/sale-receipt-print'
+import { receiptFromSale } from '@/components/sales/sale-receipt-build'
+import { PriceWithLbp } from '@/components/shared/price-with-lbp'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
@@ -10,6 +12,7 @@ import { Skeleton } from '@/components/shared/skeleton'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { Pagination } from '@/components/shared/pagination'
 import { usePagination } from '@/hooks/use-pagination'
+import { useBranches } from '@/hooks/use-branches'
 import { useSale } from '@/hooks/use-sales'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
 
@@ -35,8 +38,12 @@ function SaleLinesTable({ lines }: { lines: { lineNo: number; styleName: string;
                   <small>{line.skuCode}</small>
                 </td>
                 <td className="num tabular">{line.quantity}</td>
-                <td className="num tabular">{formatPrice(Number(line.unitPrice))}</td>
-                <td className="num tabular">{formatPrice(Number(line.lineTotal))}</td>
+                <td className="num tabular">
+                  <PriceWithLbp usd={Number(line.unitPrice)} />
+                </td>
+                <td className="num tabular">
+                  <PriceWithLbp usd={Number(line.lineTotal)} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -49,10 +56,13 @@ function SaleLinesTable({ lines }: { lines: { lineNo: number; styleName: string;
 
 export function SaleDetailView({ saleId }: { saleId: string }) {
   const { data: sale, isPending, isError, error, refetch } = useSale(saleId)
+  const { data: branches } = useBranches()
   useDocumentTitle(sale?.reference)
 
   if (isPending) return <Skeleton rows={1} stats={0} />
-  if (isError) return <ErrorState title="Could not load this sale" error={error} onRetry={() => void refetch()} />
+  if (isError || !sale) return <ErrorState title="Could not load this sale" error={error} onRetry={() => void refetch()} />
+
+  const branchName = branches?.find((branch) => branch.id === sale.branchId)?.name
 
   return (
     <>
@@ -70,28 +80,13 @@ export function SaleDetailView({ saleId }: { saleId: string }) {
             className="btn btn-secondary"
             onClick={() =>
               printSaleReceipt({
-                reference: sale.reference,
-                status: sale.status === 'completed' ? 'completed' : 'pending',
-                soldAt: sale.soldAt,
-                sellerName: sale.soldBy.name ?? '—',
-                note: sale.note,
-                total: Number(sale.total),
-                lines: sale.lines.map((line) => ({
-                  label: `${line.styleName} ${line.color} / ${line.size}`,
-                  skuCode: line.skuCode,
-                  quantity: line.quantity,
-                  unitPrice: Number(line.unitPrice),
-                  lineTotal: Number(line.lineTotal),
-                })),
-                payments: sale.payments.map((payment) => ({
-                  method: payment.method,
-                  amount: Number(payment.amount),
-                })),
+                ...receiptFromSale(sale),
+                branchName,
               })
             }
           >
             <Printer size={16} aria-hidden="true" />
-            Print invoice
+            Print receipt
           </button>
         }
       />
@@ -101,11 +96,29 @@ export function SaleDetailView({ saleId }: { saleId: string }) {
       <Panel title="Payment">
         <div className="table-wrap">
           <table className="card-table">
+            <thead>
+              <tr>
+                <th scope="col">Method</th>
+                <th scope="col" className="num">Amount</th>
+                <th scope="col" className="num">Tendered</th>
+                <th scope="col" className="num">Change</th>
+                <th scope="col">Reference</th>
+              </tr>
+            </thead>
             <tbody>
               {sale.payments.map((payment, index) => (
                 <tr key={index}>
                   <td className="card-title capitalize">{payment.method}</td>
                   <td className="num tabular">{formatPrice(Number(payment.amount))}</td>
+                  <td className="num tabular">
+                    {payment.tendered != null ? formatPrice(Number(payment.tendered)) : '—'}
+                  </td>
+                  <td className="num tabular">
+                    {payment.change != null && Number(payment.change) > 0
+                      ? formatPrice(Number(payment.change))
+                      : '—'}
+                  </td>
+                  <td>{payment.reference ?? '—'}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,6 +1,6 @@
-/** Shown when the app cannot resolve the main warehouse branch id for transfers or opening stock. */
+/** Shown when `GET /warehouse` did not return a place. */
 export const WAREHOUSE_NOT_LINKED_MESSAGE =
-  'The main warehouse is not linked yet. Ask an admin to grant you access to the warehouse branch (Employees → branch access), or set NEXT_PUBLIC_WAREHOUSE_BRANCH_ID in .env with the warehouse id.'
+  'The warehouse is not set up yet. Ask an admin to mark one place as the warehouse, then try again.'
 
 export const WAREHOUSE_NOT_LINKED_HINT =
-  'Assign the warehouse branch under Employees → branch access, or add NEXT_PUBLIC_WAREHOUSE_BRANCH_ID to .env with that branch’s id.'
+  'The app reads the warehouse from the server. A branch assignment is not required.'

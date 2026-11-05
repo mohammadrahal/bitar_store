@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
+import { forgetApiCapabilities } from '@/lib/api/capabilities'
+import { purgeLocalMockData } from '@/lib/purge-local-mock-data'
 import type { User } from '@/types'
 
 const STORAGE_KEY = 'bitar-fashion:session:v4'
@@ -24,7 +26,12 @@ export const useUserStore = create<UserState>()(
       user: null,
       signIn: (token, user) => set({ token, user }),
       setUser: (user) => set({ user }),
-      signOut: () => set({ token: null, user: null }),
+      signOut: () => {
+        /* The stored probe answers belong to the token that is going away. */
+        forgetApiCapabilities()
+        void purgeLocalMockData()
+        set({ token: null, user: null })
+      },
     }),
     {
       name: STORAGE_KEY,

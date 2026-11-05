@@ -3,6 +3,8 @@ import { createBranchesApi } from '@/lib/api/branches.api'
 import { createCatalogApi } from '@/lib/api/catalog.api'
 import { createCategoriesApi } from '@/lib/api/categories.api'
 import { createDashboardApi } from '@/lib/api/dashboard.api'
+import { createGoodsReceiptsApi } from '@/lib/api/goods-receipts.api'
+import { createInvoicesApi } from '@/lib/api/invoices.api'
 import { createPageRequest, createRequest, createTotalRequest } from '@/lib/api/client'
 import { createReorderLevelsApi } from '@/lib/api/reorder-levels.api'
 import { createReportsApi } from '@/lib/api/reports.api'
@@ -29,6 +31,8 @@ export function createApi(token: string) {
     ...createReportsApi(request),
     ...createDashboardApi(request),
     ...createTransfersApi(request, pageRequest),
+    ...createGoodsReceiptsApi(request, pageRequest),
+    ...createInvoicesApi(request, pageRequest, token),
     health: fetchHealth,
   }
 }

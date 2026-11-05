@@ -1,6 +1,7 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
+import { isApiFeatureMissing } from '@/lib/api/capabilities'
 import { salesQueryKeys } from '@/lib/query-keys'
 import { getSalesHistory } from '@/services/sales.service'
 
@@ -40,7 +41,31 @@ export function useSalesHistory(query: SalesHistoryQuery, { enabled = true }: { 
         total: filtered.length,
       }
     },
-    enabled: enabled && Boolean(from) && Boolean(to),
+    enabled: enabled && !isApiFeatureMissing('salesHistory') && Boolean(from) && Boolean(to),
+    staleTime: 60_000,
+  })
+}
+
+/** Appends pages of `GET /sales/history`. `X-Total-Count` decides whether another page exists. */
+export function useSalesHistoryPages(query: { branchId: string; from: string; to: string }, enabled = true) {
+  const { branchId, from, to } = query
+  return useInfiniteQuery({
+    queryKey: ['sales', 'history-pages', branchId, from, to] as const,
+    queryFn: ({ pageParam }) =>
+      getSalesHistory({
+        branchId: branchId || undefined,
+        from,
+        to,
+        limit: HISTORY_PAGE,
+        offset: pageParam,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, _pages, lastOffset) => {
+      if (lastPage.sales.length === 0) return undefined
+      const next = lastOffset + lastPage.sales.length
+      return next < lastPage.total ? next : undefined
+    },
+    enabled: enabled && !isApiFeatureMissing('salesHistory') && Boolean(from) && Boolean(to),
     staleTime: 60_000,
   })
 }

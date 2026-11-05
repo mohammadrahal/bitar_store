@@ -22,17 +22,11 @@ const SERIES_COLORS = [
   'var(--chart-5)',
 ] as const
 
-export const OTHER_SERIES_ID = 'other'
+const OTHER_SERIES_ID = 'other'
 const OTHER_COLOR = 'var(--chart-other)'
 
-export const CHART_SURFACE = 'var(--chart-surface)'
 export const CHART_GRID = 'var(--chart-grid)'
 export const CHART_TEXT = 'var(--chart-text)'
-
-/** The 2px of surface that separates touching marks, per the mark spec. */
-export const MARK_GAP = 2
-export const MARK_THICKNESS = 18
-export const MARK_RADIUS = 4
 
 /** Colour follows the series' position in the fixed order, never its rank. */
 export function seriesColor(seriesId: string, index: number) {

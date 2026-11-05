@@ -13,20 +13,36 @@ import { comboKey } from '@/schemas/product.schema'
 export function VariantPricesTable({
   combos,
   prices,
+  costs,
   defaultPrice,
+  defaultCost,
   onPriceChange,
+  onCostChange,
 }: {
   combos: { color: string; size: string }[]
   prices: Record<string, number>
+  costs?: Record<string, number>
   /** Used for any variant that has not been given its own price. */
   defaultPrice: number
+  defaultCost?: number
   onPriceChange: (next: Record<string, number>) => void
+  onCostChange?: (next: Record<string, number>) => void
 }) {
+  const showCosts = Boolean(onCostChange && defaultCost !== undefined)
+
   const setPrice = (key: string, text: string) => {
     const next = { ...prices }
     if (text === '') delete next[key]
     else next[key] = Number(text)
     onPriceChange(next)
+  }
+
+  const setCost = (key: string, text: string) => {
+    if (!onCostChange) return
+    const next = { ...(costs ?? {}) }
+    if (text === '') delete next[key]
+    else next[key] = Number(text)
+    onCostChange(next)
   }
 
   const pagination = usePagination(combos, 20)
@@ -37,11 +53,14 @@ export function VariantPricesTable({
     <>
     <div className="table-wrap opening-grid">
       <table className="variant-grid">
-        <caption className="sr-only">Sell price per variant. Leave blank to use the model price.</caption>
+        <caption className="sr-only">
+          {showCosts ? 'Cost and sell price per variant.' : 'Sell price per variant. Leave blank to use the model price.'}
+        </caption>
         <thead>
           <tr>
             <th scope="col">Variant</th>
-            <th scope="col">Price</th>
+            {showCosts ? <th scope="col">Cost</th> : null}
+            <th scope="col">Sell price</th>
           </tr>
         </thead>
         <tbody>
@@ -52,6 +71,21 @@ export function VariantPricesTable({
                 <th scope="row">
                   {color} / {size}
                 </th>
+                {showCosts ? (
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      className="tabular"
+                      value={costs?.[key] ?? (Number.isFinite(defaultCost) && defaultCost! > 0 ? defaultCost : '')}
+                      placeholder="0"
+                      onChange={(event) => setCost(key, event.target.value)}
+                      aria-label={`Unit cost of ${color} / ${size}`}
+                    />
+                  </td>
+                ) : null}
                 <td>
                   <input
                     type="number"

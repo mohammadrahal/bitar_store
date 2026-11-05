@@ -7,7 +7,7 @@ import type { Branch, Product, Variant } from '@/types'
  * copy of what the server returned.
  */
 
-const STORAGE_KEY = 'bitar-fashion:catalog-db:v11'
+const STORAGE_KEY = 'bitar-fashion:catalog-db:v12'
 const LEGACY_KEYS = [
   'bitar-fashion:mock-db:v1',
   'bitar-fashion:catalog-db:v1',
@@ -18,9 +18,10 @@ const LEGACY_KEYS = [
   'bitar-fashion:catalog-db:v8',
   'bitar-fashion:catalog-db:v9',
   'bitar-fashion:catalog-db:v10',
+  'bitar-fashion:catalog-db:v11',
 ]
 /** Bump, together with STORAGE_KEY, to discard any previously persisted payload. */
-const VERSION = 11
+const VERSION = 12
 
 export interface MockDb {
   version: number

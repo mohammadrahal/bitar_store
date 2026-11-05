@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ReceiptText } from 'lucide-react'
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { MotionSwap } from '@/components/motion/motion-swap'
+import { receiptFromSale } from '@/components/sales/sale-receipt-build'
 import { printSaleReceipt } from '@/components/sales/sale-receipt-print'
 import { SearchInput } from '@/components/shared/search-input'
 import { Can } from '@/components/shared/can'
@@ -16,10 +17,9 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { useBranches } from '@/hooks/use-branches'
 import { useDeletePendingSale, usePendingSales } from '@/hooks/use-pending-sales'
-import { usePermission } from '@/hooks/use-permission'
 import { useSalesList } from '@/hooks/use-sales'
 import { useCurrentUser } from '@/store/user-store'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
@@ -69,15 +69,14 @@ export function B2cRetailSalesPanel({
 }) {
   const user = useCurrentUser()
   const { data: branches } = useBranches()
-  const { locationScoped } = usePermission()
-  const defaultBranchId = useDefaultBranchId()
-  const [branchChoice, setBranchChoice] = useState('')
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
   const [date, setDate] = useState('')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [saleFilter, setSaleFilter] = useState<SaleFilter>('all')
-  const branchId = locationScoped ? defaultBranchId : branchChoice
   const branchName = branches?.find((branch) => branch.id === branchId)?.name
 
   useEffect(() => {
@@ -167,9 +166,9 @@ export function B2cRetailSalesPanel({
       }
     >
       <div className="toolbar">
-        {!locationScoped && (
+        {allowPageBranchFilter && (
           <Field label="Branch" className="toolbar-field">
-            <LocationSelect value={branchChoice} onChange={setBranchChoice} onlyAccessible />
+            <LocationSelect value={pageBranchId} onChange={setPageBranchId} onlyAccessible />
           </Field>
         )}
         {saleFilter !== 'pending' && (
@@ -272,7 +271,20 @@ export function B2cRetailSalesPanel({
                         <td>{row.sale.soldBy.name}</td>
                         <td className="num tabular">{saleUnits(row.sale)}</td>
                         <td className="num tabular">{formatPrice(Number(row.sale.total))}</td>
-                        <td />
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() =>
+                              printSaleReceipt({
+                                ...receiptFromSale(row.sale),
+                                branchName,
+                              })
+                            }
+                          >
+                            Print
+                          </button>
+                        </td>
                       </MotionTr>
                     ) : (
                       <MotionTr key={row.id} index={index}>

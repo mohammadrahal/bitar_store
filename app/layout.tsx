@@ -30,7 +30,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F7F5F0' },
+    { media: '(prefers-color-scheme: light)', color: '#F8F8F6' },
     { media: '(prefers-color-scheme: dark)', color: '#121110' },
   ],
 }
@@ -39,7 +39,7 @@ export const viewport: Viewport = {
  * Applies the stored theme before first paint. Without this the page would
  * render light and then flip, and the markup would disagree with the DOM.
  */
-const themeScript = `(function(){try{var s=localStorage.getItem('bitar-fashion:ui:v1');var t=s&&JSON.parse(s).state&&JSON.parse(s).state.theme;if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}var e=document.documentElement;e.classList.toggle('dark',t==='dark');e.style.colorScheme=t}catch(e){}})()`
+const themeScript = `(function(){try{var p=localStorage.getItem('bitar:user-preferences:v1');var pref=p&&JSON.parse(p).theme;var t=pref==='light'||pref==='dark'?pref:null;if(!t){var s=localStorage.getItem('bitar-fashion:ui:v1');t=s&&JSON.parse(s).state&&JSON.parse(s).state.theme}if(t!=='light'&&t!=='dark'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}var e=document.documentElement;e.classList.toggle('dark',t==='dark');e.style.colorScheme=t}catch(e){}})()`
 
 export default function RootLayout({
   children,

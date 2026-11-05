@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
-import { Field } from '@/components/shared/field'
-import { useCategories } from '@/hooks/use-products'
+import Link from 'next/link'
+import { SelectInput } from '@/components/shared/select-input'
+import { useCategoryRecords } from '@/hooks/use-categories'
+import { usePermission } from '@/hooks/use-permission'
 
 /**
- * One category per model. The chips are the owner's category list; a new name
- * is created on save if it is not already there.
+ * A product can only use a category that already exists.
+ * New names are added on the Categories page, not typed here.
  */
 export function CategoryPicker({
   value,
@@ -18,66 +18,36 @@ export function CategoryPicker({
   onChange: (category: string) => void
   error?: string
 }) {
-  const { data: categories, isPending } = useCategories()
-  const [name, setName] = useState('')
-  const [issue, setIssue] = useState<string | null>(null)
-
+  const { can } = usePermission()
+  const { data: categories, isPending, isError } = useCategoryRecords(true)
   const known = categories ?? []
-  /* A category typed here is not in the catalog yet, so it is shown alongside. */
-  const options = value && !known.some((entry) => entry === value) ? [...known, value] : known
-
-  const submit = () => {
-    const trimmed = name.trim()
-    if (trimmed.length < 2) {
-      setIssue('A category needs at least 2 characters')
-      return
-    }
-    /* Snap to the spelling already in use, so the catalog never grows two of
-       the same category in different cases. */
-    const existing = known.find((entry) => entry.toLowerCase() === trimmed.toLowerCase())
-    setIssue(null)
-    onChange(existing ?? trimmed)
-    setName('')
+  const options = known.map((category) => ({ value: category.name, label: category.name }))
+  if (value && !options.some((option) => option.value === value)) {
+    options.push({ value, label: `${value} (inactive)` })
   }
 
   return (
     <>
-      {options.length > 0 && (
-        <div className="chip-row" role="group" aria-label="Category">
-          {options.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className="chip chip-lg"
-              aria-pressed={value === category}
-              onClick={() => onChange(category)}
-            >
-              {category}
-            </button>
-          ))}
-        </div>
+      <SelectInput
+        value={value}
+        onValueChange={onChange}
+        options={options}
+        placeholder={isPending ? 'Loading categories…' : 'Choose a category'}
+        disabled={isPending || isError}
+        aria-invalid={error ? true : undefined}
+      />
+      {error ? <p className="field-error">{error}</p> : null}
+      {isError ? <p className="field-error">Could not load categories.</p> : null}
+      {!isPending && !isError && known.length === 0 ? (
+        <p className="field-hint">No active categories yet. Add one before saving a product.</p>
+      ) : (
+        <p className="field-hint">Only categories that already exist can be used.</p>
       )}
-      {isPending && options.length === 0 && <p className="muted">Loading categories…</p>}
-      <div className="inline-add">
-        <Field label="Add a category" error={issue ?? error}>
-          <input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                submit()
-              }
-            }}
-            autoComplete="off"
-            placeholder="Dresses"
-          />
-        </Field>
-        <button type="button" className="btn btn-secondary" onClick={submit}>
-          <Plus size={16} aria-hidden="true" />
-          Add
-        </button>
-      </div>
+      {can('catalog.create') && (
+        <p className="field-hint">
+          <Link href="/categories">Manage categories</Link>
+        </p>
+      )}
     </>
   )
 }

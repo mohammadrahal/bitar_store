@@ -16,7 +16,7 @@ export const branchCreateSchema = z.object({
     .regex(/^[A-Za-z0-9_-]+$/, 'Use letters, digits, - and _ only')
     .transform((value) => value.toUpperCase()),
   name: z.string().trim().min(1, 'Name is required').max(120, 'Name is too long'),
-  /** `POST /branches` takes this; it cannot be changed afterwards. */
+  /** `POST /branches` and `PATCH /branches/:id` (`kind`). Only one warehouse. */
   kind: z.enum(['branch', 'warehouse']),
 })
 

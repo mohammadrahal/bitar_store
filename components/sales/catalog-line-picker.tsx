@@ -6,10 +6,14 @@ import { useQuery } from '@tanstack/react-query'
 import { SearchInput } from '@/components/shared/search-input'
 import { Pagination } from '@/components/shared/pagination'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
-import { useSaleVariants } from '@/hooks/use-sale-picker'
 import { useMirroredBranches } from '@/hooks/use-stock'
 import { formatPrice } from '@/lib/format'
-import { listSaleModels } from '@/services/sale-picker.service'
+import {
+  listSaleModels,
+  listSaleModelsAtBranch,
+  listSaleVariants,
+  listSaleVariantsAtBranch,
+} from '@/services/sale-picker.service'
 import { searchVariants } from '@/services/variant-search.service'
 import type { SaleModelOption, VariantOption } from '@/types'
 
@@ -23,6 +27,19 @@ function skuSearchReady(term: string): boolean {
   return /^[\x21-\x7E]{4,64}$/.test(trimmed)
 }
 
+/**
+ * What the count in the row means for adding a line.
+ *
+ * - `enforce` — the till. `POST /sales` refuses a line it cannot cover, so a
+ *   row at zero cannot be added at all.
+ * - `warn` — preparing a transfer. `POST /transfers` only writes a draft and
+ *   moves nothing; the stock is checked at `POST /transfers/:id/dispatch`,
+ *   which also accepts sending fewer than asked. So a draft for stock that has
+ *   not arrived yet is allowed, and the row says what is there today.
+ * - `ignore` — receiving, and anything else where on-hand is context only.
+ */
+export type Availability = 'enforce' | 'warn' | 'ignore'
+
 function leftToSell(option: VariantOption, inCart: Record<string, number>): number {
   return Math.max(0, (option.available ?? 0) - (inCart[option.variantId] ?? 0))
 }
@@ -33,7 +50,7 @@ function VariantRows({
   qtyFor,
   setQty,
   onAdd,
-  enforceStock,
+  availability,
   addLabel,
   itemLabel,
 }: {
@@ -42,10 +59,12 @@ function VariantRows({
   qtyFor: (id: string) => number
   setQty: (id: string, quantity: number, max?: number) => void
   onAdd: (option: VariantOption) => void
-  enforceStock: boolean
+  availability: Availability
   addLabel: string
   itemLabel: string
 }) {
+  const enforceStock = availability === 'enforce'
+  const showsStock = availability !== 'ignore'
   if (rows.length === 0) {
     return <p className="invoice-picker-hint">No variants to add for this model.</p>
   }
@@ -58,7 +77,7 @@ function VariantRows({
             <th scope="col">Color / size</th>
             <th scope="col">SKU</th>
             <th scope="col" className="num">
-              {enforceStock ? 'Available' : 'On hand'}
+              {showsStock ? 'Available' : 'On hand'}
             </th>
             <th scope="col" className="num">
               Unit
@@ -77,13 +96,27 @@ function VariantRows({
             const left = leftToSell(option, inCart)
             const canAdd = !enforceStock || left > 0
             const maxQty = enforceStock ? left : 9999
+            /* A disabled row with a bare "0" in it reads as a broken form. Say
+               which of the two it is: nothing here to sell, or more asked for
+               than is here — which a transfer is allowed to do. */
+            const note =
+              !showsStock || left > qtyFor(option.variantId)
+                ? null
+                : left === 0
+                  ? enforceStock
+                    ? 'None here'
+                    : 'None here yet'
+                  : 'More than is here'
             return (
               <tr key={option.variantId}>
                 <td>
                   {option.color} / {option.size}
                 </td>
                 <td className="tabular invoice-muted">{option.sku}</td>
-                <td className="num tabular">{enforceStock ? left : (option.available ?? 0)}</td>
+                <td className="num tabular">
+                  {showsStock ? left : (option.available ?? 0)}
+                  {note && <small className="invoice-muted catalog-picker-note"> {note}</small>}
+                </td>
                 <td className="num tabular">{formatPrice(option.sellPrice)}</td>
                 <td className="num">
                   <input
@@ -126,7 +159,9 @@ export function CatalogLinePicker({
   branchId,
   inCart,
   onAdd,
-  enforceStock = false,
+  availability = 'ignore',
+  /** `branchStock` lists only models and SKUs recorded at `branchId`. */
+  modelScope = 'catalog',
   addLabel = 'Add',
   searchPlaceholder = 'Filter models or search SKU / barcode',
   searchAriaLabel = 'Filter products',
@@ -136,7 +171,8 @@ export function CatalogLinePicker({
   branchId: string
   inCart: Record<string, number>
   onAdd: (option: VariantOption, quantity: number) => void
-  enforceStock?: boolean
+  availability?: Availability
+  modelScope?: 'catalog' | 'branchStock'
   addLabel?: string
   searchPlaceholder?: string
   searchAriaLabel?: string
@@ -149,24 +185,43 @@ export function CatalogLinePicker({
   const [selected, setSelected] = useState<SaleModelOption | null>(null)
   const [qtyByVariant, setQtyByVariant] = useState<Record<string, number>>({})
   const mirrored = useMirroredBranches()
+  const enforceStock = availability === 'enforce'
+
+  const branchStock = modelScope === 'branchStock'
 
   useEffect(() => {
     setProductPage(1)
     setSelected(null)
-  }, [search])
+  }, [search, branchId, modelScope])
 
   const modelsQuery = useQuery({
-    queryKey: ['catalog', 'models', search.trim().toLowerCase()],
-    queryFn: () => listSaleModels(search, 500),
+    queryKey: branchStock
+      ? ['catalog', 'models-at-branch', branchId, search.trim().toLowerCase()]
+      : ['catalog', 'models', search.trim().toLowerCase()],
+    queryFn: () =>
+      branchStock ? listSaleModelsAtBranch(branchId, search, 500) : listSaleModels(search, 500),
     enabled: mirrored !== null && Boolean(branchId),
     staleTime: 60_000,
   })
 
-  const variantsQuery = useSaleVariants(branchId, selected?.productId ?? null)
+  const variantsQuery = useQuery({
+    queryKey: branchStock
+      ? ['catalog', 'variants-at-branch', branchId, selected?.productId ?? '']
+      : ['catalog', 'variants', branchId, selected?.productId ?? ''],
+    queryFn: () =>
+      branchStock
+        ? listSaleVariantsAtBranch(branchId, selected!.productId)
+        : listSaleVariants(branchId, selected!.productId),
+    enabled: mirrored !== null && Boolean(branchId && selected?.productId),
+    staleTime: 30_000,
+  })
 
   const skuSearchQuery = useQuery({
-    queryKey: ['catalog', 'variant-search', branchId, search.trim().toLowerCase()],
-    queryFn: () => searchVariants(search, SKU_SEARCH_LIMIT, branchId),
+    queryKey: ['catalog', 'variant-search', branchId, search.trim().toLowerCase(), modelScope],
+    queryFn: async () => {
+      const matches = await searchVariants(search, SKU_SEARCH_LIMIT, branchId)
+      return branchStock ? matches.filter((option) => (option.available ?? 0) > 0) : matches
+    },
     enabled: mirrored !== null && Boolean(branchId) && skuSearchReady(search) && !selected,
     staleTime: 15_000,
   })
@@ -207,7 +262,7 @@ export function CatalogLinePicker({
     qtyFor,
     setQty,
     onAdd: addRow,
-    enforceStock,
+    availability,
     addLabel,
     itemLabel,
   }
@@ -245,13 +300,19 @@ export function CatalogLinePicker({
           {modelsQuery.isError && <p className="field-error">Could not load products.</p>}
 
           {!modelsQuery.isPending && products.length === 0 && (
-            <p className="invoice-picker-hint">No active models match this filter.</p>
+            <p className="invoice-picker-hint">
+              {branchStock
+                ? 'Nothing on hand at this location matches your search. Receive stock or post an opening count first.'
+                : 'No active models match this filter.'}
+            </p>
           )}
 
           {products.length > 0 && (
             <>
               <p className="invoice-picker-hint">
-                {products.length} {products.length === 1 ? 'model' : 'models'} — choose one to pick color and size.
+                {branchStock
+                  ? `${products.length} ${products.length === 1 ? 'model' : 'models'} with stock here — choose one to pick size and color.`
+                  : `${products.length} ${products.length === 1 ? 'model' : 'models'} — choose one to pick color and size.`}
               </p>
               <div className="invoice-picker-table-wrap invoice-picker-table-wrap--catalog">
                 <table className="invoice-picker-table">

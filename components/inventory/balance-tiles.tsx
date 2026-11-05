@@ -11,11 +11,9 @@ import type { Balances } from '@/types'
 /**
  * The five BL-02 balances as `GET /stock` can report them. Available is the one
  * people act on, so it is highlighted. Reserved and on hold have no endpoint
- * yet and say so rather than showing a zero that would read as a fact.
  */
 export function BalanceTiles({ totals }: { totals: Balances }) {
   const { can, canSeeTransfers } = usePermission()
-  const pending = 'Not available yet'
   const stock = can('stock.view')
   const inventory = stock ? inventoryHref() : undefined
   return (
@@ -30,14 +28,14 @@ export function BalanceTiles({ totals }: { totals: Balances }) {
       <StatCard
         label="Reserved"
         value={balanceText(totals.reserved, formatNumber)}
-        detail={totals.reserved === null ? pending : 'Approved for transfer'}
+        detail={totals.reserved === null ? 'Not available yet' : 'Draft transfers at the sender'}
         icon={Lock}
         href={stock && canSeeTransfers() ? '/transfers' : undefined}
       />
       <StatCard
         label="On hold"
         value={balanceText(totals.onHold, formatNumber)}
-        detail={totals.onHold === null ? pending : 'Kept out of sale'}
+        detail={totals.onHold === null ? 'Not available yet' : 'Damaged or non-sellable'}
         icon={Archive}
       />
       <StatCard

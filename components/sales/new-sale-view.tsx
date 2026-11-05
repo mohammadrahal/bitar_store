@@ -12,10 +12,15 @@ import { Field } from '@/components/shared/field'
 import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
 import { ViewOnlyNotice } from '@/components/shared/view-only-notice'
+import { receiptFromSale } from '@/components/sales/sale-receipt-build'
+import { printSaleReceipt } from '@/components/sales/sale-receipt-print'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useBranches } from '@/hooks/use-branches'
+import { useCurrentUser } from '@/store/user-store'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { useSavePendingSale } from '@/hooks/use-pending-sales'
 import { useCreateSale } from '@/hooks/use-sales'
+import { createB2cInvoiceForSale } from '@/services/invoices-api.service'
 import { getPendingSale } from '@/services/pending-sales.service'
 import { useOnlineStatus } from '@/hooks/use-online-status'
 import { usePermission } from '@/hooks/use-permission'
@@ -59,6 +64,8 @@ export function NewSaleView() {
   const { can, locationScoped } = usePermission()
   const online = useOnlineStatus()
   const defaultBranch = useDefaultBranchId()
+  const user = useCurrentUser()
+  const { data: branches } = useBranches()
   const create = useCreateSale()
   const savePending = useSavePendingSale()
   const idempotency = useIdempotencyKey()
@@ -147,14 +154,24 @@ export function NewSaleView() {
         idempotencyKey: idempotency.current(),
       },
       {
-        onSuccess: (sale) => {
+        onSuccess: async (sale) => {
           idempotency.reset()
           if (pendingDraftId) {
             import('@/services/pending-sales.service').then(({ deletePendingSale }) => {
               deletePendingSale(pendingDraftId)
             })
           }
-          router.push(`/sales/${sale.id}`)
+          const branchName = branches?.find((branch) => branch.id === sale.branchId)?.name
+          printSaleReceipt({ ...receiptFromSale(sale, user.name), branchName })
+          try {
+            const invoice = await createB2cInvoiceForSale(sale.id, {
+              name: customer.trim() || undefined,
+              note: customer.trim() || undefined,
+            })
+            router.push(`/sales/invoices/${invoice.id}`)
+          } catch {
+            router.push(`/sales/${sale.id}`)
+          }
         },
       },
     )
@@ -185,7 +202,7 @@ export function NewSaleView() {
             branchId={branchId}
             inCart={inCart}
             onAdd={add}
-            enforceStock
+            availability="enforce"
             addLabel="Add to sale"
             searchPlaceholder="Search model, code or SKU"
             searchAriaLabel="Search models for sale"

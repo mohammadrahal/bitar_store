@@ -1,16 +1,21 @@
-import { ApiError, getApiClient } from '@/lib/api'
+import { getApiClient } from '@/lib/api'
+import { placeOpeningStock } from '@/services/opening-stock.service'
+import { isApiFeatureMissing, noteMissingApiFeature } from '@/lib/api/capabilities'
 import { DEFAULT_CURRENCY, priceText } from '@/lib/api/map-catalog'
 import type { ProductFilters } from '@/lib/query-keys'
 import { buildSku, buildVariantCode, formatModelCode } from '@/lib/sku'
 import { readDb } from '@/mocks/store'
 import { mintBarcode } from '@/services/barcodes.service'
+import { applyModelCosts, getSkuCost, getStyleCost, setStyleCost } from '@/services/catalog-costs.service'
 import { refreshStyle, syncCatalog } from '@/services/catalog-sync.service'
-import { postOpeningStock } from '@/services/opening-stock.service'
+
 import type { Product, ProductWithVariants, Variant } from '@/types'
 
 export interface ProductDetailsInput {
   name: string
   category: string
+  /** Stored on this device until the API accepts cost on catalog. */
+  unitCost: number
   /** On edit, a changed price is applied to every active SKU of the model. */
   sellPrice: number
 }
@@ -26,26 +31,49 @@ export interface ProductInput extends ProductDetailsInput {
   /** Style code; blank takes the next free MD code. */
   code: string
   variants: Combination[]
-  /** Units counted in at one location as the model is saved, by `color|size`. */
-  opening?: { branchId: string; quantities: Record<string, number> }
+  /** Per-variant cost overrides keyed by `color|size`. */
+  costs?: Record<string, number>
+  /** Optional opening count at one branch after SKUs are created. */
+  initialBranchId?: string
+  openingQuantities?: Record<string, number>
 }
 
 const comboKeyOf = (combo: Combination) => `${combo.color}|${combo.size}`
 
+interface SkuCreateOutcome {
+  skipped: string[]
+  unbarcoded: string[]
+  created: Map<string, string>
+}
+
 export interface CreatedProduct {
   product: ProductWithVariants
+  /** SKUs that received an opening count on create, when the form asked for it. */
+  openingLines: number
   /** Combinations the API refused, with its reason. The model itself was saved. */
   skipped: string[]
   /** Variants that were saved but did not get a barcode; one can be generated from the model page. */
   unbarcoded: string[]
-  /** Units counted in with the model. */
-  opened?: { lines: number; branchId: string }
-  /** Why the opening count did not post, when the model itself was saved. */
-  openingFailed?: string
+
+}
+
+function withLocalCosts(product: Product, variants: Variant[]): ProductWithVariants {
+  const styleCost = getStyleCost(product.id)
+  const enriched = variants
+    .filter((variant) => variant.productId === product.id)
+    .map((variant) => ({
+      ...variant,
+      unitCost: getSkuCost(variant.id) ?? styleCost,
+    }))
+  return {
+    ...product,
+    unitCost: styleCost,
+    variants: enriched,
+  }
 }
 
 function attachVariants(product: Product, variants: Variant[]): ProductWithVariants {
-  return { ...product, variants: variants.filter((variant) => variant.productId === product.id) }
+  return withLocalCosts(product, variants)
 }
 
 function matches(product: ProductWithVariants, search: string) {
@@ -72,32 +100,30 @@ export async function listProducts(filters: ProductFilters): Promise<ProductWith
 }
 
 export async function listCategories(): Promise<string[]> {
+  if (isApiFeatureMissing('categories')) {
+    const names = [...new Set(readDb().products.map((product) => product.category).filter(Boolean))]
+    return names.sort((a, b) => a.localeCompare(b))
+  }
   try {
     const categories = await getApiClient().listCategories({ activeOnly: true })
     return categories.map((category) => category.name).sort((a, b) => a.localeCompare(b))
-  } catch {
-    /* Older backends or a brief outage: fall back to names already on models. */
+  } catch (error) {
+    noteMissingApiFeature(error, 'categories')
     const names = [...new Set(readDb().products.map((product) => product.category).filter(Boolean))]
     return names.sort((a, b) => a.localeCompare(b))
   }
 }
 
-/** A product may only use a category that already exists. */
+/** A product may only use a category that already exists and is active. */
 async function ensureCategory(name: string): Promise<string> {
   const trimmed = name.trim()
   if (!trimmed) return trimmed
-  const api = getApiClient()
-  const existing = (await api.listCategories()).find((category) => category.name.toLowerCase() === trimmed.toLowerCase())
-  if (existing) return existing.name
-  try {
-    return (await api.createCategory(trimmed)).name
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 409) {
-      const again = (await api.listCategories()).find((category) => category.name.toLowerCase() === trimmed.toLowerCase())
-      if (again) return again.name
-    }
-    throw error
-  }
+  const existing = (await getApiClient().listCategories()).find(
+    (category) => category.name.toLowerCase() === trimmed.toLowerCase(),
+  )
+  if (!existing) throw new Error('This category does not exist: add it in Categories first')
+  if (!existing.isActive) throw new Error('This category is inactive. Activate it in Categories first.')
+  return existing.name
 }
 
 export async function getProduct(productId: string): Promise<ProductWithVariants> {
@@ -125,7 +151,7 @@ async function createSkus(
   styleCode: string,
   combos: Combination[],
   price: number,
-): Promise<Omit<CreatedProduct, 'product'> & { created: Map<string, string> }> {
+): Promise<SkuCreateOutcome> {
   const api = getApiClient()
   const taken = new Set(readDb().variants.map((variant) => variant.sku))
   const skipped: string[] = []
@@ -170,36 +196,28 @@ export async function createProduct(input: ProductInput): Promise<CreatedProduct
   const category = await ensureCategory(input.category)
   const style = await getApiClient().createStyle({ code, name: input.name.trim(), category })
   const outcome = await createSkus(style.id, style.code, input.variants, input.sellPrice)
+  applyModelCosts(style.id, input.unitCost, outcome.created, input.costs ?? {})
   await refreshStyle(style.id)
-  const opening = await openCountedUnits(input, outcome.created)
-  return { product: await getProduct(style.id), ...outcome, ...opening }
-}
 
-/**
- * Posts the counted units against the SKUs that were just created. The model is
- * already saved by this point, so a refusal is reported beside it rather than
- * thrown: the catalog record must not be lost over a count.
- */
-async function openCountedUnits(
-  input: ProductInput,
-  created: Map<string, string>,
-): Promise<Pick<CreatedProduct, 'opened' | 'openingFailed'>> {
-  const branchId = input.opening?.branchId
-  if (!branchId) return {}
-
-  const quantities: Record<string, number> = {}
-  for (const [combo, quantity] of Object.entries(input.opening?.quantities ?? {})) {
-    const skuId = created.get(combo)
-    if (skuId && quantity > 0) quantities[skuId] = Math.floor(quantity)
+  const branchId = input.initialBranchId?.trim()
+  let openingLines = 0
+  if (branchId && input.openingQuantities) {
+    const quantities: Record<string, number> = {}
+    for (const [key, skuId] of outcome.created) {
+      const quantity = input.openingQuantities[key] ?? 0
+      if (quantity > 0) quantities[skuId] = quantity
+    }
+    if (Object.keys(quantities).length > 0) {
+      await placeOpeningStock([{ branchId, quantities }])
+      openingLines = Object.keys(quantities).length
+    }
   }
-  const lines = Object.keys(quantities).length
-  if (lines === 0) return {}
 
-  try {
-    await postOpeningStock({ branchId, quantities })
-    return { opened: { lines, branchId } }
-  } catch (error) {
-    return { openingFailed: error instanceof Error ? error.message : 'The opening count did not post.' }
+  return {
+    product: await getProduct(style.id),
+    openingLines,
+    skipped: outcome.skipped,
+    unbarcoded: outcome.unbarcoded,
   }
 }
 
@@ -209,6 +227,7 @@ export async function updateProduct(productId: string, input: ProductDetailsInpu
   const current = await getProduct(productId)
   const category = await ensureCategory(input.category)
   await api.updateStyle(productId, { name: input.name.trim(), category })
+  setStyleCost(productId, input.unitCost)
   if (input.sellPrice !== current.sellPrice) {
     const price = priceText(input.sellPrice)
     const live = current.variants.filter((variant) => !variant.archived && variant.sellPrice !== input.sellPrice)
@@ -223,7 +242,12 @@ export async function addVariants(productId: string, combos: Combination[]): Pro
   const { created, ...outcome } = await createSkus(product.id, product.code, combos, product.sellPrice)
   if (outcome.skipped.length === combos.length) throw new Error(`No variants were added. ${outcome.skipped[0]}`)
   await refreshStyle(productId)
-  return { product: await getProduct(productId), ...outcome }
+  return {
+    product: await getProduct(productId),
+    openingLines: 0,
+    skipped: outcome.skipped,
+    unbarcoded: outcome.unbarcoded,
+  }
 }
 
 export { searchVariants } from '@/services/variant-search.service'

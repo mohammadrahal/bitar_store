@@ -12,7 +12,7 @@ import { Panel } from '@/components/shared/panel'
 import { SearchInput } from '@/components/shared/search-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { SkuTableCell } from '@/components/shared/table-empty'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { usePermission } from '@/hooks/use-permission'
 import { Pagination } from '@/components/shared/pagination'
@@ -20,9 +20,9 @@ import { usePagination } from '@/hooks/use-pagination'
 import { useDeleteReorderLevel, useReorderLevels, useSetReorderLevel } from '@/hooks/use-warehouse'
 
 export function ReorderLevelsView() {
-  const { locationScoped } = usePermission()
-  const defaultBranch = useDefaultBranchId()
-  const [branchId, setBranchId] = useState(locationScoped ? defaultBranch : '')
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
   const [searchInput, setSearchInput] = useState('')
   const search = useDebouncedValue(searchInput)
   const [skuId, setSkuId] = useState('')
@@ -56,16 +56,18 @@ export function ReorderLevelsView() {
 
       <Panel title="Current minimums">
         <div className="toolbar">
-          <div className="toolbar-field">
-            <LocationSelect
-              value={branchId}
-              onChange={setBranchId}
-              onlyAccessible
-              onlyFullAccess
-              placeholder="Choose a branch"
-              aria-label="Branch"
-            />
-          </div>
+          {allowPageBranchFilter && (
+            <div className="toolbar-field">
+              <LocationSelect
+                value={pageBranchId}
+                onChange={setPageBranchId}
+                onlyAccessible
+                onlyFullAccess
+                placeholder="Choose a branch"
+                aria-label="Branch"
+              />
+            </div>
+          )}
           <SearchInput
             value={searchInput}
             onChange={setSearchInput}

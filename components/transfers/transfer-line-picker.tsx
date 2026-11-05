@@ -24,7 +24,10 @@ export function TransferLinePicker({
   purpose?: 'transfer' | 'replenishment'
 }) {
   const inCart = Object.fromEntries(lines.map((line) => [line.skuId, line.quantity]))
-  const enforceStock = purpose === 'transfer'
+  /* A transfer draft moves nothing: the server checks the stock at dispatch,
+     and accepts sending fewer than asked. So the picker shows what is at the
+     source without refusing a line the warehouse is still waiting on. */
+  const availability = purpose === 'transfer' ? 'warn' : 'ignore'
   const addLabel = purpose === 'replenishment' ? 'Add to request' : 'Add to transfer'
   const linesHeading = purpose === 'replenishment' ? 'On this request' : 'On this transfer'
 
@@ -60,10 +63,15 @@ export function TransferLinePicker({
           branchId={branchId}
           inCart={inCart}
           onAdd={add}
-          enforceStock={enforceStock}
+          availability={availability}
+          modelScope={purpose === 'transfer' ? 'branchStock' : 'catalog'}
           addLabel={addLabel}
-          searchPlaceholder="Search model, code or SKU"
-          searchAriaLabel="Search catalog for transfer"
+          searchPlaceholder={
+            purpose === 'transfer' ? 'Search stock at this location' : 'Search model, code or SKU'
+          }
+          searchAriaLabel={
+            purpose === 'transfer' ? 'Search products stocked at source' : 'Search catalog for transfer'
+          }
           itemLabel={purpose === 'replenishment' ? 'add to request' : 'add to transfer'}
           className="catalog-picker catalog-picker--panel"
         />

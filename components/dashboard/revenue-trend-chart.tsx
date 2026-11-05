@@ -1,6 +1,6 @@
 'use client'
 
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { ChartTooltip } from '@/components/dashboard/chart-tooltip'
 import { REVENUE_TREND_HEIGHT } from '@/lib/chart-geometry'
 import { CHART_GRID, CHART_TEXT, seriesColor } from '@/lib/chart-palette'
@@ -18,10 +18,17 @@ function shortDay(day: string) {
 }
 
 /**
- * Revenue by shop day. One series, so there is no legend: the panel title says
- * what is plotted and a box with a single swatch would only restate it. The
- * reader aims at a date, so the hover layer is a crosshair that snaps to the
- * nearest day rather than a hit target on the 2px line itself.
+ * Revenue by shop day, one bar per day.
+ *
+ * Bars, not a line: a day's takings are a quantity that starts at zero and is
+ * complete in itself, not a reading of something continuous. A curve through
+ * these points implies trade at three in the afternoon on a closed Sunday, and
+ * an interpolated slope between two days is a shape the business never had. A
+ * closed day draws no bar but keeps its slot on the axis, so the gap is visible
+ * as a gap rather than being smoothed over.
+ *
+ * One series, so there is no legend: the panel title says what is plotted and a
+ * box with a single swatch would only restate it.
  */
 export function RevenueTrendChart({ points }: { points: TrendPoint[] }) {
   const peak = points.reduce((max, point) => Math.max(max, point.revenue), 0)
@@ -34,7 +41,7 @@ export function RevenueTrendChart({ points }: { points: TrendPoint[] }) {
     <div className="chart-block">
       <div role="img" aria-label={`Revenue by day, ${points.length} days to ${points.at(-1)?.day ?? 'today'}`}>
         <ResponsiveContainer width="100%" height={REVENUE_TREND_HEIGHT}>
-          <AreaChart data={points} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} accessibilityLayer>
+          <BarChart data={points} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} accessibilityLayer>
             {/* Horizontal only: vertical rules on a time axis are ink that carries
                 nothing the x labels do not already say. */}
             <CartesianGrid vertical={false} stroke={CHART_GRID} strokeWidth={1} />
@@ -55,34 +62,31 @@ export function RevenueTrendChart({ points }: { points: TrendPoint[] }) {
               axisLine={false}
             />
             <Tooltip
-              cursor={{ stroke: CHART_TEXT, strokeWidth: 1 }}
+              cursor={{ fill: CHART_GRID, fillOpacity: 0.35 }}
               content={({ active, payload }) => {
                 if (!active || !payload?.length) return null
                 const row = payload[0].payload as TrendPoint
                 return (
                   <ChartTooltip
                     title={shortDay(row.day)}
-                    rows={[
-                      { id: SERIES_ID, name: 'Revenue', value: formatPrice(row.revenue), colorIndex: 0 },
-                    ]}
+                    rows={[{ id: SERIES_ID, name: 'Revenue', value: formatPrice(row.revenue), colorIndex: 0 }]}
                     footer={`${formatNumber(row.sales)} ${row.sales === 1 ? 'sale' : 'sales'}`}
                   />
                 )
               }}
             />
-            <Area
-              type="monotone"
+            {/* No fixed barSize: 7 days and 90 days have to fill the same box,
+                so recharts sizes the bars from the category band and a 1px gap
+                keeps them separate at the dense end. */}
+            <Bar
               dataKey={SERIES_ID}
-              stroke={COLOR}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              name="Revenue"
               fill={COLOR}
-              fillOpacity={0.1}
-              activeDot={{ r: 4, fill: COLOR, stroke: 'var(--chart-surface)', strokeWidth: 2 }}
+              radius={[2, 2, 0, 0]}
+              maxBarSize={48}
               isAnimationActive={false}
             />
-          </AreaChart>
+          </BarChart>
         </ResponsiveContainer>
       </div>
     </div>

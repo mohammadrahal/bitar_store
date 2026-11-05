@@ -22,7 +22,9 @@ export function canViewAdminWarehouseTools(user: User): boolean {
   return user.role === 'super_admin'
 }
 
+/** Prepare, send, cancel, and confirm loss. The API reserves this for managers and admins even if the permission is toggled on an employee. */
 export function canDispatchTransfers(user: User): boolean {
+  if (user.role === 'employee') return false
   return hasApiPermission(user, 'transfers.dispatch')
 }
 
@@ -37,7 +39,7 @@ export function canSeeTransfers(user: User): boolean {
 /** Open the request/prepare form: dispatchers prepare any route; branch staff request replenishment when low. */
 export function canRequestTransfer(user: User): boolean {
   if (canDispatchTransfers(user)) return true
-  return canReceiveTransfers(user) && (user.branchId !== null || user.branchIds.length > 0)
+  return canReceiveTransfers(user) && user.branchIds.length > 0
 }
 
 export function canManageMinimums(user: User): boolean {

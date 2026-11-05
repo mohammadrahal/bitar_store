@@ -22,6 +22,8 @@ export { createBranchesApi, type BranchesApi } from '@/lib/api/branches.api'
 export { createCatalogApi, type CatalogApi } from '@/lib/api/catalog.api'
 export { createCategoriesApi, type CategoriesApi } from '@/lib/api/categories.api'
 export { createDashboardApi, type DashboardApi } from '@/lib/api/dashboard.api'
+export { createGoodsReceiptsApi, type GoodsReceiptsApi } from '@/lib/api/goods-receipts.api'
+export { createInvoicesApi, type InvoicesApi } from '@/lib/api/invoices.api'
 export { createSalesApi, type SalesApi } from '@/lib/api/sales.api'
 export { createStockApi, type StockApi } from '@/lib/api/stock.api'
 export { createTransfersApi, type TransfersApi } from '@/lib/api/transfers.api'
@@ -59,6 +61,7 @@ export type {
   ApiDashboardOverview,
   ApiCategory,
   DashboardOverviewParams,
+  ApiBranchAccess,
   ApiPermissionCatalog,
   ApiSaleHistoryRow,
   ApiUserPermissions,
@@ -81,4 +84,17 @@ export type {
   MeResponse,
   UpdateUserInput,
   UserRole,
+  ApiPlace,
+  ApiGoodsReceipt,
+  ApiGoodsReceiptSummary,
+  ApiInvoice,
+  ApiInvoiceKind,
+  ApiInvoiceLine,
+  ApiInvoiceStatus,
+  ApiInvoiceSummary,
+  CreateGoodsReceiptInput,
+  CreateInvoiceInput,
+  GoodsReceiptLineInput,
+  ListGoodsReceiptsParams,
+  ListInvoicesParams,
 } from '@/lib/api/types'

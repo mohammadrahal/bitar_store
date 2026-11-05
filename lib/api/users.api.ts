@@ -1,5 +1,6 @@
 import type { RequestFn } from '@/lib/api/client'
 import type {
+  ApiBranchAccess,
   ApiPermissionCatalog,
   ApiUser,
   ApiUserPermissions,
@@ -24,6 +25,9 @@ export function createUsersApi(request: RequestFn) {
     getUserPermissions: (id: string) => request<ApiUserPermissions>(`/users/${id}/permissions`),
     setUserPermissions: (id: string, permissions: Record<string, boolean>) =>
       request<ApiUserPermissions>(`/users/${id}/permissions`, 'PUT', { permissions }),
+    getBranchAccess: (id: string) => request<ApiBranchAccess>(`/users/${id}/branch-access`),
+    setBranchAccess: (id: string, mode: 'all' | 'selected') =>
+      request<ApiBranchAccess>(`/users/${id}/branch-access`, 'PUT', { mode }),
   }
 }
 

@@ -11,17 +11,16 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { SkuTableCell } from '@/components/shared/table-empty'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
-import { usePermission } from '@/hooks/use-permission'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { Pagination } from '@/components/shared/pagination'
 import { usePagination } from '@/hooks/use-pagination'
 import { useReplenishment } from '@/hooks/use-warehouse'
 import { formatNumber } from '@/lib/format'
 
 export function ReplenishmentView() {
-  const { locationScoped } = usePermission()
-  const defaultBranch = useDefaultBranchId()
-  const [branchId, setBranchId] = useState(locationScoped ? defaultBranch : '')
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
 
   const query = useReplenishment(branchId)
   const rows = query.data?.suggestions ?? []
@@ -45,12 +44,12 @@ export function ReplenishmentView() {
               : undefined
         }
       >
-        {!locationScoped && (
+        {allowPageBranchFilter && (
           <div className="toolbar">
             <div className="toolbar-field toolbar-field-grow">
               <LocationSelect
-                value={branchId}
-                onChange={setBranchId}
+                value={pageBranchId}
+                onChange={setPageBranchId}
                 onlyAccessible
                 placeholder="All branches"
                 aria-label="Filter by branch"

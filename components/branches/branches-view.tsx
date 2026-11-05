@@ -35,7 +35,7 @@ export function BranchesView() {
         description={
           locationScoped
             ? 'The branch you work from.'
-            : 'Create stores and assign people to them from the Employees page.'
+            : 'Create stores, choose which one is the main warehouse, and assign people from the Employees page.'
         }
         actions={
           <Can permission="settings.manage">
@@ -77,9 +77,9 @@ export function BranchesView() {
       )}
       {dialog?.kind === 'delete' && (
         <ConfirmDialog
-          title={`Mark ${dialog.branch.name} inactive?`}
-          description="Inactive branches disappear from day-to-day lists. Staff keep their access, but the branch must have no stock on hand. You can turn it active again from Edit."
-          confirmLabel="Mark inactive"
+          title={`Delete ${dialog.branch.name}?`}
+          description="This permanently removes the branch and all of its sales, stock, transfers, receipts, and related history at that location. This cannot be undone."
+          confirmLabel="Delete branch"
           tone="danger"
           onResolve={(confirmed) => {
             const { id, name } = dialog.branch

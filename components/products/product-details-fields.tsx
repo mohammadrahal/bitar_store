@@ -6,19 +6,23 @@ import { Field } from '@/components/shared/field'
 import type { ProductDetailsFormValues } from '@/schemas/product.schema'
 
 /**
- * Name, category, prices and the optional details, shared by the new-model page
- * and the edit drawer. There is no cost field: the API has no cost.
+ * Name, category, cost and sell price — shared by the new-model page and the edit drawer.
  */
 export function ProductDetailsFields({
   register,
   control,
   errors,
   priceHint,
+  costHint,
+  showCost = false,
 }: {
   register: UseFormRegister<ProductDetailsFormValues>
   control: Control<ProductDetailsFormValues>
   errors: FieldErrors<ProductDetailsFormValues>
   priceHint?: string
+  costHint?: string
+  /** Hidden for staff who must not see cost (`canViewCosts` from `GET /auth/me`). */
+  showCost?: boolean
 }) {
 
   return (
@@ -37,7 +41,12 @@ export function ProductDetailsFields({
             )}
           />
         </fieldset>
-        <Field label="Sell price" error={errors.sellPrice?.message} hint={priceHint} className="full">
+        {showCost ? (
+          <Field label="Unit cost" error={errors.unitCost?.message} hint={costHint}>
+            <input {...register('unitCost', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
+          </Field>
+        ) : null}
+        <Field label="Sell price" error={errors.sellPrice?.message} hint={priceHint} className={showCost ? undefined : 'full'}>
           <input {...register('sellPrice', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
         </Field>
       </div>

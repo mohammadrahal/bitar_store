@@ -17,11 +17,19 @@ export function useBranchStockUnits(branchId: string) {
   })
 }
 
-/** Fetches the API catalog into the mock store. Resolves to the SKU count. */
-export function useCatalogSync() {
+/**
+ * Fetches the API catalog into the mock store. Resolves to the SKU count.
+ *
+ * `enabled` is for the layout's prefetch, which warms this on screens that will
+ * want it and stays out of the way on screens that will not. Every caller shares
+ * one query key, so a component that genuinely needs the mirror still fetches it
+ * even while the prefetch is standing down.
+ */
+export function useCatalogSync({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.products.catalog(),
     queryFn: syncCatalog,
+    enabled,
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
   })

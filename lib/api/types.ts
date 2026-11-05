@@ -184,6 +184,65 @@ export interface OpeningStockResult {
   lines: number
 }
 
+/**
+ * `POST /stock/adjustments` — the one way to change a balance after a SKU has
+ * been opened at a location. One SKU per call, so a document with several lines
+ * is several calls.
+ *
+ * The server's own wording for `quantityDelta`: "a whole number other than 0
+ * (up to 100000, negative to take pieces out)".
+ */
+export interface StockAdjustmentInput {
+  branchId: string
+  skuId: string
+  bucket?: 'sellable' | 'non_sellable'
+  quantityDelta: number
+  reason: ApiAdjustmentReason
+  /** Required, 5 to 200 characters, and kept in the audit log. */
+  note: string
+}
+
+/**
+ * Every reason the server accepts. They are all corrections — there is no
+ * `purchase` or `receipt` among them, which is why a goods receipt is posted as
+ * `other` with the document's reference in the note. See `ARCHITECTURE.md`
+ * section 9.
+ */
+export const ADJUSTMENT_REASONS = [
+  'count_correction',
+  'damage',
+  'loss',
+  'found',
+  'data_entry_error',
+  'other',
+] as const
+
+export type ApiAdjustmentReason = (typeof ADJUSTMENT_REASONS)[number]
+
+export interface ApiStockAdjustment {
+  id: string
+  reference: string
+  branch: { id: string; code: string; name: string }
+  sku: { id: string; code: string; styleName: string; size: string; color: string }
+  bucket: string
+  quantityDelta: number
+  reason: ApiAdjustmentReason
+  note: string
+  by: { id: string; name: string | null }
+  createdAt: string
+  balanceAfter: number | null
+}
+
+export interface StockAdjustmentParams {
+  branchId?: string
+  skuId?: string
+  reason?: ApiAdjustmentReason
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+}
+
 /** `GET /stock/overview` (admin): the same filters as the stock list, less the branch. */
 export interface StockOverviewParams {
   search?: string
@@ -428,6 +487,9 @@ export interface ApiTransferLine {
   requested: number
   dispatched: number
   received: number
+  damaged: number
+  releasedToSellable: number
+  onHold: number
   lost: number
   onTheRoad: number
 }
@@ -444,7 +506,16 @@ export interface ApiTransfer {
   dispatchedBy: { id: string; name: string | null } | null
   dispatchedAt: string | null
   lines: ApiTransferLine[]
-  totals: { requested: number; dispatched: number; received: number; lost: number; onTheRoad: number }
+  totals: {
+    requested: number
+    dispatched: number
+    received: number
+    damaged: number
+    releasedToSellable: number
+    onHold: number
+    lost: number
+    onTheRoad: number
+  }
 }
 
 export interface CreateTransferInput {
@@ -594,4 +665,118 @@ export interface ApiUserPermissions {
   user: { id: string; fullName: string; role: string; isActive: boolean }
   permissions: ApiPermissionLine[]
   overrides: { permission: string; effect: 'allow' | 'deny' }[]
+}
+
+/** `GET /users/:id/branch-access`. `all` covers every shop, including ones opened later, and never the warehouse. */
+export interface ApiBranchAccess {
+  userId: string
+  mode: 'all' | 'selected'
+  branchIds: string[]
+}
+
+/** `GET /places`: active locations for transfer forms (warehouse first). */
+export type ApiPlace = ApiLocation
+
+export interface GoodsReceiptLineInput {
+  skuId: string
+  quantity: number
+  unitCost: string | number
+}
+
+export interface CreateGoodsReceiptInput {
+  supplierName: string
+  supplierInvoiceNumber: string
+  invoiceDate?: string
+  currency?: string
+  note?: string
+  lines: GoodsReceiptLineInput[]
+}
+
+export interface ApiGoodsReceiptSummary {
+  id: string
+  reference: string
+  warehouse: { id: string; code: string; name: string }
+  supplierName: string
+  supplierInvoiceNumber: string
+  invoiceDate: string
+  currency: string
+  note: string | null
+  totalCost: string
+  receivedBy: { id: string; name: string | null }
+  createdAt: string
+  lineCount: number
+  totalQuantity: number
+}
+
+export interface ApiGoodsReceipt extends ApiGoodsReceiptSummary {
+  lines: {
+    sku: { id: string; code: string; styleName: string; size: string; color: string }
+    quantity: number
+    unitCost: string
+    lineTotal: string
+  }[]
+}
+
+export interface ListGoodsReceiptsParams {
+  supplier?: string
+  invoiceNumber?: string
+  skuId?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+}
+
+export type ApiInvoiceKind = 'b2b' | 'b2c'
+export type ApiInvoiceStatus = 'draft' | 'final' | 'void'
+
+export type CreateInvoiceInput =
+  | { transferId: string; note?: string }
+  | { saleId: string; customerName?: string; customerPhone?: string; note?: string }
+
+export interface ApiInvoiceSummary {
+  id: string
+  kind: ApiInvoiceKind
+  status: ApiInvoiceStatus
+  reference: string | null
+  issuer: { id: string; name: string }
+  recipient: { branchId: string | null; name: string | null; phone: string | null }
+  transfer: { id: string; reference: string } | null
+  sale: { id: string; reference: string } | null
+  currency: string
+  subtotal: string
+  discountTotal: string
+  total: string
+  note: string | null
+  issuedBy: { id: string; name: string | null }
+  createdAt: string
+  finalizedAt: string | null
+  voided: { at: string; by: { id: string; name: string | null }; reason: string } | null
+  lineCount: number
+}
+
+export interface ApiInvoiceLine {
+  lineNo: number
+  sku: { id: string; code: string }
+  description: string
+  quantity: number
+  unitPrice: string
+  discount: string
+  lineTotal: string
+}
+
+export interface ApiInvoice extends ApiInvoiceSummary {
+  lines: ApiInvoiceLine[]
+  payments: { method: string; amount: string; reference: string | null }[]
+}
+
+export interface ListInvoicesParams {
+  kind?: ApiInvoiceKind
+  status?: ApiInvoiceStatus
+  branchId?: string
+  search?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
 }

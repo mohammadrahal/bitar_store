@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { invalidateMinimumQueries } from '@/lib/invalidate-stock'
 import { queryKeys } from '@/lib/query-keys'
 import {
   deleteReorderLevel,
@@ -32,7 +33,7 @@ export function useSetReorderLevel() {
   return useMutation({
     mutationFn: (input: ReorderLevelInput) => setReorderLevel(input),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['warehouse', 'reorder-levels'] })
+      invalidateMinimumQueries(queryClient)
       toast.success('Minimum updated')
     },
     onError: (error: Error) => toast.error(error.message),
@@ -44,7 +45,7 @@ export function useDeleteReorderLevel() {
   return useMutation({
     mutationFn: (id: string) => deleteReorderLevel(id),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['warehouse', 'reorder-levels'] })
+      invalidateMinimumQueries(queryClient)
       toast.success('Minimum removed')
     },
     onError: (error: Error) => toast.error(error.message),

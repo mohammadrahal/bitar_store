@@ -41,11 +41,19 @@ export function userFormSchema(requirePassword: boolean) {
       password: requirePassword ? passwordField : z.union([z.literal(''), passwordField]),
       role: roleField,
       locations: locationsField,
+      branchAccess: z.enum(['all', 'selected']),
     })
     .superRefine((values, ctx) => {
       /* Owners work everywhere; an employee without a location cannot do anything. */
       if (values.role === 'employee' && values.locations.length === 0) {
         ctx.addIssue({ code: 'custom', message: 'Assign at least one location', path: ['locations'] })
+      }
+      if (values.role === 'manager' && values.branchAccess === 'selected' && values.locations.length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pick at least one branch, or choose all branches',
+          path: ['locations'],
+        })
       }
     })
 }
@@ -58,11 +66,13 @@ export const emptyUserValues: UserFormValues = {
   fullName: '',
   role: 'employee',
   locations: [],
+  branchAccess: 'selected',
 }
 
 export function toUserFormValues(
   user: { email: string; fullName: string; role: Role },
   locations: UserFormValues['locations'],
+  branchAccess: 'all' | 'selected' = 'selected',
 ): UserFormValues {
   return {
     email: user.email,
@@ -70,5 +80,6 @@ export function toUserFormValues(
     password: '',
     role: user.role,
     locations,
+    branchAccess,
   }
 }

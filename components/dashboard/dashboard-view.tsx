@@ -1,12 +1,17 @@
 'use client'
 
-import { InventoryOverview } from '@/components/dashboard/inventory-overview'
-import { SalesCharts } from '@/components/dashboard/sales-charts'
+import { OverviewBody } from '@/components/dashboard/overview-body'
+import { QuickActions } from '@/components/dashboard/quick-actions'
 import { PageHeader } from '@/components/shared/page-header'
 import { useBranches } from '@/hooks/use-branches'
 import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useCurrentUser } from '@/store/user-store'
 import { ALL_BRANCHES } from '@/types'
+
+/** "Nadia Bitar" -> "Nadia". A greeting uses the name someone is called by. */
+function firstName(name: string) {
+  return name.trim().split(/\s+/)[0] || name
+}
 
 export function DashboardView() {
   const user = useCurrentUser()
@@ -17,17 +22,15 @@ export function DashboardView() {
   return (
     <>
       <PageHeader
-        eyebrow="Dashboard"
-        title={`Welcome back, ${user.name}`}
+        title={`Welcome back, ${firstName(user.name)}`}
         description={
           scopedBranch
-            ? `Trade and stock health at ${scopedBranch.name}. Use the header filter to widen the scope.`
-            : 'Trade and stock health across every branch, with the items that need attention first.'
+            ? `Trade and stock at ${scopedBranch.name}.`
+            : 'Trade and stock across every location, with what needs attention first.'
         }
+        actions={<QuickActions />}
       />
-      <InventoryOverview scope={scope} mode="network">
-        <SalesCharts scope={scope} />
-      </InventoryOverview>
+      <OverviewBody scope={scope} />
     </>
   )
 }

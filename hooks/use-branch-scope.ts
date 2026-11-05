@@ -30,3 +30,26 @@ export function useDefaultBranchId(): string {
   if (scope !== ALL_BRANCHES) return scope
   return branches?.[0]?.id ?? ''
 }
+
+/**
+ * Branch id for list and report queries. Empty means every location the user
+ * may see; a concrete id means the header filter (or the employee's location).
+ */
+export function useListBranchFilter(): string {
+  const scope = useBranchScope()
+  return scope === ALL_BRANCHES ? '' : scope
+}
+
+/** Page-level branch pickers only apply when the header is on all locations. */
+export function useAllowPageBranchFilter(): boolean {
+  const { locationScoped } = usePermission()
+  const scope = useBranchScope()
+  return !locationScoped && scope === ALL_BRANCHES
+}
+
+/** Header scope when set, otherwise the optional filter on the current page. */
+export function useEffectiveListBranchId(pageBranchId = ''): string {
+  const scopeFilter = useListBranchFilter()
+  const allowPage = useAllowPageBranchFilter()
+  return allowPage ? pageBranchId : scopeFilter
+}

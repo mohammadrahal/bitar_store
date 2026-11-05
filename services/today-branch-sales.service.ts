@@ -44,11 +44,17 @@ export async function fetchTodayBranchSales(scope: BranchScope): Promise<TodaySa
 
   let pending = inflight.get(key)
   if (!pending) {
-    pending = loadTodayBranchSales(scope).then((data) => {
-      cached = { key, at: Date.now(), data }
-      inflight.delete(key)
-      return data
-    })
+    pending = loadTodayBranchSales(scope)
+      .then((data) => {
+        cached = { key, at: Date.now(), data }
+        return data
+      })
+      /* Released whether the fetch resolved or threw. A rejected promise left
+         in the map is handed to every later caller, so one failed `GET /sales`
+         would keep the dashboard on the same error until a page reload. */
+      .finally(() => {
+        inflight.delete(key)
+      })
     inflight.set(key, pending)
   }
   return pending

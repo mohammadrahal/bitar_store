@@ -20,6 +20,11 @@ export function createTransfersApi(request: RequestFn, pageRequest: PageRequestF
       lines: { skuId: string; accepted: number; damaged?: number }[],
       idempotencyKey: string,
     ) => request<ApiTransfer>(`/transfers/${id}/receive`, 'POST', { lines }, { idempotencyKey }),
+    acceptTransfer: (
+      id: string,
+      lines: { skuId: string; quantity: number }[],
+      idempotencyKey: string,
+    ) => request<ApiTransfer>(`/transfers/${id}/accept`, 'POST', { lines }, { idempotencyKey }),
     resolveTransfer: (
       id: string,
       reason: string,

@@ -1,4 +1,4 @@
-import { formatPrice } from '@/lib/format'
+import { PriceWithLbp } from '@/components/shared/price-with-lbp'
 
 export function SaleFooter({
   total,
@@ -25,21 +25,21 @@ export function SaleFooter({
           <span className="tabular">
             {units} {units === 1 ? 'item' : 'items'}
           </span>
-          <strong>{formatPrice(total)}</strong>
+          <PriceWithLbp usd={total} strong />
         </div>
         <div className="sale-footer-actions">
           {onSavePending && (
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn btn-secondary btn-till"
               disabled={pending || savingPending}
               onClick={onSavePending}
             >
               {savingPending ? 'Saving…' : 'Save pending sale'}
             </button>
           )}
-          <button type="submit" className="btn btn-primary" disabled={disabled || pending}>
-            {pending ? 'Confirming with the server…' : 'Confirm sale'}
+          <button type="submit" className="btn btn-primary btn-till" disabled={disabled || pending}>
+            {pending ? 'Confirming…' : 'Confirm sale'}
           </button>
         </div>
         {problem ? (

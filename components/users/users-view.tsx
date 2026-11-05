@@ -13,7 +13,7 @@ import { LocationSelect } from '@/components/shared/location-select'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useBranches } from '@/hooks/use-branches'
-import { useSetUserActive, useUsers } from '@/hooks/use-users'
+import { useDeleteUser, useSetUserActive, useUsers } from '@/hooks/use-users'
 import { isOnlyActiveSuperAdmin, type StaffUser } from '@/services/users.service'
 import { useCurrentUser } from '@/store/user-store'
 
@@ -22,12 +22,14 @@ type Dialog =
   | { kind: 'edit'; user: StaffUser }
   | { kind: 'permissions'; user: StaffUser }
   | { kind: 'deactivate'; user: StaffUser }
+  | { kind: 'delete'; user: StaffUser }
 
 export function UsersView() {
   const currentUser = useCurrentUser()
   const { data: users, isPending, isError, error, refetch } = useUsers()
   const { data: branches } = useBranches()
   const setActive = useSetUserActive()
+  const remove = useDeleteUser()
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [branchFilter, setBranchFilter] = useState('')
   const close = () => setDialog(null)
@@ -53,7 +55,7 @@ export function UsersView() {
       <PageHeader
         eyebrow="Administration"
         title="Employees"
-        description="People are never deleted. Deactivating blocks sign-in and keeps every record they are named on."
+        description="Deactivating blocks sign-in and can be undone. Deleting removes the account; sales they rang up keep their name."
         actions={
           <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
             <Plus size={16} aria-hidden="true" />
@@ -109,6 +111,7 @@ export function UsersView() {
               onCreate={() => setDialog({ kind: 'create' })}
               onEdit={(user) => setDialog({ kind: 'edit', user })}
               onPermissions={(user) => setDialog({ kind: 'permissions', user })}
+              onDelete={(user) => setDialog({ kind: 'delete', user })}
               onActiveChange={handleActiveChange}
             />
           </Panel>
@@ -118,6 +121,20 @@ export function UsersView() {
       {dialog?.kind === 'create' && <UserForm onClose={close} />}
       {dialog?.kind === 'edit' && <UserForm user={dialog.user} onClose={close} />}
       {dialog?.kind === 'permissions' && <UserPermissionsForm user={dialog.user} onClose={close} />}
+
+      {dialog?.kind === 'delete' && (
+        <ConfirmDialog
+          title={`Delete ${dialog.user.fullName}?`}
+          description="They disappear from the list and cannot sign in. Sales, transfers and stock movements keep their name. You cannot delete yourself or the last admin."
+          confirmLabel="Delete account"
+          tone="danger"
+          onResolve={(confirmed) => {
+            const target = dialog.user
+            close()
+            if (confirmed) remove.mutate(target.id)
+          }}
+        />
+      )}
 
       {dialog?.kind === 'deactivate' && (
         <ConfirmDialog

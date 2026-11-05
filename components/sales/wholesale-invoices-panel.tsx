@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { ReceiptText } from 'lucide-react'
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
+import { receiptPaymentsFromDraft } from '@/components/sales/sale-receipt-build'
 import { printWholesaleInvoice } from '@/components/sales/sale-receipt-print'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -17,6 +18,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useDeleteWholesaleInvoice, useWholesaleInvoices } from '@/hooks/use-wholesale-invoices'
 import { useCurrentUser } from '@/store/user-store'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
+import { paymentMethodLabel } from '@/lib/sale-payments'
 import {
   wholesaleInvoiceTotal,
   wholesaleReference,
@@ -81,6 +83,9 @@ export function WholesaleInvoicesPanel({
       branchName,
       note: invoice.note,
       total: wholesaleInvoiceTotal(invoice),
+      payments: invoice.payment
+        ? receiptPaymentsFromDraft(invoice.payment, wholesaleInvoiceTotal(invoice))
+        : undefined,
       lines: invoice.lines.map((line) => ({
         label: line.label,
         quantity: line.quantity,
@@ -144,6 +149,7 @@ export function WholesaleInvoicesPanel({
                   <th scope="col" className="num">
                     Total
                   </th>
+                  {status === 'issued' ? <th scope="col">Payment</th> : null}
                   <th scope="col">
                     <span className="sr-only">Actions</span>
                   </th>
@@ -162,6 +168,9 @@ export function WholesaleInvoicesPanel({
                     <td>{formatDocumentDate(invoice.issuedAt ?? invoice.createdAt)}</td>
                     <td className="num tabular">{lineUnits(invoice)}</td>
                     <td className="num tabular">{formatPrice(wholesaleInvoiceTotal(invoice))}</td>
+                    {status === 'issued' ? (
+                      <td>{paymentMethodLabel(invoice.payment, wholesaleInvoiceTotal(invoice))}</td>
+                    ) : null}
                     <td>
                       <div className="row-actions">
                         {invoice.status === 'draft' && (

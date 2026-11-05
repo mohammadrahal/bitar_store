@@ -12,7 +12,7 @@ import { Panel } from '@/components/shared/panel'
 import { SearchInput } from '@/components/shared/search-input'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
-import { useDefaultBranchId } from '@/hooks/use-branch-scope'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { useOpeningState, usePostOpeningStock } from '@/hooks/use-opening-stock'
 import { usePermission } from '@/hooks/use-permission'
 import { Pagination } from '@/components/shared/pagination'
@@ -28,10 +28,10 @@ const SEARCH_DEBOUNCE_MS = 250
  * Creating a model never places stock, so this is how a location starts.
  */
 export function OpeningStockView() {
-  const { can, locationScoped } = usePermission()
-  const defaultBranch = useDefaultBranchId()
-  const [branchChoice, setBranchChoice] = useState('')
-  const branchId = locationScoped ? defaultBranch : branchChoice
+  const { can } = usePermission()
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
   const mayPost = can('opening_stock.post', branchId || undefined)
 
   const [search, setSearch] = useState('')
@@ -62,11 +62,11 @@ export function OpeningStockView() {
         description="Count what is physically at a location and post it. A SKU is opened once; after that its differences are settled by a physical count."
       />
 
-      {!locationScoped && (
+      {allowPageBranchFilter && (
         <Field label="Location">
           <LocationSelect
-            value={branchChoice}
-            onChange={setBranchChoice}
+            value={pageBranchId}
+            onChange={setPageBranchId}
             onlyAccessible
             onlyFullAccess
             placeholder="Select a location"

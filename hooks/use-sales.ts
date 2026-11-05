@@ -33,6 +33,7 @@ export function useCreateSale() {
       invalidateStockQueries(queryClient)
       void queryClient.invalidateQueries({ queryKey: salesQueryKeys.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all })
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apiInvoices.all })
       toast.success(`Sale ${sale.reference} completed`)
     },
     onError: (error: Error) => toast.error(error.message),

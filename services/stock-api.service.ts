@@ -77,11 +77,17 @@ async function fetchStockPages(params: StockPagesParams): Promise<ApiStockItem[]
 
   let pending = branchPagesInflight.get(key)
   if (!pending) {
-    pending = fetchStockPagesUncached(params).then((data) => {
-      branchPagesCache.set(key, { data, at: Date.now() })
-      branchPagesInflight.delete(key)
-      return data
-    })
+    pending = fetchStockPagesUncached(params)
+      .then((data) => {
+        branchPagesCache.set(key, { data, at: Date.now() })
+        return data
+      })
+      /* Released whether the fetch resolved or threw. A rejected promise left
+         in the map is handed to every later caller, so the retry button on a
+         stock screen would answer with the first failure for ever. */
+      .finally(() => {
+        branchPagesInflight.delete(key)
+      })
     branchPagesInflight.set(key, pending)
   }
   return pending

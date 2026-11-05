@@ -1,4 +1,5 @@
 import { priceOf } from '@/lib/api/map-catalog'
+import type { DateRange } from '@/lib/dashboard-range'
 import { readDb } from '@/mocks/store'
 import { fetchSalesSummary, fetchTopSkus } from '@/services/reports-api.service'
 import { fetchTodayBranchSales } from '@/services/today-branch-sales.service'
@@ -28,9 +29,18 @@ function seriesFromBranches(
   return series
 }
 
-/** Admin/manager charts: two report calls instead of one `GET /sales` per branch. */
-export async function getSalesAnalyticsFromReports(scope: BranchScope = ALL_BRANCHES): Promise<SalesAnalytics> {
-  const params = scope === ALL_BRANCHES ? {} : { branchId: scope }
+/**
+ * Admin/manager charts: two report calls instead of one `GET /sales` per
+ * branch. Both take the window the page is showing — without `from` and `to`
+ * the server answers for today alone, which made "best sellers over 90 days"
+ * a list of whatever happened to sell this morning.
+ */
+export async function getSalesAnalyticsFromReports(
+  scope: BranchScope = ALL_BRANCHES,
+  range?: DateRange,
+): Promise<SalesAnalytics> {
+  const window = range ? { from: range.from, to: range.to } : {}
+  const params = { ...(scope === ALL_BRANCHES ? {} : { branchId: scope }), ...window }
   const [summary, topSkus] = await Promise.all([
     fetchSalesSummary(params),
     fetchTopSkus({ ...params, limit: TOP_PRODUCTS }),
@@ -49,7 +59,11 @@ export async function getSalesAnalyticsFromReports(scope: BranchScope = ALL_BRAN
   const bucketId = series[0]?.id ?? OTHER_BRANCH_ID
 
   const topProducts: TopSellerRow[] = topSkus.rows.map((row) => ({
+    variantId: row.sku.id,
     productName: row.sku.styleName,
+    color: row.sku.color,
+    size: row.sku.size,
+    sku: row.sku.code,
     units: row.quantity,
     revenue: priceOf(row.revenue),
     /* Top-skus are scoped totals; branch split is not on the API yet. */
@@ -77,7 +91,12 @@ export async function getSalesAnalyticsFromBranchSales(scope: BranchScope = ALL_
   const businessDate = snapshot.businessDate
 
   const branchTotals = new Map<string, Tally>()
-  const productTotals = new Map<string, Tally & { productName: string; byBranch: Map<string, number> }>()
+  /* Keyed by variant, not by model: two sizes of the same dress are two things
+     to restock, and a list that merges them cannot be acted on. */
+  const variantTotals = new Map<
+    string,
+    Tally & { variantId: string; productName: string; color: string; size: string; sku: string; byBranch: Map<string, number> }
+  >()
   let documentCount = 0
 
   for (const { branchId, sales } of snapshot.byBranch) {
@@ -92,16 +111,20 @@ export async function getSalesAnalyticsFromBranchSales(scope: BranchScope = ALL_
         tally.revenue += revenue
         branchTotals.set(branchId, tally)
 
-        const product = productTotals.get(line.styleName) ?? {
+        const variant = variantTotals.get(line.skuId) ?? {
           units: 0,
           revenue: 0,
+          variantId: line.skuId,
           productName: line.styleName,
+          color: line.color,
+          size: line.size,
+          sku: line.skuCode,
           byBranch: new Map<string, number>(),
         }
-        product.units += units
-        product.revenue += revenue
-        product.byBranch.set(branchId, (product.byBranch.get(branchId) ?? 0) + units)
-        productTotals.set(line.styleName, product)
+        variant.units += units
+        variant.revenue += revenue
+        variant.byBranch.set(branchId, (variant.byBranch.get(branchId) ?? 0) + units)
+        variantTotals.set(line.skuId, variant)
       }
     }
   }
@@ -123,20 +146,24 @@ export async function getSalesAnalyticsFromBranchSales(scope: BranchScope = ALL_
    */
   const series = seriesFromBranches(named)
   const keptIds = new Set(series.filter((entry) => entry.id !== OTHER_BRANCH_ID).map((entry) => entry.id))
-  const topProducts: TopSellerRow[] = [...productTotals.values()]
-    .filter((product) => product.units > 0)
+  const topProducts: TopSellerRow[] = [...variantTotals.values()]
+    .filter((variant) => variant.units > 0)
     .sort((a, b) => b.units - a.units || b.revenue - a.revenue)
     .slice(0, TOP_PRODUCTS)
-    .map((product) => {
+    .map((variant) => {
       const byBranch: Record<string, number> = {}
-      for (const [branchId, units] of product.byBranch) {
+      for (const [branchId, units] of variant.byBranch) {
         const key = keptIds.has(branchId) ? branchId : OTHER_BRANCH_ID
         byBranch[key] = (byBranch[key] ?? 0) + units
       }
       return {
-        productName: product.productName,
-        units: product.units,
-        revenue: money(product.revenue),
+        variantId: variant.variantId,
+        productName: variant.productName,
+        color: variant.color,
+        size: variant.size,
+        sku: variant.sku,
+        units: variant.units,
+        revenue: money(variant.revenue),
         byBranch,
       }
     })

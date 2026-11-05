@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/shared/skeleton'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { usePermission } from '@/hooks/use-permission'
 import {
+  useAcceptTransfer,
   useCancelTransfer,
   useDispatchTransfer,
   useReceiveTransfer,
@@ -43,6 +44,12 @@ function TransferLinesTable({ lines }: { lines: ApiTransferLine[] }) {
                 Received
               </th>
               <th scope="col" className="num">
+                On hold
+              </th>
+              <th scope="col" className="num">
+                Sellable
+              </th>
+              <th scope="col" className="num">
                 Lost
               </th>
               <th scope="col" className="num">
@@ -62,6 +69,8 @@ function TransferLinesTable({ lines }: { lines: ApiTransferLine[] }) {
                 <td className="num">{line.requested}</td>
                 <td className="num">{line.dispatched}</td>
                 <td className="num">{line.received}</td>
+                <td className="num">{line.onHold}</td>
+                <td className="num">{line.releasedToSellable}</td>
                 <td className="num">{line.lost}</td>
                 <td className="num">{line.onTheRoad}</td>
               </tr>
@@ -79,10 +88,12 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
   const { canDispatchTransfers, canReceiveTransfers } = usePermission()
   const dispatch = useDispatchTransfer()
   const receive = useReceiveTransfer()
+  const accept = useAcceptTransfer()
   const resolve = useResolveTransfer()
   const cancel = useCancelTransfer()
   const idempotency = useIdempotencyKey()
   const [reason, setReason] = useState('')
+  const [inspectionNote, setInspectionNote] = useState('')
 
   if (isPending) return <Skeleton rows={6} stats={0} />
   if (isError || !data)
@@ -94,6 +105,21 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
   const receiveLines = transfer.lines
     .filter((line) => line.onTheRoad > 0)
     .map((line) => ({ skuId: line.sku.id, accepted: line.onTheRoad, damaged: 0 }))
+
+  const acceptLines = transfer.lines
+    .filter((line) => line.onHold > 0)
+    .map((line) => ({ skuId: line.sku.id, quantity: line.onHold }))
+
+  const canReceiveOnRoad =
+    (transfer.status === 'dispatched' || transfer.status === 'partially_received') &&
+    canReceiveTransfers() &&
+    receiveLines.length > 0
+
+  const canAcceptForSale =
+    (transfer.status === 'partially_received' || transfer.status === 'received' || transfer.status === 'closed') &&
+    canReceiveTransfers() &&
+    acceptLines.length > 0 &&
+    transfer.totals.onHold > 0
 
   return (
     <>
@@ -108,6 +134,9 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
 
       <div className="detail-meta">
         <TransferStatusPill status={transfer.status} />
+        {transfer.totals.onHold > 0 && (
+          <span className="muted">{formatNumber(transfer.totals.onHold)} units on hold at destination (not sellable yet)</span>
+        )}
         {transfer.note && <span className="muted">{transfer.note}</span>}
       </div>
 
@@ -150,23 +179,51 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
             </button>
           </>
         )}
-        {(transfer.status === 'dispatched' || transfer.status === 'partially_received') &&
-          canReceiveTransfers() &&
-          receiveLines.length > 0 && (
+        {canReceiveOnRoad && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={receive.isPending}
+            onClick={() =>
+              receive.mutate(
+                { id: transfer.id, idempotencyKey: idempotency.current(), lines: receiveLines },
+                { onSuccess: idempotency.reset },
+              )
+            }
+          >
+            Receive shipment (puts stock on hold)
+          </button>
+        )}
+        {canAcceptForSale && (
+          <div className="inline-form">
+            <input
+              type="text"
+              className="input"
+              placeholder="Inspection note (optional, for your records)"
+              value={inspectionNote}
+              onChange={(event) => setInspectionNote(event.target.value)}
+              aria-label="Inspection note"
+            />
             <button
               type="button"
               className="btn btn-primary"
-              disabled={receive.isPending}
+              disabled={accept.isPending}
               onClick={() =>
-                receive.mutate(
-                  { id: transfer.id, idempotencyKey: idempotency.current(), lines: receiveLines },
-                  { onSuccess: idempotency.reset },
+                accept.mutate(
+                  { id: transfer.id, idempotencyKey: idempotency.current(), lines: acceptLines },
+                  {
+                    onSuccess: () => {
+                      idempotency.reset()
+                      setInspectionNote('')
+                    },
+                  },
                 )
               }
             >
-              Receive everything still on the road (good condition)
+              Accept for sale ({formatNumber(transfer.totals.onHold)} on hold)
             </button>
-          )}
+          </div>
+        )}
         {transfer.totals.onTheRoad > 0 && canDispatchTransfers() && (
           <div className="inline-form">
             <input

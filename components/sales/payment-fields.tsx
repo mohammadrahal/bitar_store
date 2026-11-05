@@ -1,7 +1,13 @@
 'use client'
 
+import Link from 'next/link'
 import { Field } from '@/components/shared/field'
-import { formatPrice } from '@/lib/format'
+import { PriceWithLbp } from '@/components/shared/price-with-lbp'
+import { useExchangeRate } from '@/hooks/use-exchange-rate'
+import { usePermission } from '@/hooks/use-permission'
+import { formatLbp, formatPrice } from '@/lib/format'
+import { MAX_CASH_TENDERED, MAX_LINE_MONEY, parseMoneyInput } from '@/lib/input-limits'
+import { usdToLbpAmount } from '@/services/exchange-rate.service'
 import { amountsOf, changeDue, syncTendered, type PaymentDraft, type PaymentMode } from '@/lib/sale-payments'
 
 const MODES: { value: PaymentMode; label: string }[] = [
@@ -21,22 +27,38 @@ export function PaymentFields({
   total,
   onChange,
   referenceError,
+  totalLabel = 'Sale total',
 }: {
   draft: PaymentDraft
   total: number
   onChange: (next: PaymentDraft) => void
   /** The server's message when it rejects the Whish reference. */
   referenceError?: string
+  totalLabel?: string
 }) {
   const { cash, whish } = amountsOf(draft, total)
   const change = changeDue(draft, total)
+  const rateQuery = useExchangeRate()
+  const { superAdmin, can } = usePermission()
+  const canSetRate = superAdmin || can('settings.manage')
+  const changeLbp = usdToLbpAmount(change, rateQuery.data ?? null)
   const set = (patch: Partial<PaymentDraft>) => onChange({ ...draft, ...patch })
 
-  const amount = (value: string) => Math.max(0, Number(value) || 0)
-
   return (
-    <section className="sale-card" aria-label="Payment">
-      <div className="segmented compact" role="radiogroup" aria-label="Payment method">
+    <section className="sale-card till-panel" aria-label="Payment">
+      {rateQuery.data ? (
+        <p className="till-rate-hint muted">
+          1 USD = {formatLbp(rateQuery.data.usdToLbp)} · totals show an LBP guide for the customer
+        </p>
+      ) : canSetRate ? (
+        <p className="till-rate-hint muted">
+          No LBP rate yet.{' '}
+          <Link href="/settings" className="text-link">
+            Set USD / LBP in Settings
+          </Link>
+        </p>
+      ) : null}
+      <div className="segmented compact till-segmented" role="radiogroup" aria-label="Payment method">
         {MODES.map((mode) => (
           <button
             key={mode.value}
@@ -50,8 +72,6 @@ export function PaymentFields({
                   {
                     ...draft,
                     mode: mode.value,
-                    /* Splitting starts from the whole total in cash, so the cashier
-                       moves part of it to Whish rather than typing both. */
                     cashAmount: mode.value === 'split' ? total : 0,
                     whishAmount: 0,
                   },
@@ -65,6 +85,11 @@ export function PaymentFields({
         ))}
       </div>
 
+      <div className="till-total-row">
+        <span className="muted">{totalLabel}</span>
+        <PriceWithLbp usd={total} strong />
+      </div>
+
       <div className="form-grid">
         {draft.mode === 'split' && (
           <>
@@ -72,13 +97,17 @@ export function PaymentFields({
               <input
                 type="number"
                 min="0"
+                max={MAX_LINE_MONEY}
                 step="0.01"
                 inputMode="decimal"
-                className="tabular"
+                className="tabular till-input"
                 value={draft.cashAmount || ''}
                 onChange={(event) => {
-                  const next = amount(event.target.value)
-                  set({ cashAmount: next, whishAmount: Math.max(0, Math.round((total - next) * 100) / 100) })
+                  const next = parseMoneyInput(event.target.value, MAX_LINE_MONEY)
+                  set({
+                    cashAmount: next,
+                    whishAmount: parseMoneyInput(String(Math.max(0, total - next)), MAX_LINE_MONEY),
+                  })
                 }}
               />
             </Field>
@@ -86,11 +115,12 @@ export function PaymentFields({
               <input
                 type="number"
                 min="0"
+                max={MAX_LINE_MONEY}
                 step="0.01"
                 inputMode="decimal"
-                className="tabular"
+                className="tabular till-input"
                 value={draft.whishAmount || ''}
-                onChange={(event) => set({ whishAmount: amount(event.target.value) })}
+                onChange={(event) => set({ whishAmount: parseMoneyInput(event.target.value, MAX_LINE_MONEY) })}
               />
             </Field>
           </>
@@ -98,25 +128,28 @@ export function PaymentFields({
 
         {cash > 0 && (
           <>
-            <Field
-              label="Cash received"
-              hint="Filled with the sale total. Edit if they paid with a larger bill."
-            >
+            <Field label="Cash received" hint="Edit if the customer paid with a larger bill.">
               <input
                 type="number"
                 min="0"
+                max={MAX_CASH_TENDERED}
                 step="0.01"
                 inputMode="decimal"
-                className="tabular"
+                className="tabular till-input"
                 value={draft.tendered > 0 ? draft.tendered : cash || ''}
-                onChange={(event) => set({ tendered: amount(event.target.value) })}
+                onChange={(event) => set({ tendered: parseMoneyInput(event.target.value, MAX_CASH_TENDERED) })}
               />
             </Field>
             <Field
-              label="Change"
-              hint={change > 0 ? 'Give this back to the customer' : 'Exact payment — nothing to hand back'}
+              label="Change to give"
+              hint={change > 0 ? 'Hand this back to the customer with the receipt.' : 'Exact payment — nothing to return.'}
             >
-              <input type="text" className="tabular" value={formatPrice(change)} readOnly tabIndex={-1} />
+              <p className="till-change-readout tabular" aria-live="polite">
+                {formatPrice(change)}
+                {changeLbp != null && change > 0 && (
+                  <small className="price-lbp"> ≈ {formatLbp(changeLbp)}</small>
+                )}
+              </p>
             </Field>
           </>
         )}
@@ -129,11 +162,13 @@ export function PaymentFields({
             className="full"
           >
             <input
+              className="till-input"
               value={draft.whishReference}
-              onChange={(event) => set({ whishReference: event.target.value })}
+              onChange={(event) => set({ whishReference: event.target.value.slice(0, 64) })}
               autoComplete="off"
               placeholder="WH-12345"
               spellCheck={false}
+              maxLength={64}
             />
           </Field>
         )}

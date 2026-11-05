@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { SkuTableCell } from '@/components/shared/table-empty'
-import { usePermission } from '@/hooks/use-permission'
+import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { Pagination } from '@/components/shared/pagination'
 import { usePagination } from '@/hooks/use-pagination'
 import { useSalesSummaryReport, useTopSkusReport } from '@/hooks/use-reports-api'
@@ -22,8 +22,9 @@ function todayIso() {
 }
 
 export function ReportsView() {
-  const { locationScoped } = usePermission()
-  const [branchId, setBranchId] = useState('')
+  const allowPageBranchFilter = useAllowPageBranchFilter()
+  const [pageBranchId, setPageBranchId] = useState('')
+  const branchId = useEffectiveListBranchId(pageBranchId)
   const [from, setFrom] = useState(todayIso())
   const [to, setTo] = useState(todayIso())
 
@@ -49,11 +50,11 @@ export function ReportsView() {
 
       <Panel title="Date range">
         <div
-          className={`panel-body report-filters${locationScoped ? ' report-filters--dates-only' : ''}`}
+          className={`panel-body report-filters${!allowPageBranchFilter ? ' report-filters--dates-only' : ''}`}
         >
-          {!locationScoped && (
+          {allowPageBranchFilter && (
             <Field label="Branch (optional)">
-              <LocationSelect value={branchId} onChange={setBranchId} onlyAccessible placeholder="All branches" />
+              <LocationSelect value={pageBranchId} onChange={setPageBranchId} onlyAccessible placeholder="All branches" />
             </Field>
           )}
           <Field label="From">

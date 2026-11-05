@@ -107,14 +107,18 @@ const FLAGGED_ROUTES: [prefix: string, flag: 'b2bSales' | 'replenishmentSuggesti
 
 /** Path prefixes and what each one needs. Longest prefix is checked first. */
 const ROUTE_PERMISSIONS: [prefix: string, rule: PermissionRule][] = [
+  ['/categories', 'catalog.create'],
   ['/products/new', 'catalog.create'],
   ['/sales/new', 'sales.create'],
+  ['/sales/invoices/new', 'sales.create'],
   ['/sales/b2c', ['sales.view_own', 'sales.view_branch']],
   ['/sales/b2b', 'locations.view_all'],
   ['/sales/', ['sales.view_own', 'sales.view_branch']],
   ['/inventory', 'stock.view'],
   ['/opening-stock', 'opening_stock.post'],
+  ['/stock-receipts', 'stock.adjust'],
   ['/users', 'users.manage'],
+  ['/settings', 'settings.manage'],
 ]
 
 const API_ROUTE_ACCESS: [prefix: string, allowed: (user: User) => boolean][] = [

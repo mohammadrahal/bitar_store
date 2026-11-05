@@ -1,8 +1,10 @@
 'use client'
 
 import { Menu } from 'lucide-react'
-import { SignOutButton } from '@/components/auth/sign-out-button'
 import { BrandLogo } from '@/components/dashboard/sidebar-nav'
+import { GlobalSearch } from '@/components/dashboard/global-search'
+import { NotificationsBell } from '@/components/dashboard/notifications-bell'
+import { UserMenu } from '@/components/dashboard/user-menu'
 import { Can } from '@/components/shared/can'
 import { SelectInput } from '@/components/shared/select-input'
 import { ThemeToggle } from '@/components/shared/theme-toggle'
@@ -76,6 +78,11 @@ function ActiveLocationSwitcher() {
   )
 }
 
+/**
+ * Search, scope, what needs attention, theme, account — left to right, in the
+ * order they are reached for. Search leads because it is the fastest way to any
+ * record in the app and a barcode scanner types straight into it.
+ */
 export function Topbar() {
   const setMobileNavOpen = useUIStore((state) => state.setMobileNavOpen)
   const mobileNavOpen = useUIStore((state) => state.mobileNavOpen)
@@ -94,12 +101,27 @@ export function Topbar() {
         </button>
         <BrandLogo />
       </div>
+      <div className="topbar-search">
+        <GlobalSearch />
+      </div>
       <div className="top-actions">
-        <Can permission="locations.view_all" fallback={<ActiveLocationSwitcher />}>
-          <BranchFilter />
+        <Can
+          permission="locations.view_all"
+          fallback={
+            <div className="topbar-scope">
+              <ActiveLocationSwitcher />
+            </div>
+          }
+        >
+          <div className="topbar-scope">
+            <BranchFilter />
+          </div>
         </Can>
-        <ThemeToggle />
-        <SignOutButton />
+        <NotificationsBell />
+        <span className="topbar-theme">
+          <ThemeToggle />
+        </span>
+        <UserMenu />
       </div>
     </header>
   )

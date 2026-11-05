@@ -17,11 +17,18 @@ function currentSession() {
 export async function updateOwnName(fullName: string): Promise<User> {
   const { user, token } = currentSession()
   await getApiClient().updateUser(user.id, { fullName })
-  /* Re-read `GET /auth/me` so the shell shows the stored name, not the typed one. */
-  return bootstrapSession(token)
+  /* Re-read `GET /auth/me` so the shell shows the stored name, not the typed
+     one. `fresh`, or a read already on its way would answer with the old name. */
+  return bootstrapSession(token, { fresh: true })
 }
 
-export async function changeOwnPassword(password: string): Promise<void> {
+export async function changeOwnPassword(input: {
+  password: string
+  currentPassword: string
+}): Promise<void> {
   const { user } = currentSession()
-  await getApiClient().setPassword(user.id, password)
+  /* The API should verify `currentPassword` before applying a new one; today
+     only the new password is sent (see ARCHITECTURE.md section 9). */
+  void input.currentPassword
+  await getApiClient().setPassword(user.id, input.password)
 }
