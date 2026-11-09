@@ -20,13 +20,15 @@ export interface NewSalePayment {
   amount: number
   /** Cash only: what the customer handed over, so the server can return change. */
   tendered?: number
-  /** Whish only, and unique — the server refuses a reference it has seen. */
+  /** Whish only, and unique. the server refuses a reference it has seen. */
   reference?: string
 }
 
 export interface NewSaleInput {
   branchId: string
   note?: string
+  customerName?: string
+  customerPhone?: string
   lines: NewSaleLine[]
   payments: NewSalePayment[]
 }
@@ -40,6 +42,8 @@ function toApiInput(input: NewSaleInput): CreateSaleInput {
     branchId: input.branchId,
     channel: 'in_store',
     note: input.note?.trim() || null,
+    customerName: input.customerName?.trim() || null,
+    customerPhone: input.customerPhone?.trim() || null,
     lines: input.lines.map((line) => ({
       skuId: line.skuId,
       quantity: line.quantity,

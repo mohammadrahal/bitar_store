@@ -1,9 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Skeleton } from '@/components/shared/skeleton'
 import { isUnauthorized } from '@/lib/errors'
 import { ensureLocalMockDataPurged } from '@/lib/purge-local-mock-data'
+import { cacheScope, restoreQueryCache, startPersistingQueryCache } from '@/lib/query-persist'
 import { bootstrapSession } from '@/services/session.service'
 import { warmWarehouseLink } from '@/services/warehouse-link.service'
 import { useUIStore } from '@/store/ui-store'
@@ -16,6 +18,12 @@ const FOCUS_REFRESH_MS = 60_000
  * The session uses sessionStorage; UI preferences use localStorage. Both
  * rehydrate after mount so markup matches what the client will show. A saved
  * token is re-checked with `GET /auth/me` so role and branch access are fresh.
+ *
+ * The saved query cache for that user is restored here too, before anything
+ * renders. It belongs at this point rather than in the provider: the snapshot
+ * is kept per user, so there is nothing to look up until the session has
+ * rehydrated, and holding the gate until it is in means the screens draw real
+ * figures straight away instead of flashing empty states on a dead network.
  */
 export function HydrationGate({
   children,
@@ -26,12 +34,25 @@ export function HydrationGate({
   fallback?: React.ReactNode
 }) {
   const [hydrated, setHydrated] = useState(false)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
+    let stopPersisting: (() => void) | null = null
+    let unmounted = false
     clearLegacySessionStorage()
     void ensureLocalMockDataPurged().then(() =>
       Promise.all([useUserStore.persist.rehydrate(), useUIStore.persist.rehydrate()]).then(async () => {
       const { token, user, setUser, signOut } = useUserStore.getState()
+      if (token && user) {
+        /* Ahead of `GET /auth/me`, which has no answer at all when offline. */
+        const scope = cacheScope(user.id)
+        await restoreQueryCache(queryClient, scope)
+        const stop = startPersistingQueryCache(queryClient, scope)
+        /* Unmounted while the read was in flight: nothing is holding the stop
+           function, so release the subscription here rather than leak it. */
+        if (unmounted) stop()
+        else stopPersisting = stop
+      }
       if (token) {
         try {
           const fresh = await bootstrapSession(token)
@@ -45,13 +66,17 @@ export function HydrationGate({
       setHydrated(true)
       }),
     )
-  }, [])
+    return () => {
+      unmounted = true
+      stopPersisting?.()
+    }
+  }, [queryClient])
 
   /* Permission changes from an admin apply on the server immediately; refresh
      the cached user when this tab is focused so transfer buttons match.
 
-     Throttled, because `focus` fires on every return to the tab — clicking back
-     from a terminal or another window counts — and each run is a `GET /auth/me`
+     Throttled, because `focus` fires on every return to the tab. clicking back
+     from a terminal or another window counts. and each run is a `GET /auth/me`
      plus whatever `warmWarehouseLink` needs. An admin editing someone's
      permissions is not a once-a-second event, so a minute between reads is
      still far faster than that person notices. */

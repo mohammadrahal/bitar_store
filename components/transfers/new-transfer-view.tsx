@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useCatalogSync } from '@/hooks/use-stock'
-import { PackageSearch } from 'lucide-react'
+import { ArrowLeft, Check, MapPin, PackageSearch, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   TransferLinePicker,
@@ -18,25 +18,41 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useBranches } from '@/hooks/use-branches'
-import { useWarehouseId } from '@/hooks/use-inventory'
+import { useInventory, useWarehouseId } from '@/hooks/use-inventory'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { usePermission } from '@/hooks/use-permission'
-import { useCreateTransfer } from '@/hooks/use-transfers'
+import { useStockHealth } from '@/hooks/use-stock-health'
+import { useCreateTransfer, useDispatchTransfer } from '@/hooks/use-transfers'
+import { sumBalances } from '@/lib/balances'
+import { formatNumber } from '@/lib/format'
 import { readDb } from '@/mocks/store'
 import { WarehouseLinkNotice } from '@/components/shared/warehouse-link-notice'
 import { WAREHOUSE_NOT_LINKED_MESSAGE } from '@/lib/warehouse-messages'
 import { resolveWarehouseId } from '@/services/warehouse-link.service'
+import { useCurrentUser } from '@/store/user-store'
 import type { Branch } from '@/types'
+
+const FORM_ID = 'prepare-transfer-form'
 
 export function NewTransferView() {
   const router = useRouter()
+  const user = useCurrentUser()
   const create = useCreateTransfer()
   const idempotency = useIdempotencyKey()
-  const { user, canDispatchTransfers, canReceiveTransfers, locationScoped, activeLocationId } = usePermission()
+  const dispatchKey = useIdempotencyKey()
+  const dispatchTransfer = useDispatchTransfer()
+  const {
+    user: permissionUser,
+    canAccessLocation,
+    canDispatchTransfers,
+    canReceiveTransfers,
+    locationScoped,
+    activeLocationId,
+  } = usePermission()
   const requestMode = canReceiveTransfers() && !canDispatchTransfers()
   const defaultBranch = useDefaultBranchId()
   const assignedBranchId =
-    (locationScoped ? activeLocationId : null) ?? user.branchIds[0] ?? user.branchId ?? defaultBranch
+    (locationScoped ? activeLocationId : null) ?? permissionUser.branchIds[0] ?? permissionUser.branchId ?? defaultBranch
   const { data: branches } = useBranches()
 
   const [sourceBranchId, setSource] = useState('')
@@ -58,22 +74,10 @@ export function NewTransferView() {
     if (requestMode && branches) void refetchWarehouse()
   }, [requestMode, branches, refetchWarehouse])
 
-  /* Replenishment requests always ship from the warehouse. Prepare-transfer
-     must not auto-fill From — that was overwriting the manager's pick and
-     showing warehouse availability (often 0 while stock sits at branches). */
   useEffect(() => {
     if (requestMode && warehouseId) setSource(warehouseId)
   }, [requestMode, warehouseId])
 
-  /**
-   * `?from=<branchId>` fills in the source once.
-   *
-   * It is how a just-posted receipt hands off: the stock arrived at the
-   * warehouse and the next thing anyone does is send some of it to a shop, so
-   * arriving here with From already set saves re-picking the location you were
-   * looking at a moment ago. It runs once and never in request mode, where the
-   * source is the warehouse by rule and not the caller's to choose.
-   */
   const requestedSource = useSearchParams().get('from') ?? ''
   const sourceFromUrl = useRef(false)
   useEffect(() => {
@@ -85,8 +89,8 @@ export function NewTransferView() {
 
   useEffect(() => {
     if (!requestMode || !assignedBranchId) return
-    if (!user.branchIds.includes(destinationBranchId)) setDestination(assignedBranchId)
-  }, [requestMode, assignedBranchId, destinationBranchId, user.branchIds])
+    if (!permissionUser.branchIds.includes(destinationBranchId)) setDestination(assignedBranchId)
+  }, [requestMode, assignedBranchId, destinationBranchId, permissionUser.branchIds])
 
   const findBranch = (branchId: string): Branch | undefined =>
     branches?.find((branch) => branch.id === branchId) ??
@@ -101,14 +105,24 @@ export function NewTransferView() {
   const stockBranch = requestMode ? destinationBranch : sourceBranch
   const catalogGateId = requestMode ? destinationBranchId : sourceBranchId
 
+  const sourceStockQuery = useInventory({
+    scope: sourceBranchId || defaultBranch,
+    filter: 'all',
+    search: '',
+  })
+  const sourceSellable =
+    sourceBranchId && sourceStockQuery.data ? sumBalances(sourceStockQuery.data).available : null
+
+  const destHealth = useStockHealth(destinationBranchId || defaultBranch)
+  const destLow =
+    destinationBranchId && destHealth.data?.minimumsKnown ? destHealth.data.lowStock : null
+
   useEffect(() => {
     if (requestMode) return
     setPickerLines([])
   }, [sourceBranchId, requestMode])
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
-
+  const submitWith = async (mode: 'draft' | 'send') => {
     let sourceId = sourceBranchId
     if (!sourceId && requestMode && destinationBranchId) {
       sourceId = (await resolveWarehouseId({ branchId: destinationBranchId })) ?? ''
@@ -124,8 +138,9 @@ export function NewTransferView() {
       .filter((line) => line.skuId && line.quantity > 0)
     if (!destinationBranchId || parsed.length === 0) return
 
-    create.mutate(
-      {
+    let transferId = ''
+    try {
+      const transfer = await create.mutateAsync({
         input: {
           sourceBranchId: sourceId,
           destinationBranchId,
@@ -133,47 +148,111 @@ export function NewTransferView() {
           lines: parsed,
         },
         idempotencyKey: idempotency.current(),
-      },
-      {
-        onSuccess: (transfer) => {
-          idempotency.reset()
-          router.push(`/transfers/${transfer.id}`)
-        },
-      },
-    )
+      })
+      transferId = transfer.id
+      idempotency.reset()
+    } catch {
+      return
+    }
+
+    if (mode === 'send') {
+      try {
+        await dispatchTransfer.mutateAsync({ id: transferId, idempotencyKey: dispatchKey.current() })
+        dispatchKey.reset()
+      } catch {
+        /* Draft exists; detail screen has Send. */
+      }
+    }
+
+    router.push(`/transfers/${transferId}`)
   }
 
-  const submitBlocked =
-    create.isPending || !destinationBranchId || !linePickerBranchId || pickerLines.length === 0
+  const busy = create.isPending || dispatchTransfer.isPending
+  const submitBlocked = busy || !destinationBranchId || !linePickerBranchId || pickerLines.length === 0
+  const totalUnits = pickerLines.reduce((sum, line) => sum + line.quantity, 0)
+
+  const canSendNow =
+    !requestMode && canDispatchTransfers() && Boolean(sourceBranchId) && canAccessLocation(sourceBranchId)
+
+  const primaryLabel = canSendNow
+    ? busy
+      ? 'Sending…'
+      : 'Review & submit transfer'
+    : busy
+      ? 'Saving…'
+      : requestMode
+        ? 'Submit replenishment request'
+        : 'Save as pending draft'
+
+  const headerActions = !requestMode ? (
+    <div className="heading-actions prepare-transfer-header-actions">
+      <button
+        type="button"
+        className="btn btn-secondary"
+        disabled={submitBlocked}
+        onClick={() => void submitWith('draft')}
+      >
+        Save as draft
+      </button>
+      {canSendNow ? (
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={submitBlocked}
+          onClick={() => void submitWith('send')}
+        >
+          <Check size={16} aria-hidden="true" />
+          Review & submit transfer
+        </button>
+      ) : (
+        <button type="submit" form={FORM_ID} className="btn btn-primary" disabled={submitBlocked}>
+          {primaryLabel}
+        </button>
+      )}
+    </div>
+  ) : undefined
 
   return (
-    <>
-      <Link href="/transfers" className="back-link">
-        {requestMode ? 'Back to your requests' : 'Back to transfers'}
+    <div className="prepare-transfer-page">
+      <Link href={requestMode ? '/inventory?section=receiving' : '/transfers'} className="back-link">
+        <ArrowLeft size={16} aria-hidden="true" />
+        {requestMode ? 'Back to your requests' : 'Back to transfers overview'}
       </Link>
+
       <PageHeader
-        eyebrow={requestMode ? 'Inventory' : 'Warehouse'}
+        eyebrow={requestMode ? 'Inventory · Replenishment' : 'Warehouse logistics · Dispatches'}
         title={requestMode ? 'Request replenishment' : 'Prepare transfer'}
         description={
           requestMode
-            ? 'Tell the team which variants to send when your branch is low or sold out. Add each product and how many you need.'
-            : 'Draft a shipment. Nothing moves until you send it from the transfer page.'
+            ? 'Tell the team which variants to send when your branch is low or sold out. Nothing moves until the warehouse dispatches.'
+            : 'Draft a shipment and allocate stock. Nothing moves physically until authorized dispatch rights send it.'
         }
+        actions={headerActions}
       />
 
       {requestMode && (
         <p className="muted page-note" role="status">
-          This is not a sale — you are asking for more stock at your branch. A manager or the warehouse prepares and
-          sends it; nothing moves until they dispatch the shipment.
+          This is not a sale. You are asking for more stock at your branch; a manager or the warehouse prepares and
+          sends it.
         </p>
       )}
 
-      <form className="stack" onSubmit={submit}>
-        <Panel title={requestMode ? 'Your branch' : 'Route'}>
-          <div className="panel-body">
+      <form
+        id={FORM_ID}
+        className="stack prepare-transfer-form"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submitWith(canSendNow ? 'send' : 'draft')
+        }}
+      >
+        <Panel
+          title={requestMode ? '1. Your branch' : '1. Route & logistics specifications'}
+          className="prepare-transfer-section"
+        >
+          <div className="panel-body prepare-transfer-route-body">
             {requestMode ? (
               <>
-                {user.branchIds.length > 1 ? (
+                {permissionUser.branchIds.length > 1 ? (
                   <Field label="Restock at" hint="The warehouse sends to this branch. Must be a location you work at.">
                     <LocationSelect
                       value={destinationBranchId}
@@ -190,33 +269,45 @@ export function NewTransferView() {
                     </div>
                   </dl>
                 )}
-                <p className="muted field-hint replenishment-hint">
-                  Availability in the picker reflects what you have on hand now — use it to spot sizes that are low.
-                </p>
               </>
             ) : (
-              <div className="form-grid">
-                <Field
-                  label="From"
-                  hint="Available quantities in the list below are sellable stock at this location."
-                >
-                  <LocationSelect
-                    value={sourceBranchId}
-                    onChange={setSource}
-                    onlyAccessible
-                    onlyFullAccess
-                    exclude={destinationBranchId}
-                  />
-                </Field>
-                <Field label="To">
-                  <LocationSelect
-                    value={destinationBranchId}
-                    onChange={setDestination}
-                    onlyAccessible
-                    onlyFullAccess
-                    exclude={sourceBranchId}
-                  />
-                </Field>
+              <div className="prepare-transfer-route-grid">
+                <div className="prepare-transfer-route-col">
+                  {sourceSellable !== null ? (
+                    <span className="prepare-transfer-route-badge">
+                      <MapPin size={14} aria-hidden="true" />
+                      {formatNumber(sourceSellable)} units sellable
+                    </span>
+                  ) : null}
+                  <Field
+                    label="Source location (from)"
+                    hint="Available counts in the list below are sellable stock at this location."
+                  >
+                    <LocationSelect
+                      value={sourceBranchId}
+                      onChange={setSource}
+                      onlyAccessible
+                      onlyFullAccess
+                      exclude={destinationBranchId}
+                    />
+                  </Field>
+                </div>
+                <div className="prepare-transfer-route-col">
+                  {destLow !== null && destLow > 0 ? (
+                    <span className="prepare-transfer-route-badge prepare-transfer-route-badge--gold">
+                      Restock needed ({formatNumber(destLow)} {destLow === 1 ? 'item' : 'items'})
+                    </span>
+                  ) : null}
+                  <Field label="Destination location (to)">
+                    <LocationSelect
+                      value={destinationBranchId}
+                      onChange={setDestination}
+                      onlyAccessible
+                      onlyFullAccess
+                      exclude={sourceBranchId}
+                    />
+                  </Field>
+                </div>
               </div>
             )}
 
@@ -230,35 +321,40 @@ export function NewTransferView() {
             )}
 
             <Field
-              label={requestMode ? 'Details for the team' : 'Note'}
+              label={requestMode ? 'Details for the team' : 'Dispatch manifest & handling directives'}
               hint={
                 requestMode
-                  ? 'Optional — e.g. which shelf is empty, an event this week, or sizes that sell fast.'
-                  : 'Optional — saved on the transfer when you submit.'
+                  ? 'Optional. e.g. which shelf is empty, an event this week, or sizes that sell fast.'
+                  : 'Optional note saved on the transfer — handling, priority, or seal references your team uses offline.'
               }
               className="full transfer-note-field"
             >
               <textarea
-                className="input"
-                rows={3}
+                className="input prepare-transfer-note"
+                rows={4}
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
                 maxLength={500}
-                placeholder={requestMode ? 'What is running low and why you need more' : 'Shipment note'}
+                placeholder={
+                  requestMode
+                    ? 'What is running low and why you need more'
+                    : 'e.g. VIP event restock — inspect cartons before release to floor'
+                }
               />
             </Field>
           </div>
         </Panel>
 
         <Panel
-          title={requestMode ? 'Products to restock' : 'Variants'}
+          title={requestMode ? '2. Products to restock' : '2. Allocated variants & quantities'}
           description={
             pickerLines.length > 0
               ? transferLinesSummary(pickerLines)
               : requestMode
                 ? 'Search the catalog and add every variant that needs more units.'
-                : 'Only products with stock at the From location appear below. Pick source first, then search or open a model.'
+                : 'Search stocked variants at the source, then set quantities for this dispatch.'
           }
+          className="prepare-transfer-section"
         >
           {!catalogGateId ? (
             <div className="panel-body">
@@ -268,25 +364,19 @@ export function NewTransferView() {
                 description={
                   requestMode
                     ? 'Your account is not linked to a branch yet. Ask a manager to assign you to a store.'
-                    : 'Choose the From location in Route first. Availability is read from that branch’s stock.'
+                    : 'Choose the source location in step 1 first. Availability is read from that branch’s stock.'
                 }
               />
             </div>
           ) : !catalogReady ? (
             <div className="panel-body muted">Loading catalog…</div>
           ) : (
-            <div className="panel-body transfer-picker-panel">
+            <div className="panel-body transfer-picker-panel prepare-transfer-picker">
               {stockBranch?.name && (
                 <p className="invoice-picker-hint" role="status">
                   {requestMode
                     ? `On hand at ${stockBranch.name} (to spot sizes that are low).`
-                    : `Showing only variants with stock at ${stockBranch.name}. Available counts are sellable units there.`}
-                </p>
-              )}
-              {!requestMode && (
-                <p className="invoice-picker-hint muted">
-                  Nothing at this location yet? Stock arrives through <strong>Opening stock</strong> for a first
-                  count, or <strong>Receive stock</strong> for a delivery.
+                    : `Showing variants with stock at ${stockBranch.name}. Dispatch may send fewer than requested if shelves move.`}
                 </p>
               )}
               <TransferLinePicker
@@ -295,23 +385,80 @@ export function NewTransferView() {
                 onChange={setPickerLines}
                 purpose={requestMode ? 'replenishment' : 'transfer'}
               />
+              {pickerLines.length > 0 ? (
+                <div className="prepare-transfer-batch-summary" aria-live="polite">
+                  <span className="tabular">
+                    <strong>{formatNumber(pickerLines.length)}</strong> variants
+                  </span>
+                  <span className="prepare-transfer-batch-dot" aria-hidden="true" />
+                  <span className="tabular">
+                    <strong>{formatNumber(totalUnits)}</strong> physical units
+                  </span>
+                </div>
+              ) : null}
             </div>
           )}
         </Panel>
 
-        <div className="form-actions transfer-form-actions">
-          {submitBlocked && pickerLines.length === 0 && (
-            <p className="field-hint">
-              {requestMode
-                ? 'Add at least one product that is low or out of stock.'
-                : 'Choose source and destination, then add at least one variant from the catalog.'}
-            </p>
-          )}
-          <button type="submit" className="btn btn-primary" disabled={submitBlocked}>
-            {requestMode ? 'Submit replenishment request' : 'Save draft'}
-          </button>
+        {!requestMode ? (
+          <div className="prepare-transfer-auth-grid">
+            <section className="prepare-transfer-auth-card prepare-transfer-auth-card--active" aria-labelledby="dispatch-auth-title">
+              <ShieldCheck size={20} aria-hidden="true" />
+              <h3 id="dispatch-auth-title">Authorized dispatch rights</h3>
+              <p className="prepare-transfer-auth-name">{user.name}</p>
+              <p className="muted prepare-transfer-auth-detail">
+                {canSendNow
+                  ? 'You can submit and dispatch from the selected source in one step.'
+                  : 'You can save a draft. Dispatch must be done by someone with rights at the source.'}
+              </p>
+            </section>
+            <section className="prepare-transfer-auth-card" aria-labelledby="dispatch-docs-title">
+              <h3 id="dispatch-docs-title">After submit</h3>
+              <p className="muted">
+                Open the transfer to print the receiving report or raise a supply invoice when the shipment leaves the
+                warehouse.
+              </p>
+            </section>
+          </div>
+        ) : null}
+
+        <div className="prepare-transfer-footer" role="region" aria-label="Transfer summary">
+          <p className="prepare-transfer-footer-copy">
+            {pickerLines.length > 0 ? (
+              <>
+                Ready for dispatch scheduling:{' '}
+                <strong className="tabular">{formatNumber(totalUnits)}</strong> total items allocated
+              </>
+            ) : (
+              'Add variants above to schedule this dispatch.'
+            )}
+          </p>
+          <div className="prepare-transfer-footer-actions">
+            <Link href="/transfers" className="btn btn-ghost">
+              Discard
+            </Link>
+            {canSendNow ? (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={submitBlocked}
+                  onClick={() => void submitWith('draft')}
+                >
+                  Save as pending draft
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={submitBlocked}>
+                  {busy ? 'Sending…' : 'Authorize & submit transfer'}
+                </button>
+              </>
+            ) : (
+              <button type="submit" className="btn btn-primary" disabled={submitBlocked}>
+                {primaryLabel}
+              </button>
+            )}
+          </div>
         </div>
       </form>
-    </>
+    </div>
   )
 }

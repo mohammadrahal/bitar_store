@@ -74,7 +74,9 @@ export function ChartsRow({ scope, days }: { scope: BranchScope; days: RangeDays
             </div>
           </div>
         ) : (
-          <RevenueTrendTable points={trend.data.points} />
+          <div className="panel-body">
+            <RevenueTrendTable points={trend.data.points} />
+          </div>
         )}
       </Panel>
 

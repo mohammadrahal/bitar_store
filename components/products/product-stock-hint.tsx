@@ -6,6 +6,7 @@ import { Can } from '@/components/shared/can'
 import { useBranches } from '@/hooks/use-branches'
 import { useBranchScope } from '@/hooks/use-branch-scope'
 import { ALL_BRANCHES } from '@/types'
+import { adminHubHref } from '@/lib/admin-hub'
 
 /** Explains that stock on the product page is read-only and where to see or set it. */
 export function ProductStockHint({
@@ -31,7 +32,7 @@ export function ProductStockHint({
       <p className="muted">
         {justCreated ? (
           <>
-            <strong>Saved. Stock is zero everywhere.</strong> Adding a model to the catalog never places pieces — book
+            <strong>Saved. Stock is zero everywhere.</strong> Adding a model to the catalog never places pieces. book
             in the delivery it came with, or post an opening count.
           </>
         ) : (
@@ -42,7 +43,7 @@ export function ProductStockHint({
         )}{' '}
         Figures are for <span className="tabular">{scopeLabel}</span>. Tap a variant or its quantity to open full
         balances by location. Quantities change by <em>receiving</em> a delivery, an opening count, transfers or
-        sales — never from the catalog.
+        sales. never from the catalog.
       </p>
       <div className="product-stock-hint-actions">
         <Link href="/inventory" className="btn btn-secondary btn-sm">
@@ -61,7 +62,7 @@ export function ProductStockHint({
           </Link>
         </Can>
         <Can permission="opening_stock.post">
-          <Link href="/opening-stock" className="btn btn-secondary btn-sm">
+          <Link href={adminHubHref('opening-stock')} className="btn btn-secondary btn-sm">
             <ClipboardList size={16} aria-hidden="true" />
             Opening stock
           </Link>

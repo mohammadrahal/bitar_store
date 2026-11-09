@@ -32,7 +32,7 @@ const row: Variants = {
 
 /**
  * A tbody whose rows arrive in sequence. `dataset` names which set of rows is
- * on screen — the branch and page, never the rows themselves — and the
+ * on screen. the branch and page, never the rows themselves. and the
  * entrance replays only when that name changes.
  */
 export function MotionTbody({

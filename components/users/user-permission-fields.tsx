@@ -3,6 +3,7 @@
 import { usePermissionCatalog } from '@/hooks/use-user-permissions'
 import { toApiRole } from '@/services/session.service'
 import { SwitchToggle } from '@/components/shared/switch'
+import { isOwnerRole, ROLE_LABELS } from '@/lib/permissions'
 import type { Role } from '@/types'
 
 function sourceLabel(allowed: boolean, fromRole: boolean) {
@@ -24,10 +25,18 @@ export function UserPermissionFields({
   onChange: (key: string, allowed: boolean) => void
   disabled?: boolean
 }) {
-  const catalog = usePermissionCatalog(role !== 'super_admin')
+  /* Both owner roles hold every key, so neither has anything to grant. This
+     used to exempt the Admin only, which left a Business Manager being offered
+     toggles that `can()` ignored. */
+  const owner = isOwnerRole(role)
+  const catalog = usePermissionCatalog(!owner)
 
-  if (role === 'super_admin') {
-    return <p className="full muted">An admin already has every permission. That cannot be changed.</p>
+  if (owner) {
+    return (
+      <p className="full muted">
+        {ROLE_LABELS[role]} already holds every permission. That cannot be changed.
+      </p>
+    )
   }
   if (catalog.isPending || !wanted) return <p className="full muted">Loading permissions…</p>
   if (catalog.isError) {

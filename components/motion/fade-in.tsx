@@ -5,7 +5,7 @@ import { EASE, FADE_DURATION } from '@/components/motion/transition'
 
 /**
  * The one entrance config, as props, for a surface that has to keep its own
- * tag — a section, a paragraph — instead of being wrapped in a div.
+ * tag. a section, a paragraph. instead of being wrapped in a div.
  */
 export function useFadeInProps(delay = 0) {
   const reduce = useReducedMotion()

@@ -38,15 +38,17 @@ function sumInto(target: TrendPoint, row: ApiSalesSummaryRow) {
 }
 
 /**
- * The server returns one row per day *per branch*, so a network-wide range
- * comes back with several rows for the same day. The chart plots one point per
- * day, and a day the shops did not sell on has no row at all — it still needs a
- * zero, or the line would join across the gap and imply trade that never
- * happened.
+ * One point per day across the range.
+ *
+ * `byDay` is the server's own daily split (9 Nov), already summed across the
+ * branches in scope. `rows` is the day x branch grid, which needs folding: a
+ * network-wide range comes back with one row per day per branch. Either way a
+ * day the shops did not sell on has no row at all and still needs a zero, or
+ * the line joins across the gap and implies trade that never happened.
  */
 function toPoints(payload: ApiSalesSummary, range: DateRange): TrendPoint[] {
   const byDay = new Map<string, TrendPoint>()
-  for (const row of payload.rows) {
+  for (const row of payload.byDay ?? payload.rows) {
     let point = byDay.get(row.day)
     if (!point) {
       point = { day: row.day, revenue: 0, sales: 0 }

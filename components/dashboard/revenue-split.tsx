@@ -16,7 +16,7 @@ function shareOf(amount: number, total: number) {
  * silent. A part at zero draws no segment.
  *
  * Shares are taken against the parts shown rather than against gross revenue,
- * so the bar always reads as a whole — the server excludes change given back,
+ * so the bar always reads as a whole. the server excludes change given back,
  * and a bar that stopped short of its track would look like a rendering fault
  * rather than the rounding it is.
  */
@@ -61,7 +61,7 @@ function Split({ split, colorOffset }: { split: RevenueSplit; colorOffset: numbe
               aria-hidden="true"
             />
             <span className="split-name">{part.name}</span>
-            <span className="split-share tabular">{total > 0 ? `${shareOf(part.amount, total)}%` : '—'}</span>
+            <span className="split-share tabular">{total > 0 ? `${shareOf(part.amount, total)}%` : ''}</span>
             <strong className="split-amount tabular">{formatPrice(part.amount)}</strong>
           </li>
         ))}
@@ -71,8 +71,8 @@ function Split({ split, colorOffset }: { split: RevenueSplit; colorOffset: numbe
 }
 
 /**
- * Payment and channel are two different splits of the same revenue — cash plus
- * Whish is one whole, in store plus social media is another — so they are two
+ * Payment and channel are two different splits of the same revenue. cash plus
+ * Whish is one whole, in store plus social media is another. so they are two
  * bars rather than one four-part bar, which would count every sale twice. Each
  * split takes the next pair of hues so no colour means two things on screen.
  */

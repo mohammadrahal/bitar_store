@@ -1,6 +1,8 @@
 'use client'
 
+import { Trash2 } from 'lucide-react'
 import { CatalogLinePicker } from '@/components/sales/catalog-line-picker'
+import { QtyStepper } from '@/components/sales/qty-stepper'
 import { formatNumber } from '@/lib/format'
 import type { VariantOption } from '@/types'
 
@@ -67,7 +69,7 @@ export function TransferLinePicker({
           modelScope={purpose === 'transfer' ? 'branchStock' : 'catalog'}
           addLabel={addLabel}
           searchPlaceholder={
-            purpose === 'transfer' ? 'Search stock at this location' : 'Search model, code or SKU'
+            purpose === 'transfer' ? 'Scan barcode or type SKU, model or code…' : 'Search model, code or SKU'
           }
           searchAriaLabel={
             purpose === 'transfer' ? 'Search products stocked at source' : 'Search catalog for transfer'
@@ -78,48 +80,61 @@ export function TransferLinePicker({
       )}
 
       {lines.length > 0 && (
-        <section className="transfer-lines-section" aria-label={linesHeading}>
+        <section className="transfer-lines-section prepare-transfer-lines" aria-label={linesHeading}>
           <h3 className="invoice-picker-subhead">{linesHeading}</h3>
-          <div className="invoice-picker-table-wrap">
-            <table className="invoice-picker-table">
+          <div className="invoice-picker-table-wrap prepare-transfer-table-wrap">
+            <table className="invoice-picker-table prepare-transfer-lines-table">
               <caption className="sr-only">{linesHeading}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Description</th>
-                  <th scope="col">SKU</th>
+                  <th scope="col">Item & specifications</th>
+                  <th scope="col">SKU / model</th>
                   <th scope="col" className="num">
-                    Qty
+                    Transfer quantity
                   </th>
-                  <th scope="col">
-                    <span className="sr-only">Remove</span>
+                  <th scope="col" className="num prepare-transfer-lines-action">
+                    <span className="sr-only">Remove line</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {lines.map((line) => (
                   <tr key={line.skuId}>
-                    <td>{line.label}</td>
-                    <td className="tabular invoice-muted">{line.sku || '—'}</td>
-                    <td className="num">
-                      <input
-                        id={`qty-${line.skuId}`}
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={9999}
-                        className="invoice-qty-input tabular"
-                        value={line.quantity}
-                        onChange={(event) => setQuantity(line.skuId, Math.floor(Number(event.target.value)))}
-                        aria-label={`Quantity for ${line.label}`}
-                      />
+                    <td className="prepare-transfer-line-item">
+                      <strong>{line.label}</strong>
                     </td>
-                    <td>
+                    <td className="tabular invoice-muted">{line.sku || '—'}</td>
+                    <td className="num prepare-transfer-line-qty">
+                      {purpose === 'transfer' ? (
+                        <QtyStepper
+                          value={line.quantity}
+                          max={9999}
+                          onChange={(qty) => setQuantity(line.skuId, qty)}
+                          label={`Quantity for ${line.label}`}
+                          hideHint
+                        />
+                      ) : (
+                        <input
+                          id={`qty-${line.skuId}`}
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={9999}
+                          className="invoice-qty-input tabular"
+                          value={line.quantity}
+                          onChange={(event) => setQuantity(line.skuId, Math.floor(Number(event.target.value)))}
+                          aria-label={`Quantity for ${line.label}`}
+                        />
+                      )}
+                    </td>
+                    <td className="num prepare-transfer-lines-action">
                       <button
                         type="button"
-                        className="btn btn-ghost btn-sm danger invoice-picker-add"
+                        className="icon-btn danger"
                         onClick={() => setQuantity(line.skuId, 0)}
+                        aria-label={`Remove ${line.label}`}
                       >
-                        Remove
+                        <Trash2 size={16} aria-hidden="true" />
                       </button>
                     </td>
                   </tr>

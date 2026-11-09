@@ -290,7 +290,12 @@ export function B2cRetailSalesPanel({
                       <MotionTr key={row.id} index={index}>
                         <td className="card-title">
                           <span>Pending sale</span>
-                          {row.pending.note ? <small>{row.pending.note}</small> : null}
+                          {row.pending.customerName || row.pending.note ? (
+                            <small>{row.pending.customerName ?? row.pending.note}</small>
+                          ) : null}
+                          {row.pending.customerPhone ? (
+                            <small className="tabular muted">{row.pending.customerPhone}</small>
+                          ) : null}
                         </td>
                         <td>
                           <span className="pill pill-low">Pending</span>

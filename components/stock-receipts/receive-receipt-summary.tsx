@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Info } from 'lucide-react'
 import { Panel } from '@/components/shared/panel'
 import { formatNumber, formatPrice } from '@/lib/format'
+import { inventoryHubHref } from '@/lib/inventory-hub'
 
 export function ReceiveReceiptSummary({
   supplierName,
@@ -51,14 +52,14 @@ export function ReceiveReceiptSummary({
           <dd>{docLabel}</dd>
           <dt>Lines</dt>
           <dd className="tabular">
-            {lineCount === 0 ? '—' : filledLines === lineCount ? lineCount : `${filledLines} of ${lineCount}`}
+            {lineCount === 0 ? '' : filledLines === lineCount ? lineCount : `${filledLines} of ${lineCount}`}
           </dd>
           <dt>Pieces</dt>
-          <dd className="tabular">{units > 0 ? formatNumber(units) : '—'}</dd>
+          <dd className="tabular">{units > 0 ? formatNumber(units) : ''}</dd>
           {showCosts ? (
             <>
               <dt>Document value</dt>
-              <dd className="tabular">{totalValue > 0 ? formatPrice(totalValue) : '—'}</dd>
+              <dd className="tabular">{totalValue > 0 ? formatPrice(totalValue) : ''}</dd>
             </>
           ) : null}
         </dl>
@@ -72,7 +73,7 @@ export function ReceiveReceiptSummary({
           </p>
         ) : null}
         <div className="receive-summary-actions">
-          <Link href="/stock-receipts" className="btn btn-secondary">
+          <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary">
             Cancel
           </Link>
           <button type="submit" className="btn btn-primary" disabled={Boolean(problem) || pending}>

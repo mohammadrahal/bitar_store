@@ -12,9 +12,15 @@ function displayName(fullName: string) {
 }
 
 /**
- * The one place the API's role vocabulary is translated. The backend still
- * says `admin` for the owner who may change settings, roles and accounts; the
- * app calls that role `super_admin` everywhere else.
+ * The one place the API's role vocabulary is translated. The backend says
+ * `admin`; the app stores that role as `super_admin`.
+ *
+ * The stored id is a historical name, not a rank: Admin and Business Manager
+ * have equal authority (rule 1) and `can()` treats them identically. It is kept
+ * because a cold start trusts the cached session until `GET /auth/me` answers —
+ * and offline, for the whole visit — so an id this build did not recognise
+ * would strip an owner of every permission. `ROLE_LABELS` carries the name
+ * people actually see.
  */
 export function toRole(role: UserRole): Role {
   return role === 'admin' ? 'super_admin' : role

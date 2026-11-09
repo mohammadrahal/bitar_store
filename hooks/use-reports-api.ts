@@ -29,9 +29,17 @@ export function useTopSkusReport(branchId: string, from: string, to: string) {
   })
 }
 
-export function useAuditEvents(offset: number) {
+export function useAuditEvents(offset: number, params: { entityType?: string; entityId?: string } = {}) {
   return useQuery({
-    queryKey: queryKeys.reports.audit(offset),
-    queryFn: () => listAuditEvents({ limit: 50, offset }),
+    queryKey: [...queryKeys.reports.audit(offset), params.entityType ?? '', params.entityId ?? ''],
+    queryFn: () => listAuditEvents({ limit: 50, offset, ...params }),
+  })
+}
+
+export function useTransferAuditEvents(transferId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['reports', 'audit', 'transfer', transferId],
+    queryFn: () => listAuditEvents({ entityType: 'transfer', entityId: transferId, limit: 50 }),
+    enabled: enabled && Boolean(transferId),
   })
 }

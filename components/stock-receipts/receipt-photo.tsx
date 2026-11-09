@@ -18,8 +18,8 @@ import { getReceiptPhoto, type ReceiptPhotoMeta } from '@/services/stock-receipt
  * - **Written but unreadable now.** Site data has been cleared since.
  *
  * `meta` comes from a legacy receipt, which recorded the picture's size beside
- * itself. A server receipt has no such record — the document is the server's and
- * the picture is not — so it is left out and the store is simply asked whether
+ * itself. A server receipt has no such record. the document is the server's and
+ * the picture is not. so it is left out and the store is simply asked whether
  * this browser is the one that holds it.
  */
 export function ReceiptPhoto({ receiptId, meta }: { receiptId: string; meta?: ReceiptPhotoMeta }) {
@@ -59,7 +59,7 @@ export function ReceiptPhoto({ receiptId, meta }: { receiptId: string; meta?: Re
     return (
       <p className="muted receipt-photo-empty">
         <ImageOff size={16} aria-hidden="true" />
-        A photo was attached but could not be saved — the browser was out of storage. The stock and the audit note
+        A photo was attached but could not be saved. the browser was out of storage. The stock and the audit note
         went through.
       </p>
     )

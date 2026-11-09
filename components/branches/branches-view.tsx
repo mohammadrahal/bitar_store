@@ -20,7 +20,7 @@ type Dialog =
   | { kind: 'edit'; branch: Branch }
   | { kind: 'delete'; branch: Branch }
 
-export function BranchesView() {
+export function BranchesView({ embedded = false }: { embedded?: boolean } = {}) {
   const { locationScoped } = usePermission()
   const { data: branches, isPending, isError, error, refetch } = useBranches()
   const remove = useDeleteBranch()
@@ -29,23 +29,25 @@ export function BranchesView() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Network"
-        title="Branches"
-        description={
-          locationScoped
-            ? 'The branch you work from.'
-            : 'Create stores, choose which one is the main warehouse, and assign people from the Employees page.'
-        }
-        actions={
-          <Can permission="settings.manage">
-            <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
-              <Plus size={16} aria-hidden="true" />
-              Add branch
-            </button>
-          </Can>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Network"
+          title="Branches"
+          description={
+            locationScoped
+              ? 'The branch you work from.'
+              : 'Create stores, choose which one is the main warehouse, and assign people from the Employees page.'
+          }
+          actions={
+            <Can permission="settings.manage">
+              <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
+                <Plus size={16} aria-hidden="true" />
+                Add branch
+              </button>
+            </Can>
+          }
+        />
+      ) : null}
 
       <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
         {isPending ? (
@@ -60,6 +62,16 @@ export function BranchesView() {
           <Panel
             title="All branches"
             description={`${branches.length} ${branches.length === 1 ? 'branch' : 'branches'}`}
+            actions={
+              embedded ? (
+                <Can permission="settings.manage">
+                  <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
+                    <Plus size={16} aria-hidden="true" />
+                    Add branch
+                  </button>
+                </Can>
+              ) : undefined
+            }
           >
             <BranchTable
               branches={branches}

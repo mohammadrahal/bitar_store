@@ -24,13 +24,14 @@ import { useTransfersList } from '@/hooks/use-transfers'
 import { formatDateInput, formatNumber, formatPrice, formatRelativeDateTime } from '@/lib/format'
 import { receiptTotalCost } from '@/services/goods-receipts.service'
 import { invoiceLabel, invoiceTotal } from '@/services/invoices-api.service'
+import { inventoryHubHref } from '@/lib/inventory-hub'
 
 /**
  * The warehouse, read as what it actually is: a place stock passes through.
  *
  * It is not a shop and the ordinary branch overview does not describe it. A
  * sale at the warehouse is refused by the server with a `409`, so revenue,
- * best sellers and recent sales are all structurally zero there — showing those
+ * best sellers and recent sales are all structurally zero there. showing those
  * bands would be four empty panels implying a bad trading week rather than a
  * place that never trades.
  *
@@ -45,7 +46,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
 
   const onTheRoad = useTransfersList(warehouseId, 'dispatched', 0)
   const drafts = useTransfersList(warehouseId, 'draft', 0)
-  const deliveries = useGoodsReceipts('', 0)
+  const deliveries = useGoodsReceipts({ search: '' }, 0)
   const invoices = useApiInvoices({ kind: 'b2b', branchId: warehouseId, enabled: can('stock.view') })
   /* `branchId` on `/replenishment/suggestions` names the branch being *supplied*,
      not the supplier, so the warehouse's own id would filter out every row.
@@ -74,7 +75,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           value={formatNumber(onTheRoad.data?.total ?? 0)}
           detail="Dispatched, not yet confirmed"
           icon={Truck}
-          href="/transfers?status=dispatched"
+          href={inventoryHubHref('receiving')}
         />
         <StatCard
           label="Waiting to be sent"
@@ -82,7 +83,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           detail="Prepared or requested, nothing has moved"
           icon={ArrowLeftRight}
           alert={(drafts.data?.total ?? 0) > 0}
-          href="/transfers?status=draft"
+          href={inventoryHubHref('transfers', { status: 'draft' })}
         />
         <StatCard
           label="Branches short"
@@ -90,14 +91,14 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           detail={branchesShort > 0 ? countOf(suggestions.length, 'variant') + ' under minimum' : 'All at or above minimum'}
           icon={Boxes}
           alert={branchesShort > 0}
-          href="/replenishment"
+          href={inventoryHubHref('replenishment')}
         />
         <StatCard
           label="Deliveries in"
           value={formatNumber(deliveries.data?.total ?? 0)}
           detail="Supplier receipts recorded here"
           icon={PackagePlus}
-          href="/stock-receipts"
+          href={inventoryHubHref('receive-stock')}
         />
       </StaggerList>
 
@@ -106,7 +107,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           title="On the road"
           description="Dispatched and not yet confirmed at the other end. Mostly supply going out; a branch returning stock here shows as coming in."
           actions={
-            <Link href="/transfers?status=dispatched" className="btn btn-secondary btn-sm">
+            <Link href={inventoryHubHref('receiving')} className="btn btn-secondary btn-sm">
               All transfers
             </Link>
           }
@@ -161,7 +162,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
                           : `In from ${transfer.from.name}`}
                       </td>
                       <td className="tabular" data-label="Sent">
-                        {transfer.dispatchedAt ? formatRelativeDateTime(transfer.dispatchedAt) : '—'}
+                        {transfer.dispatchedAt ? formatRelativeDateTime(transfer.dispatchedAt) : ''}
                       </td>
                       <td className="num tabular" data-label="Still on the way">
                         {formatNumber(transfer.totals.onTheRoad)}
@@ -183,7 +184,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           title="What to send next"
           description="Branches under their minimum, biggest need first, against what this warehouse can actually cover."
           actions={
-            <Link href="/replenishment" className="btn btn-secondary btn-sm">
+            <Link href={inventoryHubHref('replenishment')} className="btn btn-secondary btn-sm">
               Open replenishment
             </Link>
           }
@@ -268,7 +269,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           title="Deliveries in"
           description="Supplier receipts. Every delivery is recorded into this warehouse."
           actions={
-            <Link href="/stock-receipts" className="btn btn-secondary btn-sm">
+            <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary btn-sm">
               All deliveries
             </Link>
           }

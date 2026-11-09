@@ -44,7 +44,7 @@ function Skeleton() {
 /**
  * The first block on the overview: what is waiting for someone, with the way to
  * it. It leads the page because a manager opens the dashboard to find out what
- * needs doing, not to read yesterday's revenue — the KPIs below answer "how are
+ * needs doing, not to read yesterday's revenue. the KPIs below answer "how are
  * we doing", this answers "what do I do now".
  *
  * Rows at zero are hidden rather than greyed, so the length of the list is
@@ -57,29 +57,30 @@ export function NeedsAttention({ scope }: { scope: BranchScope }) {
 
   return (
     <section className="attention" aria-label="Needs attention">
-      <div className="section-bar">
-        <h2 className="section-title">Needs attention</h2>
-      </div>
-
       {isPending ? (
-        <Skeleton />
+        <div className="attention-banner">
+          <Skeleton />
+        </div>
       ) : isError ? (
-        <div className="attention-panel">
+        <div className="attention-banner attention-panel">
           <ErrorState title="Could not load what needs attention" error={error} onRetry={refetch} />
         </div>
       ) : rows.length === 0 ? (
-        <p className="attention-clear">
+        <p className="attention-clear attention-banner">
           <span className="attention-clear-icon" aria-hidden="true">
             <Check size={16} />
           </span>
-          All clear — nothing is waiting on you.
+          All clear. Nothing is waiting on you.
         </p>
       ) : (
-        <StaggerList as="ul" className="attention-list">
-          {rows.map((row) => (
-            <Row key={row.key} row={row} />
-          ))}
-        </StaggerList>
+        <div className="attention-banner">
+          <p className="attention-banner-eyebrow">Needs attention</p>
+          <StaggerList as="ul" className="attention-list attention-list--inset">
+            {rows.map((row) => (
+              <Row key={row.key} row={row} />
+            ))}
+          </StaggerList>
+        </div>
       )}
     </section>
   )

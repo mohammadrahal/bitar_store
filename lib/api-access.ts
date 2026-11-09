@@ -12,12 +12,30 @@ export type ApiPermission =
   | 'transfers.receive'
   | 'users.administer'
 
+/**
+ * What the **server** says this account may call, from `GET /auth/me`.
+ *
+ * The `super_admin` shortcut is not a UI rank: the API grants its `admin` role
+ * everything implicitly and lists a manager's keys explicitly, so this mirrors
+ * the server rather than deciding anything. Treating a manager as holding every
+ * key here would show controls the server then refuses, which is worse than
+ * hiding one it would have allowed.
+ */
 export function hasApiPermission(user: User, permission: ApiPermission | string): boolean {
   if (user.role === 'super_admin') return true
   return user.permissions.includes(permission)
 }
 
-/** `GET /stock/overview` and `GET /audit-events` (admin only on the server). */
+/**
+ * `GET /stock/overview` and `GET /audit-events`.
+ *
+ * **This is the server's restriction, not the app's.** `API_GUIDE.md` has both
+ * as admin-only and `/stock/overview` answers a manager `403` outright. The two
+ * owner roles are otherwise equal (rule 1) and `can()` makes no distinction —
+ * so do not "level" this one to match: it would route a Business Manager to a
+ * screen that errors. It is the last place in the frontend where the two owner
+ * roles differ, and it closes when the backend widens those two reads.
+ */
 export function canViewAdminWarehouseTools(user: User): boolean {
   return user.role === 'super_admin'
 }

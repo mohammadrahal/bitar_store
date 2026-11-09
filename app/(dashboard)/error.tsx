@@ -7,7 +7,7 @@ import { CircleAlert, RotateCw } from 'lucide-react'
 /**
  * Catches a render or data failure inside the dashboard. It sits below the
  * layout, so the rail and the header stay on screen and the person can either
- * retry the segment or navigate away — rather than being dropped on Next's own
+ * retry the segment or navigate away. rather than being dropped on Next's own
  * error page with the shell gone.
  */
 export default function DashboardError({ error, retry }: { error: unknown; retry: () => void }) {

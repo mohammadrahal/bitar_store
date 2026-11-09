@@ -69,7 +69,7 @@ export function ProfileTab() {
           )}
         </SettingsRow>
 
-        <SettingsRow label="Email" description="Only a Super Admin can change this.">
+        <SettingsRow label="Email" description="An admin or business manager changes this.">
           <div className="settings-readonly">
             <Lock size={14} aria-hidden="true" />
             <span>{user.email}</span>

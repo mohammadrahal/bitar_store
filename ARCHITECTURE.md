@@ -269,6 +269,11 @@ In the order that would unlock the most screen:
     and `newPassword`. The Security tab collects the current password; today the
     client only sends the new password via `PUT /users/:id/password`.
 
+Two of these are specified endpoint by endpoint in **`BACKEND_REQUESTS.md`**:
+the transfer receive & confirm chain (item 1 there is a live block — the branch
+cannot confirm received stock for sale when the supply invoice is not found from
+the transfer) and returns (item 6 above).
+
 Until those exist, the rule holds: **component → hook → service**. When a route
 lands, change the service and its mapper; the screens do not move.
 

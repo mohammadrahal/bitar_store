@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { ChevronRight } from 'lucide-react'
 import { activeHref, flattenHrefs, useNavEntries, type NavLinkItem, type NavSection } from '@/components/dashboard/nav-entries'
+import { adminHubNavPath } from '@/lib/admin-hub'
+import { inventoryHubNavPath } from '@/lib/inventory-hub'
 import { useBranchScope } from '@/hooks/use-branch-scope'
 import { isScopedBranch } from '@/services/attention.service'
 import { ALL_BRANCHES } from '@/types'
@@ -98,8 +100,16 @@ function useOpenSections(sections: NavSection[], currentSection: string | null) 
 
 export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const sections = useNavEntries()
-  const current = activeHref(pathname, flattenHrefs(sections))
+  const navPathname = useMemo(() => {
+    const mapped = inventoryHubNavPath(pathname) ?? adminHubNavPath(pathname) ?? pathname
+    if (mapped === '/admin' && searchParams.toString().length > 0) {
+      return `/admin?${searchParams.toString()}`
+    }
+    return mapped
+  }, [pathname, searchParams])
+  const current = activeHref(navPathname, flattenHrefs(sections))
   const badges = useNavBadges()
 
   /* The section holding the active link, so it can be opened for you. */
@@ -112,9 +122,15 @@ export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavi
 
   const countOf = (badge: NavLinkItem['badge']) => (badge ? badges[badge] : 0)
 
-  const link = ({ href, label, icon: Icon, badge }: NavLinkItem) => {
+  const badgeTotal = (item: NavLinkItem) => {
+    const keys = item.badges ?? (item.badge ? [item.badge] : [])
+    return keys.reduce((sum, key) => sum + countOf(key), 0)
+  }
+
+  const link = (item: NavLinkItem) => {
+    const { href, label, icon: Icon } = item
     const active = href === current
-    const count = countOf(badge)
+    const count = badgeTotal(item)
     return (
       <Link
         key={href}
@@ -127,7 +143,7 @@ export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavi
         <Icon size={18} aria-hidden="true" />
         {!collapsed && <span>{label}</span>}
         {/* A count only appears when there is something waiting, so the rail is
-            quiet when nothing needs doing. Collapsed, it becomes a dot — there
+            quiet when nothing needs doing. Collapsed, it becomes a dot. there
             is no room for a figure, and that something is waiting is the part
             worth keeping. */}
         {count > 0 &&
@@ -160,7 +176,7 @@ export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavi
 
         const open = isOpen(section.label)
         const id = `nav-section-${section.label.toLowerCase()}`
-        const waiting = section.links.reduce((sum, item) => sum + countOf(item.badge), 0)
+        const waiting = section.links.reduce((sum, item) => sum + badgeTotal(item), 0)
 
         return (
           <div className="nav-section" key={section.label}>
@@ -181,7 +197,7 @@ export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavi
                   <span className="sr-only"> waiting</span>
                 </span>
               )}
-              <ChevronRight size={13} className="nav-section-chevron" aria-hidden="true" />
+              <ChevronRight size={16} className="nav-section-chevron" aria-hidden="true" />
             </button>
             <div className="nav-section-links" id={id} data-open={open}>
               <div className="nav-section-rows" inert={!open || undefined}>

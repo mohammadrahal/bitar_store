@@ -50,8 +50,9 @@ export function useStockAdjustments() {
 export function usePostStockCorrection() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (input: StockCorrection) => postStockCorrection(input),
-    onSuccess: (_result, input) => {
+    mutationFn: ({ input, idempotencyKey }: { input: StockCorrection; idempotencyKey: string }) =>
+      postStockCorrection(input, idempotencyKey),
+    onSuccess: (_result, { input }) => {
       void queryClient.invalidateQueries({ queryKey: ['stock', 'adjustments'] })
       invalidateStockQueries(queryClient)
       const delta = input.quantityDelta

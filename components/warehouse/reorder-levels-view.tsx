@@ -129,7 +129,7 @@ export function ReorderLevelsView() {
                       size={row.sku.size}
                     />
                     <td className="num">{row.minQuantity}</td>
-                    <td className="num">{row.targetQuantity ?? '—'}</td>
+                    <td className="num">{row.targetQuantity ?? ''}</td>
                     <td className="row-actions">
                       <button
                         type="button"

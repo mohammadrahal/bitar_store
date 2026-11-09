@@ -9,7 +9,7 @@ import type { ApiStockItem } from '@/lib/api/types'
 import { ALL_BRANCHES, type Branch, type BranchScope, type InventoryStats } from '@/types'
 
 /*
- * The figures behind the stat cards, read from the server — the server owns
+ * The figures behind the stat cards, read from the server. the server owns
  * the quantities, and nothing here is held locally.
  */
 
@@ -35,7 +35,7 @@ function branchesInScope(db: MockDb, scope: BranchScope): Branch[] {
   )
 }
 
-/** One read per branch in scope — `GET /stock` has no all-branch form. */
+/** One read per branch in scope. `GET /stock` has no all-branch form. */
 async function itemsPerBranch(branches: Branch[]): Promise<BranchItems[]> {
   return Promise.all(branches.map(async (branch) => ({ branch, items: await branchStockItems(branch.id) })))
 }

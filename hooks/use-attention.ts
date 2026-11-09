@@ -12,6 +12,7 @@ import {
   getTransferAttention,
 } from '@/services/attention.service'
 import { inventoryHref } from '@/lib/inventory-filters'
+import { inventoryHubHref } from '@/lib/inventory-hub'
 import { formatNumber } from '@/lib/format'
 import { queryKeys } from '@/lib/query-keys'
 import { useBranches } from '@/hooks/use-branches'
@@ -87,7 +88,7 @@ export function useOverdueTransfers(scope: BranchScope, { enabled = false } = {}
  * active location, because `scope` resolves to it for a location-scoped user.
  *
  * Three rows the brief asked for are absent because the backend has no route
- * for them — supplier receipts, discount and refund requests, and social media
+ * for them. supplier receipts, discount and refund requests, and social media
  * orders past a pickup time. They are listed in `ARCHITECTURE.md` section 9.
  */
 export function useAttention(scope: BranchScope, { detail = false } = {}) {
@@ -108,7 +109,7 @@ export function useAttention(scope: BranchScope, { detail = false } = {}) {
       count,
       label: `${plural(count, 'transfer')} waiting to be sent`,
       detail: 'Prepared or requested, nothing has moved yet',
-      href: '/transfers?status=draft',
+      href: inventoryHubHref('transfers', { status: 'draft' }),
       action: 'Review drafts',
       icon: ArrowLeftRight,
       tone: 'warning',
@@ -131,7 +132,7 @@ export function useAttention(scope: BranchScope, { detail = false } = {}) {
         overdue > 0
           ? `${formatNumber(overdue)} sent over ${OVERDUE_DAYS} days ago`
           : undefined,
-      href: '/transfers?status=dispatched',
+      href: inventoryHubHref('receiving'),
       action: 'Receive stock',
       icon: Truck,
       tone: overdue > 0 ? 'warning' : 'info',
@@ -147,7 +148,7 @@ export function useAttention(scope: BranchScope, { detail = false } = {}) {
         overdue > 0
           ? `${formatNumber(overdue)} sent over ${OVERDUE_DAYS} days ago`
           : undefined,
-      href: '/transfers?status=dispatched',
+      href: inventoryHubHref('receiving'),
       action: 'Track shipments',
       icon: Truck,
       tone: overdue > 0 ? 'warning' : 'info',
@@ -155,7 +156,7 @@ export function useAttention(scope: BranchScope, { detail = false } = {}) {
   }
 
   /* `minimumsKnown` is false when no minimum could be read for the scope, which
-     is not the same as nothing being low — so the row stays away rather than
+     is not the same as nothing being low. so the row stays away rather than
      claiming the shelves are fine. */
   if (can('stock.view') && health.data?.minimumsKnown && health.data.lowStock > 0) {
     const count = health.data.lowStock

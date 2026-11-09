@@ -93,14 +93,17 @@ export function useReceiveTransfer() {
       id,
       idempotencyKey,
       lines,
+      note,
     }: {
       id: string
       idempotencyKey: string
       lines: { skuId: string; accepted: number; damaged?: number }[]
-    }) => receiveTransfer(id, lines, idempotencyKey),
+      /** The inspector's remark on this pass, 1 to 500 characters. */
+      note?: string
+    }) => receiveTransfer(id, lines, idempotencyKey, note),
     onSuccess: async () => {
       await invalidateTransfers(queryClient)
-      toast.success('Received — stock is on hold until you accept it for sale')
+      toast.success('Received. Stock is on hold until you accept it for sale')
     },
     onError: (error: Error) => toast.error(error.message),
   })
@@ -122,7 +125,14 @@ export function useAcceptTransfer() {
       await invalidateTransfers(queryClient)
       toast.success('Stock released to the sellable shelf')
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      const msg = error.message
+      if (/not found|404|accept/i.test(msg)) {
+        toast.error('Accept for sale needs the updated API (receive → on hold → accept). Restart or redeploy Bitar_Store.')
+        return
+      }
+      toast.error(msg)
+    },
   })
 }
 

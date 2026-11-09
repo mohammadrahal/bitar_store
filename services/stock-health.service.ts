@@ -89,7 +89,7 @@ function healthFromOverview(overview: ApiStockOverview, scope: BranchScope): Sto
     if (rows.length === 0) continue
 
     /* Overview lists every active branch for every SKU, usually with zeros.
-       A branch that has never held a SKU is not "out" of it — skip those rows
+       A branch that has never held a SKU is not "out" of it. skip those rows
        when the header scopes to one location. */
     const carrying = rows.filter((row) =>
       carries({

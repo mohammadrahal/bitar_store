@@ -60,6 +60,9 @@ export function formatLongDate(date: Date) {
 
 export const CURRENCY = 'USD'
 
+/** Empty table cells and summaries: no em dash placeholder. */
+export const EMPTY_DISPLAY = ''
+
 const priceFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: CURRENCY,
@@ -73,7 +76,7 @@ export function formatPrice(value: number) {
 
 const lbpFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
 
-/** Lebanese pounds — whole numbers, no currency symbol in the formatter. */
+/** Lebanese pounds. whole numbers, no currency symbol in the formatter. */
 export function formatLbp(value: number) {
   return `${lbpFormatter.format(Math.round(value))} LBP`
 }
@@ -99,7 +102,7 @@ export function formatDocumentDate(iso: string) {
  * A `yyyy-mm-dd` the user typed, which is a calendar date and not an instant.
  *
  * `new Date('2026-11-03')` is parsed as UTC midnight, so west of Greenwich it
- * formats as the 2nd — the date on a document would be shown as the day before
+ * formats as the 2nd. the date on a document would be shown as the day before
  * the one that is printed on it. Reading the parts and building a local date
  * keeps the day the person entered.
  */
@@ -137,3 +140,52 @@ export function toDateInput(date: Date) {
 export function todayAsDateInput() {
   return toDateInput(new Date())
 }
+
+/** Maps `resource.verb` audit actions to a short verb label (e.g. `user.delete` → delete). */
+const AUDIT_VERB_LABELS: Record<string, string> = {
+  delete: 'delete',
+  remove: 'delete',
+  destroy: 'delete',
+  update: 'edit',
+  edit: 'edit',
+  patch: 'edit',
+  change: 'change',
+  modify: 'change',
+  create: 'create',
+  add: 'create',
+  insert: 'create',
+  sell: 'sell',
+  sale: 'sell',
+}
+
+/**
+ * Human-readable audit action: uses the part after the last `.` when present,
+ * then maps known API verbs to short labels. Unknown verbs stay lowercased with
+ * underscores as spaces.
+ */
+export function formatAuditAction(action: string): string {
+  const raw = action.trim()
+  if (!raw) return raw
+  const verb = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1) : raw
+  const key = verb.toLowerCase().replace(/-/g, '_')
+  if (AUDIT_VERB_LABELS[key]) return AUDIT_VERB_LABELS[key]
+  return verb.replace(/_/g, ' ').toLowerCase()
+}
+
+/** Turns API entity types (`user`, `opening_stock`, `transfer.line`) into short labels. */
+export function formatAuditEntityType(entityType: string | null | undefined): string {
+  const raw = String(entityType ?? '').trim()
+  if (!raw) return EMPTY_DISPLAY
+  return raw
+    .split(/[./]/)
+    .filter(Boolean)
+    .map((segment) =>
+      segment
+        .split(/[_-]+/)
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' '),
+    )
+    .join(' · ')
+}
+

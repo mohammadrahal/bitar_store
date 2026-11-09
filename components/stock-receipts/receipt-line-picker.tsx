@@ -14,7 +14,7 @@ import type { VariantOption } from '@/types'
  *
  * It reuses the till's catalog picker with `enforceStock` off. Everywhere else
  * that picker stops you adding more than is on the shelf, which is right when
- * stock is going out — here the stock is coming *in*, so what is currently on
+ * stock is going out. here the stock is coming *in*, so what is currently on
  * hand is no limit at all, and a receipt that refused to add a variant sitting
  * at zero would refuse exactly the first delivery of a new model.
  */
@@ -67,7 +67,7 @@ export function ReceiptLinePicker({
   const units = lines.reduce((sum, line) => sum + line.quantity, 0)
   const total = lines.reduce((sum, line) => sum + line.quantity * line.unitCost, 0)
   /* Only the lines with something on them will be posted, so that is the count
-     worth showing — a pre-loaded receipt of thirty variants where four arrived
+     worth showing. a pre-loaded receipt of thirty variants where four arrived
      is "4 of 30", not "30 lines". */
   const filled = lines.filter((line) => line.quantity > 0).length
 
@@ -142,7 +142,7 @@ export function ReceiptLinePicker({
                     )}
                     {showCosts && (
                       <td className="num tabular">
-                        {line.unitCost > 0 ? formatPrice(line.quantity * line.unitCost) : '—'}
+                        {line.unitCost > 0 ? formatPrice(line.quantity * line.unitCost) : ''}
                       </td>
                     )}
                     <td>
@@ -167,7 +167,7 @@ export function ReceiptLinePicker({
                   </td>
                   <td className="num tabular">{formatNumber(units)}</td>
                   {showCosts && <td />}
-                  {showCosts && <td className="num tabular">{total > 0 ? formatPrice(total) : '—'}</td>}
+                  {showCosts && <td className="num tabular">{total > 0 ? formatPrice(total) : ''}</td>}
                   <td />
                 </tr>
               </tfoot>

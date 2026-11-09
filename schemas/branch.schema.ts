@@ -22,7 +22,7 @@ export const branchCreateSchema = z.object({
 
 export type BranchCreateFormValues = z.infer<typeof branchCreateSchema>
 
-/** PATCH /branches/:id — name and active flag; code is read-only in the UI. */
+/** PATCH /branches/:id. name and active flag; code is read-only in the UI. */
 export const branchEditSchema = branchCreateSchema.extend({
   isActive: z.boolean(),
 })
@@ -35,7 +35,7 @@ export const emptyBranchCreateValues: BranchCreateFormValues = {
   kind: 'branch',
 }
 
-/** Legacy mock fields — unused by the API client. */
+/** Legacy mock fields. unused by the API client. */
 export const branchSchema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 characters').max(60, 'Name is too long'),
   location: z.string().trim().min(3, 'Location must be at least 3 characters').max(120, 'Location is too long'),

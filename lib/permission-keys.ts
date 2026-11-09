@@ -1,17 +1,23 @@
 /**
  * Every permission key in the system, named once so the backend can use the
- * same strings. Three tiers, because a key's tier is what decides who may hold
- * it:
+ * same strings. **Two** tiers, because a key's tier is what decides who may
+ * hold it:
  *
- * - `BASELINE` — implicit for anyone signed in. The API lets any authenticated
+ * - `BASELINE`. implicit for anyone signed in. The API lets any authenticated
  *   caller read the catalog, so there is nothing to grant.
- * - `EMPLOYEE` — the grantable set. Granted per location, except the catalog
+ * - `EMPLOYEE`. the grantable set. Granted per location, except the catalog
  *   keys, which are platform-wide.
- * - `MANAGER` — business operations an employee may never be granted
+ * - `MANAGER`. business operations an employee may never be granted
  *   (confirming dispatch, receipt or a supplier receipt, corrections, releasing
- *   holds, approving refunds and discounts, changing permissions). Every
- *   manager and super admin holds all of them.
- * - `SUPER_ADMIN` — the three keys a manager is blocked from.
+ *   holds, approving refunds and discounts, changing permissions). **Both owner
+ *   roles hold all of them.**
+ *
+ * There used to be a third tier, `SUPER_ADMIN`, holding `settings.manage`,
+ * `users.deactivate` and `users.role.change` — three keys a Business Manager
+ * was blocked from. That put the Admin role *above* the managers, and the
+ * approved rules give the owner roles equal authority with nobody above them
+ * (rule 1). The three keys now sit in `MANAGER` with the rest, so the two owner
+ * roles differ in name only.
  */
 
 export const BASELINE_PERMISSIONS = ['catalog.view'] as const
@@ -24,10 +30,14 @@ export const EMPLOYEE_PERMISSIONS = [
   'catalog.create',
   'catalog.edit',
   'stock.view',
+  /* The four keys `GET /auth/me` sends for `/cash-sessions`. They were named
+     `cash.handover` and `cash.adjust` here, which no server ever granted: the
+     drawer is taken over by the person ACCEPTING it, and cash in or out is a
+     movement, not an adjustment. A manager holds all four. */
   'cash.open',
-  'cash.handover',
+  'cash.accept',
   'cash.close',
-  'cash.adjust',
+  'cash.move',
   'reports.view_branch',
 ] as const
 
@@ -43,16 +53,19 @@ export const MANAGER_PERMISSIONS = [
      has been opened, and it writes a note into the audit log under the caller's
      name. That is a correction, which this tier already reserves. */
   'stock.adjust',
+  /* The three keys the old super-admin tier kept to itself. An owner role that
+     cannot change a setting, switch an account off or move someone between
+     roles is not an equal of one that can, so they live here now. */
+  'settings.manage',
+  'users.deactivate',
+  'users.role.change',
 ] as const
-
-export const SUPER_ADMIN_PERMISSIONS = ['settings.manage', 'users.deactivate', 'users.role.change'] as const
 
 export type BaselinePermission = (typeof BASELINE_PERMISSIONS)[number]
 export type EmployeePermission = (typeof EMPLOYEE_PERMISSIONS)[number]
 export type ManagerPermission = (typeof MANAGER_PERMISSIONS)[number]
-export type SuperAdminPermission = (typeof SUPER_ADMIN_PERMISSIONS)[number]
 
-export type Permission = BaselinePermission | EmployeePermission | ManagerPermission | SuperAdminPermission
+export type Permission = BaselinePermission | EmployeePermission | ManagerPermission
 
 /** Catalog is one shared list, so these are granted once rather than per location. */
 export const PLATFORM_PERMISSIONS: readonly Permission[] = ['catalog.view', 'catalog.create', 'catalog.edit']
@@ -76,7 +89,7 @@ export const DEFAULT_EMPLOYEE_PERMISSIONS: readonly EmployeePermission[] = [
   'stock.view',
   'sales.create',
   'sales.view_own',
-  /* Asking is not deciding: both of these go to a manager or super admin. */
+  /* Asking is not deciding: both of these go to an owner role. */
   /* A new model can be added from the floor. Cost needs `costs.view`, which is
      not here, so an employee fills in the sell price only. */
   'catalog.create',
@@ -93,8 +106,9 @@ export function isEmployeeGrantable(permission: string): permission is EmployeeP
   return (EMPLOYEE_PERMISSIONS as readonly string[]).includes(permission)
 }
 
-export function isSuperAdminOnly(permission: Permission): boolean {
-  return (SUPER_ADMIN_PERMISSIONS as readonly string[]).includes(permission)
+/** A key only the owner roles hold, which no employee grant can unlock (rule 5). */
+export function isManagerOnly(permission: Permission): boolean {
+  return (MANAGER_PERMISSIONS as readonly string[]).includes(permission)
 }
 
 /** One short label per grantable key, for the permissions editor. */
@@ -107,9 +121,9 @@ export const PERMISSION_LABELS: Record<EmployeePermission, string> = {
   'catalog.edit': 'Edit models and variants',
   'stock.view': 'See stock balances',
   'cash.open': 'Open the drawer',
-  'cash.handover': 'Hand the drawer over',
+  'cash.accept': 'Take the drawer over',
   'cash.close': 'Close the drawer',
-  'cash.adjust': 'Adjust the drawer',
+  'cash.move': 'Move cash in or out',
   'reports.view_branch': "See the location's reports",
 }
 
@@ -123,9 +137,9 @@ export const PERMISSION_HINTS: Record<EmployeePermission, string> = {
   'catalog.edit': 'Can edit models and variants in the shared catalog.',
   'stock.view': 'Can see on-hand quantities at this location.',
   'cash.open': 'Can open the cash drawer.',
-  'cash.handover': 'Can hand the drawer to the next person.',
+  'cash.accept': 'Can count the drawer and take it over from the last person.',
   'cash.close': 'Can close the drawer at the end of the shift.',
-  'cash.adjust': 'Can record a drawer adjustment.',
+  'cash.move': 'Can take cash out of the drawer or put cash in, with a reason.',
   'reports.view_branch': 'Can see reports for this location.',
 }
 
@@ -134,6 +148,6 @@ export const PERMISSION_GROUPS: { label: string; platformWide?: boolean; keys: r
   { label: 'Till', keys: ['sales.create', 'sales.view_own', 'sales.view_branch', 'sales.cancel'] },
   { label: 'Catalog', platformWide: true, keys: ['catalog.create', 'catalog.edit'] },
   { label: 'Stock', keys: ['stock.view'] },
-  { label: 'Cash drawer', keys: ['cash.open', 'cash.handover', 'cash.close', 'cash.adjust'] },
+  { label: 'Cash drawer', keys: ['cash.open', 'cash.accept', 'cash.close', 'cash.move'] },
   { label: 'Reports', keys: ['reports.view_branch'] },
 ]

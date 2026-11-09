@@ -37,7 +37,7 @@ export function useCatalogSync({ enabled = true }: { enabled?: boolean } = {}) {
 
 /**
  * Stock lives in the mock store while branches and the catalog come from the
- * API, and fetching them is what mirrors them in — which is what gives each
+ * API, and fetching them is what mirrors them in. which is what gives each
  * SKU its per-branch rows. So stock reads wait for both and are keyed by
  * them: they never run against an empty mirror, and a new branch or SKU
  * re-reads them rather than serving figures that predate it.

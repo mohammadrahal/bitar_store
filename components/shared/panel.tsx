@@ -23,11 +23,13 @@ export function Panel({
   return (
     <motion.section className={`panel ${className ?? ''}`} {...useFadeInProps(0.1)}>
       <div className="panel-heading">
-        <div>
-          <Heading>{title}</Heading>
-          {description && <p>{description}</p>}
+        <div className="panel-heading-inner">
+          <div className="panel-title-row">
+            <Heading>{title}</Heading>
+            {actions ? <div className="panel-heading-actions">{actions}</div> : null}
+          </div>
+          {description ? <p>{description}</p> : null}
         </div>
-        {actions}
       </div>
       {children}
     </motion.section>

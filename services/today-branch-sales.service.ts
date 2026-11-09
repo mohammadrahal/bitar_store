@@ -37,7 +37,7 @@ export function clearTodayBranchSalesCache(): void {
   inflight.clear()
 }
 
-/** Today's completed sales per branch in scope — shared by dashboard ops and charts. */
+/** Today's completed sales per branch in scope. shared by dashboard ops and charts. */
 export async function fetchTodayBranchSales(scope: BranchScope): Promise<TodaySalesSnapshot> {
   const key = scopeCacheKey(scope)
   if (cached?.key === key && Date.now() - cached.at < CACHE_MS) return cached.data

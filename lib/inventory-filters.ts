@@ -8,5 +8,19 @@ export function parseInventoryFilter(value: string | null | undefined): Inventor
 }
 
 export function inventoryHref(filter: InventoryFilter = 'all') {
-  return filter === 'all' ? '/inventory' : `/inventory?filter=${filter}`
+  if (filter === 'all') return '/inventory'
+  const qs = new URLSearchParams({ section: 'variants', filter })
+  return `/inventory?${qs.toString()}`
+}
+
+/** Variant list with an optional filter; overview stays the default at `/inventory`. */
+export function inventoryVariantsHref(filter: InventoryFilter = 'all') {
+  const qs = new URLSearchParams({ section: 'variants' })
+  if (filter !== 'all') qs.set('filter', filter)
+  return `/inventory?${qs.toString()}`
+}
+
+export function inventoryVariantHref(variantId: string, filter: InventoryFilter = 'all') {
+  const base = `/inventory/${variantId}`
+  return filter === 'all' ? base : `${base}?filter=${filter}`
 }

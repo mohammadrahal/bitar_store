@@ -27,7 +27,7 @@ const SEARCH_DEBOUNCE_MS = 250
  * `counts.enter` fill the sheet in; an owner role reviews and posts it, once.
  * Creating a model never places stock, so this is how a location starts.
  */
-export function OpeningStockView() {
+export function OpeningStockView({ embedded = false }: { embedded?: boolean } = {}) {
   const { can } = usePermission()
   const allowPageBranchFilter = useAllowPageBranchFilter()
   const [pageBranchId, setPageBranchId] = useState('')
@@ -56,11 +56,13 @@ export function OpeningStockView() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Stock"
-        title="Opening stock"
-        description="Count what is physically at a location and post it. A SKU is opened once; after that its differences are settled by a physical count."
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Stock"
+          title="Opening stock"
+          description="Count what is physically at a location and post it. A SKU is opened once; after that its differences are settled by a physical count."
+        />
+      ) : null}
 
       {allowPageBranchFilter && (
         <Field label="Location">
@@ -139,7 +141,7 @@ export function OpeningStockView() {
                     {pagination.visible.map((option) => (
                       <tr key={option.variantId}>
                         <td className="card-title" data-label="Variant">
-                          {option.productName} — {option.color} / {option.size}
+                          {option.productName}. {option.color} / {option.size}
                         </td>
                         <td data-label="SKU" className="tabular">
                           {option.sku}
@@ -187,7 +189,7 @@ export function OpeningStockView() {
                   </button>
                 ) : (
                   <p className="muted">
-                    A super admin or manager reviews and posts this sheet. Your counts are not saved until they do.
+                    An admin or business manager reviews and posts this sheet. Your counts are not saved until they do.
                   </p>
                 )}
               </div>

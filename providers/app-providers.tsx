@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Toaster } from 'sonner'
 import { PreferenceEffects } from '@/components/shared/preference-effects'
+import { ServiceWorkerRegistrar } from '@/components/shared/service-worker-registrar'
 import { QueryProvider } from '@/providers/query-provider'
 import { useUIStore } from '@/store/ui-store'
 
@@ -22,6 +23,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
     <QueryProvider>
       <PreferenceEffects />
+      <ServiceWorkerRegistrar />
       {children}
       <ThemedToaster />
     </QueryProvider>

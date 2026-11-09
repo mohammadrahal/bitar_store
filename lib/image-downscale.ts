@@ -4,7 +4,7 @@
  * A phone camera produces 3 to 8 MB for one sheet of paper, almost all of it
  * detail nobody needs: what matters is that the numbers on the invoice can be
  * read back. 2000px on the long edge at JPEG 0.82 keeps printed digits legible
- * and lands between 250 and 600 KB — about a tenth of the original, so a year of
+ * and lands between 250 and 600 KB. about a tenth of the original, so a year of
  * deliveries fits in the browser instead of filling it.
  *
  * The original is never kept. There is nowhere to put it, and holding a 6 MB

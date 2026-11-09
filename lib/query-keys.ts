@@ -17,13 +17,6 @@ export const salesQueryKeys = {
   pendingSales: (branchId: string) => ['sales', 'pending-sales', branchId] as const,
 } as const
 
-/** B2B wholesale documents (local until the documents API ships). */
-export const invoiceQueryKeys = {
-  all: ['invoices', 'wholesale'] as const,
-  list: (branchId: string, status: string) => ['invoices', 'wholesale', 'list', branchId, status] as const,
-  detail: (id: string) => ['invoices', 'wholesale', 'detail', id] as const,
-} as const
-
 /** Every query key in the app, so invalidation never guesses at a shape. */
 export const queryKeys = {
   users: {
@@ -50,6 +43,8 @@ export const queryKeys = {
     catalog: () => ['products', 'catalog'] as const,
     priceHistory: (variantId: string) => ['products', 'price-history', variantId] as const,
     variants: (search: string) => ['products', 'variants', search] as const,
+    /** One SKU code or barcode resolved to its id, for screens that filter by variant. */
+    skuId: (reference: string) => ['products', 'sku-id', reference] as const,
   },
   analytics: {
     all: ['analytics'] as const,
@@ -116,6 +111,7 @@ export const queryKeys = {
   },
   transfers: {
     all: ['transfers'] as const,
+    supplyInvoice: (transferId: string) => ['transfers', 'supply-invoice', transferId] as const,
     list: (branchId: string, status: string, offset: number) =>
       ['transfers', 'list', branchId, status, offset] as const,
     detail: (id: string) => ['transfers', 'detail', id] as const,
@@ -126,11 +122,10 @@ export const queryKeys = {
     reorderLevels: (branchId: string, search: string) => ['warehouse', 'reorder-levels', branchId, search] as const,
     replenishment: (branchId: string) => ['warehouse', 'replenishment', branchId] as const,
   },
-  /** Server invoices from `GET /invoices`, not the device-local wholesale drafts. */
+  /** Server invoices from `GET /invoices`. */
   apiInvoices: {
     all: ['api-invoices'] as const,
-    list: (kind: string, branchId: string, offset: number) =>
-      ['api-invoices', 'list', kind, branchId, offset] as const,
+    list: (scope: string) => ['api-invoices', 'list', scope] as const,
     detail: (id: string) => ['api-invoices', 'detail', id] as const,
   },
   reports: {
@@ -138,6 +133,31 @@ export const queryKeys = {
     summary: (branchId: string, from: string, to: string) => ['reports', 'summary', branchId, from, to] as const,
     topSkus: (branchId: string, from: string, to: string) => ['reports', 'top-skus', branchId, from, to] as const,
     audit: (offset: number) => ['reports', 'audit', offset] as const,
+  },
+  /** `GET /settings`: the business-wide rules, exchange rate included. */
+  settings: {
+    all: ['settings'] as const,
+    store: () => ['settings', 'store'] as const,
+    /** Kept apart so the till can read the rate without the rest of the row. */
+    exchangeRate: () => ['settings', 'exchange-rate'] as const,
+  },
+  /** `GET /suppliers`: who the warehouse buys from. */
+  suppliers: {
+    all: ['suppliers'] as const,
+    list: (search: string, active: string, offset: number) =>
+      ['suppliers', 'list', search, active, offset] as const,
+    detail: (id: string) => ['suppliers', 'detail', id] as const,
+  },
+  /** `GET /cash-sessions`: the drawer. */
+  cashSessions: {
+    all: ['cash-sessions'] as const,
+    /* The open session at one branch. Its own key, not `detail`: the till asks
+       "is a drawer open here" and gets `null` for an answer, which `detail`
+       never returns. */
+    current: (branchId: string) => ['cash-sessions', 'current', branchId] as const,
+    detail: (id: string) => ['cash-sessions', 'detail', id] as const,
+    list: (branchId: string, status: string, review: string, offset: number) =>
+      ['cash-sessions', 'list', branchId, status, review, offset] as const,
   },
   dashboard: {
     all: ['dashboard'] as const,

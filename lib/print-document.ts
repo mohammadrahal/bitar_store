@@ -8,7 +8,7 @@ function escapeHtml(text: string): string {
  */
 export function printHtmlDocument(title: string, bodyHtml: string) {
   const safeTitle = escapeHtml(title)
-  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${safeTitle}</title></head><body>${bodyHtml}</body></html>`
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/><meta name="color-scheme" content="light"/><title>${safeTitle}</title></head><body>${bodyHtml}</body></html>`
 
   const iframe = document.createElement('iframe')
   iframe.setAttribute(

@@ -12,6 +12,23 @@ import {
   setVariantActive,
   setVariantPrice,
 } from '@/services/skus.service'
+import { resolveSkuReferenceToId } from '@/services/variant-search.service'
+
+/**
+ * A SKU code or barcode off a tag, resolved to the uuid the API filters by.
+ * `null` once the lookup has run and found nothing, so a screen can say "no
+ * such SKU" instead of silently showing an unfiltered list.
+ */
+export function useSkuIdFromCode(reference: string): string | null {
+  const term = reference.trim()
+  const query = useQuery({
+    queryKey: queryKeys.products.skuId(term),
+    queryFn: () => resolveSkuReferenceToId(term),
+    enabled: term.length > 0,
+    staleTime: 5 * 60_000,
+  })
+  return term.length === 0 ? null : (query.data ?? null)
+}
 
 export function usePriceHistory(variantId: string | null) {
   return useQuery({

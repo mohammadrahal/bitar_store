@@ -3,11 +3,12 @@
 import Link from 'next/link'
 import { Field } from '@/components/shared/field'
 import { PriceWithLbp } from '@/components/shared/price-with-lbp'
-import { useExchangeRate } from '@/hooks/use-exchange-rate'
+import { useExchangeRate } from '@/hooks/use-settings'
 import { usePermission } from '@/hooks/use-permission'
 import { formatLbp, formatPrice } from '@/lib/format'
 import { MAX_CASH_TENDERED, MAX_LINE_MONEY, parseMoneyInput } from '@/lib/input-limits'
-import { usdToLbpAmount } from '@/services/exchange-rate.service'
+import { usdToLbp } from '@/services/settings.service'
+import { adminHubHref } from '@/lib/admin-hub'
 import { amountsOf, changeDue, syncTendered, type PaymentDraft, type PaymentMode } from '@/lib/sale-payments'
 
 const MODES: { value: PaymentMode; label: string }[] = [
@@ -20,7 +21,7 @@ const MODES: { value: PaymentMode; label: string }[] = [
  * How the sale is paid: cash, Whish, or both with an amount each (BL-04). Cash
  * records what was tendered and shows the change, which is money handed back
  * rather than revenue. Whish needs its reference, and the server refuses a
- * reference it has seen before — that error lands under the field.
+ * reference it has seen before. that error lands under the field.
  */
 export function PaymentFields({
   draft,
@@ -28,6 +29,7 @@ export function PaymentFields({
   onChange,
   referenceError,
   totalLabel = 'Sale total',
+  showRateHint = true,
 }: {
   draft: PaymentDraft
   total: number
@@ -35,29 +37,32 @@ export function PaymentFields({
   /** The server's message when it rejects the Whish reference. */
   referenceError?: string
   totalLabel?: string
+  /** Till footer already shows the exchange line. */
+  showRateHint?: boolean
 }) {
   const { cash, whish } = amountsOf(draft, total)
   const change = changeDue(draft, total)
   const rateQuery = useExchangeRate()
-  const { superAdmin, can } = usePermission()
-  const canSetRate = superAdmin || can('settings.manage')
-  const changeLbp = usdToLbpAmount(change, rateQuery.data ?? null)
+  const { can } = usePermission()
+  const canSetRate = can('settings.manage')
+  const changeLbp = usdToLbp(change, rateQuery.rate)
   const set = (patch: Partial<PaymentDraft>) => onChange({ ...draft, ...patch })
 
   return (
     <section className="sale-card till-panel" aria-label="Payment">
-      {rateQuery.data ? (
-        <p className="till-rate-hint muted">
-          1 USD = {formatLbp(rateQuery.data.usdToLbp)} · totals show an LBP guide for the customer
-        </p>
-      ) : canSetRate ? (
-        <p className="till-rate-hint muted">
-          No LBP rate yet.{' '}
-          <Link href="/settings" className="text-link">
-            Set USD / LBP in Settings
-          </Link>
-        </p>
-      ) : null}
+      {showRateHint &&
+        (rateQuery.rate !== null ? (
+          <p className="till-rate-hint muted">
+            1 USD = {formatLbp(rateQuery.rate)} · totals show an LBP guide for the customer
+          </p>
+        ) : canSetRate ? (
+          <p className="till-rate-hint muted">
+            No LBP rate yet.{' '}
+            <Link href={adminHubHref('settings')} className="text-link">
+              Set USD / LBP in Settings
+            </Link>
+          </p>
+        ) : null)}
       <div className="segmented compact till-segmented" role="radiogroup" aria-label="Payment method">
         {MODES.map((mode) => (
           <button
@@ -142,7 +147,7 @@ export function PaymentFields({
             </Field>
             <Field
               label="Change to give"
-              hint={change > 0 ? 'Hand this back to the customer with the receipt.' : 'Exact payment — nothing to return.'}
+              hint={change > 0 ? 'Hand this back to the customer with the receipt.' : 'Exact payment. Nothing to return.'}
             >
               <p className="till-change-readout tabular" aria-live="polite">
                 {formatPrice(change)}

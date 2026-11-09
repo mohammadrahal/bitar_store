@@ -100,14 +100,14 @@ export function salePaymentKind(payments: readonly SalePayment[]): 'cash' | 'whi
   return whish > 0 ? 'whish' : 'cash'
 }
 
-/** Short label for lists: Cash, Whish, Cash + Whish, or — when nothing is stored. */
+/** Short label for lists: Cash, Whish, Cash + Whish, or. when nothing is stored. */
 export function paymentMethodLabel(draft: PaymentDraft | undefined, total: number): string {
-  if (!draft || toCents(total) <= 0) return '—'
+  if (!draft || toCents(total) <= 0) return ''
   const { cash, whish } = amountsOf(draft, total)
   const cashC = toCents(cash)
   const whishC = toCents(whish)
   if (cashC > 0 && whishC > 0) return 'Cash + Whish'
   if (whishC > 0) return 'Whish'
   if (cashC > 0) return 'Cash'
-  return '—'
+  return ''
 }

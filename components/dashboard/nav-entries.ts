@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  ArrowLeftRight,
+  Banknote,
   BarChart3,
   Boxes,
   ClipboardCheck,
@@ -10,20 +10,15 @@ import {
   History,
   LayoutDashboard,
   Package,
-  PackageCheck,
-  PackagePlus,
   ScanLine,
   ScrollText,
-  Settings,
-  Store,
   Tags,
-  Truck,
-  Users,
   Warehouse,
   type LucideIcon,
 } from 'lucide-react'
 import { useBranchHref } from '@/hooks/use-branches'
 import { usePermission } from '@/hooks/use-permission'
+import { adminHubHref } from '@/lib/admin-hub'
 
 export interface NavLinkItem {
   href: string
@@ -31,6 +26,8 @@ export interface NavLinkItem {
   icon: LucideIcon
   /** Which figure, if any, this link shows a count for. */
   badge?: 'transfer_drafts' | 'incoming'
+  /** Sum of several badge channels on one link (e.g. inventory hub). */
+  badges?: ('transfer_drafts' | 'incoming')[]
 }
 
 export interface NavSection {
@@ -44,12 +41,16 @@ export function flattenHrefs(sections: NavSection[]): string[] {
 }
 
 /** The most specific matching link wins, so /branches/:id never lights up two items. */
-export function activeHref(pathname: string, hrefs: string[]) {
+export function activeHref(current: string, hrefs: string[]) {
   return (
     hrefs
       .filter((href) => {
+        if (href.includes('?')) {
+          return current === href
+        }
         const path = href.split('?')[0]
-        return pathname === path || pathname.startsWith(`${path}/`)
+        const curPath = current.split('?')[0]
+        return curPath === path || curPath.startsWith(`${path}/`)
       })
       .sort((a, b) => b.length - a.length)[0] ?? null
   )
@@ -82,7 +83,7 @@ export function useNavEntries(): NavSection[] {
     canManageMinimums,
     canViewFinancialReports,
     canViewAdminWarehouseTools,
-    superAdmin,
+    canViewInvoicesLedger,
   } = usePermission()
   const hrefOf = useBranchHref()
   const ownLocation = activeLocationId ?? user.branchId
@@ -96,7 +97,7 @@ export function useNavEntries(): NavSection[] {
 
   const sell: NavLinkItem[] = []
   if (can('sales.create')) sell.push({ href: '/sales/new', label: 'New sale', icon: ScanLine })
-  if (canAny(['sales.create', 'sales.view_own', 'sales.view_branch'])) {
+  if (canViewInvoicesLedger()) {
     sell.push({ href: '/sales/invoices', label: 'Invoices', icon: FileText })
   }
   /* "B2C" and "Today" were the same list as history, narrowed to one shop day,
@@ -104,32 +105,30 @@ export function useNavEntries(): NavSection[] {
   if (canAny(['sales.view_own', 'sales.view_branch'])) {
     sell.push({ href: '/sales/history', label: 'Sales history', icon: History })
   }
+  /* The drawer sits with the till, not under Admin: the person who opens it and
+     counts it is the cashier. A manager's review list is a tab on the same
+     screen, so one nav item covers both. */
+  if (canAny(['cash.open', 'cash.accept', 'cash.close', 'cash.move'])) {
+    sell.push({ href: '/cash', label: 'Cash drawer', icon: Banknote })
+  }
 
   const stock: NavLinkItem[] = []
-  if (can('stock.view')) stock.push({ href: '/inventory', label: 'Inventory', icon: Boxes })
-  if (canDispatchTransfers()) {
-    stock.push({ href: '/transfers', label: 'Transfers', icon: ArrowLeftRight, badge: 'transfer_drafts' })
-  }
-  /* Receiving is the destination's side of the same endpoint, so it is the
-     transfer list already filtered to what is on its way here. */
-  if (canReceiveTransfers()) {
+  if (can('stock.view')) {
+    /* Transfers, receiving, supplier receipts and replenishment live under
+       Inventory as tabs; badges roll up onto this one link. */
+    const hubBadges: ('transfer_drafts' | 'incoming')[] = []
+    if (canDispatchTransfers() || (!canDispatchTransfers() && !canReceiveTransfers() && canSeeTransfers())) {
+      hubBadges.push('transfer_drafts')
+    }
+    if (canReceiveTransfers()) hubBadges.push('incoming')
     stock.push({
-      href: '/transfers?status=dispatched',
-      label: 'Receiving',
-      icon: PackageCheck,
-      badge: 'incoming',
+      href: '/inventory',
+      label: 'Inventory',
+      icon: Boxes,
+      ...(hubBadges.length > 0 ? { badges: hubBadges } : {}),
     })
   }
-  if (!canDispatchTransfers() && !canReceiveTransfers() && canSeeTransfers()) {
-    stock.push({ href: '/transfers', label: 'Transfers', icon: ArrowLeftRight, badge: 'transfer_drafts' })
-  }
-  /* Receiving a delivery is how stock gets in after a location has been opened,
-     so it sits with the rest of Stock rather than under Admin. */
-  if (can('stock.adjust')) {
-    stock.push({ href: '/stock-receipts', label: 'Receive stock', icon: PackagePlus })
-  }
   if (canManageMinimums()) {
-    stock.push({ href: '/replenishment', label: 'Replenishment', icon: Truck })
     stock.push({ href: '/reorder-levels', label: 'Branch minimums', icon: ClipboardCheck })
   }
   if (canViewAdminWarehouseTools()) {
@@ -141,13 +140,20 @@ export function useNavEntries(): NavSection[] {
   if (can('catalog.create')) catalog.push({ href: '/categories', label: 'Categories', icon: Tags })
 
   const admin: NavLinkItem[] = []
-  if (can('users.manage')) admin.push({ href: '/users', label: 'Users', icon: Users })
-  if (can('locations.view_all')) admin.push({ href: '/branches', label: 'Locations', icon: Store })
-  if (can('opening_stock.post')) admin.push({ href: '/opening-stock', label: 'Opening stock', icon: ClipboardList })
-  if (canViewFinancialReports()) admin.push({ href: '/reports', label: 'Reports', icon: BarChart3 })
-  if (canViewAdminWarehouseTools()) admin.push({ href: '/audit', label: 'Audit log', icon: ScrollText })
-  if (superAdmin || can('settings.manage')) {
-    admin.push({ href: '/settings', label: 'Settings', icon: Settings })
+  const showAdminSection =
+    can('opening_stock.post') ||
+    canViewFinancialReports() ||
+    canViewAdminWarehouseTools()
+  if (showAdminSection) {
+    if (can('opening_stock.post')) {
+      admin.push({ href: adminHubHref('opening-stock'), label: 'Opening stock', icon: ClipboardList })
+    }
+    if (canViewFinancialReports()) {
+      admin.push({ href: adminHubHref('reports'), label: 'Reports', icon: BarChart3 })
+    }
+    if (canViewAdminWarehouseTools()) {
+      admin.push({ href: adminHubHref('audit'), label: 'Audit log', icon: ScrollText })
+    }
   }
 
   return [

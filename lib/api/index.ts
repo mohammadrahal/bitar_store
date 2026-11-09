@@ -19,13 +19,16 @@ export {
   type TotalRequestFn,
 } from '@/lib/api/client'
 export { createBranchesApi, type BranchesApi } from '@/lib/api/branches.api'
+export { createCashSessionsApi, type CashSessionsApi } from '@/lib/api/cash-sessions.api'
 export { createCatalogApi, type CatalogApi } from '@/lib/api/catalog.api'
 export { createCategoriesApi, type CategoriesApi } from '@/lib/api/categories.api'
 export { createDashboardApi, type DashboardApi } from '@/lib/api/dashboard.api'
 export { createGoodsReceiptsApi, type GoodsReceiptsApi } from '@/lib/api/goods-receipts.api'
 export { createInvoicesApi, type InvoicesApi } from '@/lib/api/invoices.api'
 export { createSalesApi, type SalesApi } from '@/lib/api/sales.api'
+export { createSettingsApi, type SettingsApi } from '@/lib/api/settings.api'
 export { createStockApi, type StockApi } from '@/lib/api/stock.api'
+export { createSuppliersApi, type SuppliersApi } from '@/lib/api/suppliers.api'
 export { createTransfersApi, type TransfersApi } from '@/lib/api/transfers.api'
 export { createUsersApi, type UsersApi } from '@/lib/api/users.api'
 export { getApiClient } from '@/lib/api/get-api-client'
@@ -97,4 +100,30 @@ export type {
   GoodsReceiptLineInput,
   ListGoodsReceiptsParams,
   ListInvoicesParams,
+  ApiInvoicePriceSource,
+  ApiTransferReceipt,
+  ApiTransferSupplyInvoice,
+  ApiSettings,
+  UpdateSettingsInput,
+  ApiSupplier,
+  CreateSupplierInput,
+  UpdateSupplierInput,
+  ListSuppliersParams,
+  ApiCashSession,
+  ApiCashSessionSummary,
+  ApiCashSessionTotals,
+  ApiCashSessionByUser,
+  ApiCashSessionReview,
+  ApiCashMovement,
+  ApiCashHandover,
+  ApiCashCorrection,
+  ApiCashClosing,
+  CashMovementDirection,
+  CashSessionStatus,
+  OpenCashSessionInput,
+  CashMovementInput,
+  CashHandoverInput,
+  CloseCashSessionInput,
+  CashCorrectionInput,
+  ListCashSessionsParams,
 } from '@/lib/api/types'

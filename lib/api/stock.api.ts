@@ -32,7 +32,7 @@ export function createStockApi(request: RequestFn, pageRequest: PageRequestFn) {
     listStockMovements: (params: StockMovementParams) =>
       request<ApiStockMovement[]>(`/stock/movements${queryOf({ ...params })}`),
     /* One SKU per call, and the key must be new each time or the server replays
-       the first answer — which is what stops a double-click from counting the
+       the first answer. which is what stops a double-click from counting the
        same delivery twice. */
     createStockAdjustment: (input: StockAdjustmentInput, idempotencyKey: string) =>
       request<ApiStockAdjustment>('/stock/adjustments', 'POST', input, { idempotencyKey }),

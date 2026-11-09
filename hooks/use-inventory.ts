@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useBranchesKey, useMirroredBranches } from '@/hooks/use-stock'
 import { invalidateStockQueries } from '@/lib/invalidate-stock'
@@ -34,6 +34,26 @@ export function useVariantDetail(variantId: string) {
     queryKey: queryKeys.stock.variant(variantId),
     queryFn: () => getVariantDetail(variantId),
     enabled: mirrored !== null && Boolean(variantId),
+  })
+}
+
+/**
+ * The same per-location balances as `useVariantDetail`, for several variants at
+ * once, under the same key each so a variant already read for the side card is
+ * served from cache and one movement invalidates every view of it.
+ *
+ * The quick transfer drawer needs this shape: to cap a line at what the source
+ * actually holds it has to know each selected variant's position at every
+ * location before the source has even been chosen.
+ */
+export function useVariantDetails(variantIds: string[]) {
+  const mirrored = useMirroredBranches()
+  return useQueries({
+    queries: variantIds.map((variantId) => ({
+      queryKey: queryKeys.stock.variant(variantId),
+      queryFn: () => getVariantDetail(variantId),
+      enabled: mirrored !== null && Boolean(variantId),
+    })),
   })
 }
 

@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { ArrowLeftRight, PackagePlus, Plus, ScanLine, Truck, X, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, PackagePlus, PackageSearch, Plus, ScanLine, Truck, X, type LucideIcon } from 'lucide-react'
 import { usePermission } from '@/hooks/use-permission'
+import { inventoryHubHref } from '@/lib/inventory-hub'
 
 interface Action {
   href: string
@@ -29,16 +30,21 @@ function useQuickActions(): Action[] {
     actions.push({ href: '/sales/new', label: 'New sale', icon: ScanLine, primary: true })
   }
   if (canReceiveTransfers()) {
-    actions.push({ href: '/transfers?status=dispatched', label: 'Receive delivery', icon: Truck })
+    actions.push({ href: inventoryHubHref('receiving'), label: 'Receive delivery', icon: Truck })
   }
   if (canDispatchTransfers()) {
     actions.push({ href: '/transfers/new', label: 'New transfer', icon: ArrowLeftRight })
   }
   /* Booking a supplier delivery in. Distinct from "Receive delivery" above,
-     which confirms a transfer from another branch — one brings stock into the
+     which confirms a transfer from another branch. one brings stock into the
      business, the other moves stock already in it. */
   if (can('stock.adjust')) {
     actions.push({ href: '/stock-receipts/new', label: 'Receive stock', icon: PackagePlus })
+  }
+  /* Adding a model was only reachable from Products → Add product. It is a
+     daily job when a delivery arrives, so it belongs with the rest. */
+  if (can('catalog.create')) {
+    actions.push({ href: '/products/new', label: 'Add product', icon: PackageSearch })
   }
   return actions
 }

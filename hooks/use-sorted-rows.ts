@@ -28,7 +28,7 @@ function compare(a: string | number | null | undefined, b: string | number | nul
  * Sorts a page of rows that is already in memory.
  *
  * Every list this is used on is fetched whole and paged in the browser, so
- * sorting here sorts the entire result rather than just the visible page — the
+ * sorting here sorts the entire result rather than just the visible page. the
  * figure at the top really is the largest, not the largest of twelve. A column
  * is re-sorted in place, so changing it never refetches.
  *

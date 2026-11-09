@@ -41,11 +41,14 @@ export interface Delta {
 
 /**
  * A like-for-like change, or `null` when there is nothing to compare against.
- * A previous period of zero has no percentage — "up 100%" from nothing is not a
- * fact about the business — so the tile says what it is instead of inventing one.
+ * A previous period of zero has no percentage. "up 100%" from nothing is not a
+ * fact about the business. so the tile says what it is instead of inventing one.
  */
 export function deltaOf(current: number, previous: number): Delta | null {
-  if (previous <= 0) return null
+  if (previous <= 0) {
+    if (current <= 0) return { percent: 0, direction: 'flat' }
+    return null
+  }
   const percent = Math.round(((current - previous) / previous) * 1000) / 10
   if (percent === 0) return { percent, direction: 'flat' }
   return { percent, direction: percent > 0 ? 'up' : 'down' }

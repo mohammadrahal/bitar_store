@@ -1,8 +1,8 @@
 'use client'
 
 import { formatLbp, formatPrice } from '@/lib/format'
-import { usdToLbpAmount } from '@/services/exchange-rate.service'
-import { useExchangeRate } from '@/hooks/use-exchange-rate'
+import { usdToLbp } from '@/services/settings.service'
+import { useExchangeRate } from '@/hooks/use-settings'
 
 /** USD price with an optional LBP equivalent from the shared exchange rate. */
 export function PriceWithLbp({
@@ -15,7 +15,7 @@ export function PriceWithLbp({
   strong?: boolean
 }) {
   const rateQuery = useExchangeRate()
-  const lbp = usdToLbpAmount(usd, rateQuery.data ?? null)
+  const lbp = usdToLbp(usd, rateQuery.rate)
   const Tag = strong ? 'strong' : 'span'
 
   return (

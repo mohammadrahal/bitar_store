@@ -11,7 +11,6 @@ import {
   BASELINE_PERMISSIONS,
   MANAGER_PERMISSIONS,
   PLATFORM_SCOPE,
-  SUPER_ADMIN_PERMISSIONS,
   VIEW_ONLY_PERMISSIONS,
   isPlatformPermission,
   type Permission,
@@ -41,9 +40,11 @@ function employeeKeysAt(user: User, locationId: string): readonly string[] {
 /**
  * The single permission check.
  *
- * - A super admin may do everything.
- * - A manager may do every business operation, except the three keys reserved
- *   for the super admin.
+ * - **The two owner roles are equal** (rule 1). Admin and Business Manager both
+ *   do everything; there is no tier above either of them. The manager used to
+ *   be blocked from `settings.manage`, `users.deactivate` and
+ *   `users.role.change`, which made the Admin a fourth tier the rules do not
+ *   have.
  * - An employee needs the key, at the location they are working in. Leaving
  *   `locationId` out asks whether they hold it anywhere, which is what the
  *   sidebar and the route guard want; anything that writes passes the active
@@ -53,10 +54,10 @@ function employeeKeysAt(user: User, locationId: string): readonly string[] {
  */
 export function can(user: User, permission: Permission, locationId?: string): boolean {
   if (holds(BASELINE_PERMISSIONS, permission)) return true
-  if (user.role === 'super_admin') return true
-  if (user.role === 'manager') return !holds(SUPER_ADMIN_PERMISSIONS, permission)
+  if (user.role === 'super_admin' || user.role === 'manager') return true
 
-  if (holds(SUPER_ADMIN_PERMISSIONS, permission) || holds(MANAGER_PERMISSIONS, permission)) return false
+  /* Rule 5: a manager-tier key is never reachable by an employee grant. */
+  if (holds(MANAGER_PERMISSIONS, permission)) return false
 
   if (isPlatformPermission(permission)) {
     return user.permissions.includes(permission) || (user.grants[PLATFORM_SCOPE] ?? []).includes(permission)
@@ -71,8 +72,20 @@ export function canAny(user: User, rule: PermissionRule, locationId?: string): b
   return list.some((permission) => can(user, permission, locationId))
 }
 
-export function isSuperAdmin(user: User): boolean {
-  return user.role === 'super_admin'
+/* `isSuperAdmin` is gone on purpose. Every caller used it to unlock something a
+   Business Manager was not trusted with, which is the hierarchy rule 1 rules
+   out. Gate on the key instead — both owner roles hold all of them — and read
+   `role` from `usePermission` when the role itself is the question, such as
+   labelling a row. */
+
+/**
+ * Admin and Business Manager, the two roles with equal authority over the
+ * business (rule 1). Asked wherever a screen treats "an owner" differently from
+ * an employee — such as the permission editor, which has nothing to offer
+ * someone who already holds every key.
+ */
+export function isOwnerRole(role: Role): boolean {
+  return role === 'super_admin' || role === 'manager'
 }
 
 /** Owners work at every location; only employees are tied to assignments. */
@@ -95,6 +108,42 @@ export function isViewOnlyAt(user: User, locationId: string): boolean {
   return locationAccess(user, locationId) === 'view_only'
 }
 
+/** At least one admin tab is available (used for `/admin`). */
+export function canAccessAdminHub(user: User): boolean {
+  return (
+    can(user, 'users.manage') ||
+    can(user, 'locations.view_all') ||
+    can(user, 'opening_stock.post') ||
+    canViewFinancialReports(user) ||
+    canViewAdminWarehouseTools(user) ||
+    can(user, 'settings.manage')
+  )
+}
+
+/**
+ * Fiscal invoices ledger. Issuing from a till (`/sales/invoices/new`) stays on
+ * `sales.create`; browsing the registry is for owners and financial roles.
+ */
+export function canViewInvoicesLedger(user: User): boolean {
+  return canViewFinancialReports(user) || can(user, 'locations.view_all')
+}
+
+/**
+ * Branch-wide till telemetry on the overview: today's shop sales, best sellers,
+ * revenue charts. `sales.view_own` is not enough; that is what history is for.
+ */
+export function canViewBranchSalesTelemetry(user: User, locationId?: string): boolean {
+  if (canViewFinancialReports(user)) return true
+  if (can(user, 'locations.view_all')) return true
+  if (locationId) return can(user, 'sales.view_branch', locationId)
+  return can(user, 'sales.view_branch')
+}
+
+/** Network overview sales bands (`scope` is all branches). */
+export function canViewNetworkSalesTelemetry(user: User): boolean {
+  return canViewFinancialReports(user) || can(user, 'locations.view_all')
+}
+
 /** The landing page: the combined overview for owners, their own location otherwise. */
 export function homePathFor(user: User): string {
   if (can(user, 'locations.view_all')) return '/dashboard'
@@ -114,6 +163,9 @@ const ROUTE_PERMISSIONS: [prefix: string, rule: PermissionRule][] = [
   ['/sales/b2c', ['sales.view_own', 'sales.view_branch']],
   ['/sales/b2b', 'locations.view_all'],
   ['/sales/', ['sales.view_own', 'sales.view_branch']],
+  /* Any one of the four drawer keys gets in: a cashier who may only open it
+     still needs the screen, and the panels inside check their own key. */
+  ['/cash', ['cash.open', 'cash.accept', 'cash.close', 'cash.move']],
   ['/inventory', 'stock.view'],
   ['/opening-stock', 'opening_stock.post'],
   ['/stock-receipts', 'stock.adjust'],
@@ -142,8 +194,26 @@ export function redirectPathFor(user: User, pathname: string): string | null {
   if (pathname === '/dashboard' && !can(user, 'locations.view_all')) return home
   if (pathname === '/branches' && !can(user, 'locations.view_all')) return home
 
-  const rule = ROUTE_PERMISSIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
-  if (rule && !canAny(user, rule[1])) return home
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+    if (!canAccessAdminHub(user)) return home
+  }
+
+  if (pathname.startsWith('/sales/invoices')) {
+    const creating = pathname === '/sales/invoices/new' || pathname.startsWith('/sales/invoices/new/')
+    if (creating) {
+      if (!can(user, 'sales.create')) return home
+    } else if (!canViewInvoicesLedger(user)) {
+      return home
+    }
+  }
+
+  if (pathname.startsWith('/users/')) {
+    const profileId = pathname.slice('/users/'.length).split('/')[0]
+    if (profileId !== user.id && !can(user, 'users.manage')) return home
+  } else {
+    const rule = ROUTE_PERMISSIONS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+    if (rule && !canAny(user, rule[1])) return home
+  }
 
   const apiRule = API_ROUTE_ACCESS.find(([prefix]) => pathname === prefix || pathname.startsWith(`${prefix}/`))
   if (apiRule && !apiRule[1](user)) return home
@@ -168,8 +238,16 @@ export function postLoginPathFor(user: User, next: string | null): string {
   return redirectPathFor(user, next) ?? next
 }
 
+/**
+ * The three roles the rules name. `super_admin` is the stored id for the API's
+ * `admin` and is deliberately **not** renamed: on a cold start the cached
+ * session is trusted until `GET /auth/me` answers, and offline it is trusted
+ * for the whole visit, so a role id this build no longer recognised would strip
+ * an owner of every permission until the network came back. The id is internal;
+ * the label is what anyone reads, and it no longer claims a rank.
+ */
 export const ROLE_LABELS: Record<Role, string> = {
-  super_admin: 'Super admin',
-  manager: 'Manager',
+  super_admin: 'Admin',
+  manager: 'Business manager',
   employee: 'Employee',
 }

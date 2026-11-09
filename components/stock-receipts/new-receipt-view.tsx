@@ -11,9 +11,11 @@ import { LocationEyebrow, PageHeader } from '@/components/shared/page-header'
 import { ReceiveReceiptSummary } from '@/components/stock-receipts/receive-receipt-summary'
 import { ReceiptLinePicker } from '@/components/stock-receipts/receipt-line-picker'
 import { ReceiptPhotoField } from '@/components/stock-receipts/receipt-photo-field'
+import { SupplierPicker } from '@/components/stock-receipts/supplier-picker'
 import { useBranches } from '@/hooks/use-branches'
 import { useWarehouseId } from '@/hooks/use-inventory'
 import { usePostGoodsReceipt } from '@/hooks/use-goods-receipts'
+import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { todayAsDateInput } from '@/lib/format'
 import { useCatalogSync } from '@/hooks/use-stock'
 import {
@@ -25,13 +27,16 @@ import {
 } from '@/services/goods-receipts.service'
 import { blankLinesForStyle, type ReceiptPhotoDraft, type StockReceiptLine } from '@/services/stock-receipts.service'
 import { useCurrentUser } from '@/store/user-store'
+import type { ApiSupplier } from '@/lib/api/types'
+import { adminHubHref } from '@/lib/admin-hub'
+import { inventoryHubHref } from '@/lib/inventory-hub'
 
 /**
  * Recording a supplier delivery.
  *
  * One `POST /goods-receipts`: supplier, their invoice number and its date, and
  * a cost per piece on every line. The warehouse stock grows in the same
- * transaction, so the delivery either lands whole or not at all — it is no
+ * transaction, so the delivery either lands whole or not at all. it is no
  * longer a run of separate adjustments that could stop half way.
  *
  * There is no location to choose. A delivery arrives at the warehouse and
@@ -42,6 +47,7 @@ export function NewReceiptView() {
   const router = useRouter()
   const showCosts = useCurrentUser().canViewCosts
   const post = usePostGoodsReceipt()
+  const idempotency = useIdempotencyKey()
   const searchParams = useSearchParams()
   const styleCode = searchParams.get('style')?.trim().toUpperCase() ?? ''
 
@@ -49,7 +55,7 @@ export function NewReceiptView() {
   const { data: branches } = useBranches()
   const warehouseName = branches?.find((branch) => branch.id === warehouseId)?.name ?? 'the main warehouse'
 
-  const [supplierName, setSupplierName] = useState('')
+  const [supplier, setSupplier] = useState<ApiSupplier | null>(null)
   const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('')
   const [invoiceDate, setInvoiceDate] = useState(todayAsDateInput())
   const [note, setNote] = useState('')
@@ -66,7 +72,15 @@ export function NewReceiptView() {
     setLines(blanks)
   }, [styleCode, catalog.data])
 
-  const draft: GoodsReceiptDraft = { supplierName, supplierInvoiceNumber, invoiceDate, note, lines, photo }
+  const draft: GoodsReceiptDraft = {
+    supplierId: supplier?.id,
+    supplierName: supplier?.name ?? '',
+    supplierInvoiceNumber,
+    invoiceDate,
+    note,
+    lines,
+    photo,
+  }
   const problem = validateGoodsReceipt(draft)
 
   const filled = filledLines(lines).length
@@ -76,15 +90,23 @@ export function NewReceiptView() {
   const submit = (event: React.FormEvent) => {
     event.preventDefault()
     if (problem) return
-    post.mutate(draft, {
-      onSuccess: ({ receipt }) => router.push(`/stock-receipts/${receipt.id}`),
-    })
+    /* One key for this delivery, held across retries: a lost answer must replay
+       the first receipt rather than receive the goods a second time. */
+    post.mutate(
+      { draft, idempotencyKey: idempotency.current() },
+      {
+        onSuccess: ({ receipt }) => {
+          idempotency.reset()
+          router.push(`/stock-receipts/${receipt.id}`)
+        },
+      },
+    )
   }
 
   if (!warehousePending && !warehouseId) {
     return (
       <>
-        <Link href="/stock-receipts" className="back-link">
+        <Link href={inventoryHubHref('receive-stock')} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -93,7 +115,7 @@ export function NewReceiptView() {
           title="No warehouse yet"
           description="A supplier delivery is recorded into the main warehouse, and this network does not have one. An admin can mark a location as the warehouse in Locations."
           action={
-            <Link href="/branches" className="btn btn-primary">
+            <Link href={adminHubHref('locations')} className="btn btn-primary">
               Open Locations
             </Link>
           }
@@ -104,7 +126,7 @@ export function NewReceiptView() {
 
   return (
     <>
-      <Link href="/stock-receipts" className="back-link">
+      <Link href={inventoryHubHref('receive-stock')} className="back-link">
         <ArrowLeft size={16} aria-hidden="true" />
         Receive stock
       </Link>
@@ -134,19 +156,15 @@ export function NewReceiptView() {
               The receipt number is issued by the server when you post this, as <span className="tabular">GR-00000001</span>.
               You do not type it.
             </p>
+            <Field label="Supplier" hint="Who sent it. Required." className="full">
+              <div className="stack gap-sm">
+                <SupplierPicker value={supplier} onChange={setSupplier} />
+              </div>
+            </Field>
             <div className="form-grid">
-              <Field label="Supplier" hint="Who sent it. Required.">
-                <input
-                  value={supplierName}
-                  onChange={(event) => setSupplierName(event.target.value)}
-                  placeholder="Al Amin Textiles"
-                  autoComplete="off"
-                  required
-                />
-              </Field>
               <Field
                 label="Their invoice number"
-                hint="Required. The delivery is filed under it, and the same number from the same supplier is refused as a duplicate."
+                hint="Optional. When you give one, the same number from the same supplier is refused as a duplicate."
               >
                 <input
                   className="tabular"
@@ -154,7 +172,6 @@ export function NewReceiptView() {
                   onChange={(event) => setSupplierInvoiceNumber(event.target.value)}
                   placeholder="INV-2026-114"
                   autoComplete="off"
-                  required
                 />
               </Field>
               <Field label="Date on the invoice" hint="Not always today.">
@@ -202,7 +219,7 @@ export function NewReceiptView() {
           <Section number={4} title="What happens when you post" hint="So nobody has to guess what is shared.">
             <ul className="section-note-list receive-stock-notes">
               <li>
-                <strong>On the server:</strong> the whole document — supplier, their invoice number and date, every
+                <strong>On the server:</strong> the whole document. supplier, their invoice number and date, every
                 line with its quantity and unit cost, and the total it works out. The warehouse stock grows in the same
                 transaction, and it is written to the ledger and the audit log. Every device sees it.
               </li>
@@ -220,7 +237,7 @@ export function NewReceiptView() {
 
         <aside className="split-aside">
           <ReceiveReceiptSummary
-            supplierName={supplierName}
+            supplierName={supplier?.name ?? ''}
             reference={supplierInvoiceNumber}
             styleCode={styleCode}
             branchName={warehouseName}

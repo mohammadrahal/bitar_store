@@ -15,7 +15,7 @@ export interface StoredUserAccess {
   locations: LocationAssignment[]
   /** Keys per location id, plus the platform-wide ones under `*`. */
   grants: Record<string, string[]>
-  /** Managers only — mirrors `GET /users/:id/branch-access` for the employee list. */
+  /** Managers only. mirrors `GET /users/:id/branch-access` for the employee list. */
   branchAccessMode?: 'all' | 'selected'
 }
 
@@ -52,7 +52,7 @@ export function clearUserAccess(userId: string) {
   writeMap(map)
 }
 
-/** Live branch ids from `GET /auth/me` — the only source of truth for a signed-in session. */
+/** Live branch ids from `GET /auth/me`. the only source of truth for a signed-in session. */
 export function assignmentsFromBranchIds(branchIds: string[]): LocationAssignment[] {
   return branchIds.map((locationId) => ({ locationId, access: 'full' as LocationAccess }))
 }

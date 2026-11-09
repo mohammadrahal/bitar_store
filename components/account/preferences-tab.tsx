@@ -43,7 +43,7 @@ export function PreferencesTab() {
       const branch = branches?.find((candidate) => candidate.id === entry.locationId)
       return {
         value: entry.locationId,
-        label: `${branch?.name ?? 'Location'}${entry.access === 'view_only' ? ' — view only' : ''}`,
+        label: `${branch?.name ?? 'Location'}${entry.access === 'view_only' ? ' (view only)' : ''}`,
       }
     })
   })()

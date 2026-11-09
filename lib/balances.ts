@@ -22,7 +22,7 @@ export function sumBalances(rows: Balances[]): Balances {
 }
 
 /** Shown wherever the API has no number to give. */
-export const NOT_AVAILABLE_YET = '—'
+export const NOT_AVAILABLE_YET = 'Not yet'
 
 export function balanceText(value: number | null, format: (value: number) => string): string {
   return value === null ? NOT_AVAILABLE_YET : format(value)

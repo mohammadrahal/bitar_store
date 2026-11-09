@@ -14,7 +14,7 @@ export function isUnauthorized(error: unknown): boolean {
   return statusOf(error) === 401
 }
 
-/** 409: a duplicate the user has to resolve — a branch code, a Whish reference. */
+/** 409: a duplicate the user has to resolve. a branch code, a Whish reference. */
 export function isConflict(error: unknown): boolean {
   return statusOf(error) === 409
 }

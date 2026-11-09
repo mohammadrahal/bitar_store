@@ -27,3 +27,19 @@ export function ActiveStatusPill({ isActive }: { isActive: boolean }) {
     </span>
   )
 }
+
+const invoiceLedgerTone: Record<string, string> = {
+  paid: 'pill-healthy',
+  pending: 'pill-accent',
+  draft: 'pill-neutral',
+  void: 'pill-out',
+}
+
+export function InvoiceLedgerStatusPill({ status, label }: { status: keyof typeof invoiceLedgerTone; label: string }) {
+  return (
+    <span className={`pill ${invoiceLedgerTone[status]}`}>
+      <span className="pill-dot" aria-hidden="true" />
+      {label}
+    </span>
+  )
+}

@@ -18,6 +18,11 @@ import { receiptPhotoKey } from '@/services/stock-receipts.service'
  * grows in the **same transaction**, so a delivery is all-or-nothing instead of
  * one adjustment per line that could half-land.
  *
+ * Since 9 Nov the supplier is a **record**, not free text: `supplierId` comes
+ * from `GET /suppliers`, and the receipt keeps `supplierName` as the name on the
+ * day so a later rename does not rewrite history. The invoice number is
+ * optional, for a delivery that arrives without paperwork.
+ *
  * Two things the endpoint does not take, and this module is explicit about:
  *
  * - **A location.** The delivery always arrives at the warehouse; branches are
@@ -32,10 +37,21 @@ import { receiptPhotoKey } from '@/services/stock-receipts.service'
  * adjustment, which is what `postStockCorrection` is for.
  */
 export interface GoodsReceiptDraft {
+  /**
+   * The supplier record from `GET /suppliers`, which is how a delivery should be
+   * filed. `supplierName` below is the fallback for a server that has no
+   * suppliers resource yet.
+   */
+  supplierId?: string
   supplierName: string
-  /** The number printed on the supplier's own invoice. Required by the server. */
+  /**
+   * The number printed on the supplier's own invoice. **Optional** since 9 Nov:
+   * a delivery that arrives with no paperwork no longer needs an invented
+   * number. When one is given, the same number from the same supplier is still
+   * refused as a duplicate.
+   */
   supplierInvoiceNumber: string
-  /** `yyyy-mm-dd` — the date on their document, which is not always today. */
+  /** `yyyy-mm-dd`. the date on their document, which is not always today. */
   invoiceDate: string
   note: string
   lines: StockReceiptLine[]
@@ -56,10 +72,10 @@ function hasTooManyDecimals(value: number): boolean {
 
 /** The first thing wrong with the draft, in the words the form will show. */
 export function validateGoodsReceipt(draft: GoodsReceiptDraft): string | null {
-  if (!draft.supplierName.trim()) return 'Enter the supplier’s name.'
-  if (!draft.supplierInvoiceNumber.trim()) {
-    return 'Enter the number on the supplier’s invoice — the server files the delivery under it.'
-  }
+  if (!draft.supplierId && !draft.supplierName.trim()) return 'Choose the supplier who sent this delivery.'
+  /* The invoice number is the server's to require, and it no longer does: a
+     delivery with no paperwork is a real delivery, and a number invented to get
+     past this check was worse than none. */
   if (!draft.invoiceDate) return 'Enter the date on the supplier’s invoice.'
 
   const lines = filledLines(draft.lines)
@@ -101,14 +117,23 @@ export interface PostedGoodsReceipt {
  * The idempotency key is taken once so a retry after a lost answer replays the
  * first receipt instead of receiving the goods twice.
  */
-export async function postGoodsReceipt(draft: GoodsReceiptDraft): Promise<PostedGoodsReceipt> {
+export async function postGoodsReceipt(
+  draft: GoodsReceiptDraft,
+  idempotencyKey: string,
+): Promise<PostedGoodsReceipt> {
   const problem = validateGoodsReceipt(draft)
   if (problem) throw new Error(problem)
 
   const receipt = await getApiClient().receiveGoods(
     {
-      supplierName: draft.supplierName.trim(),
-      supplierInvoiceNumber: draft.supplierInvoiceNumber.trim(),
+      /* One or the other, never both: `supplierId` is the record, and
+         `supplierName` is only for a server with no suppliers resource. */
+      ...(draft.supplierId
+        ? { supplierId: draft.supplierId }
+        : { supplierName: draft.supplierName.trim() }),
+      ...(draft.supplierInvoiceNumber.trim()
+        ? { supplierInvoiceNumber: draft.supplierInvoiceNumber.trim() }
+        : {}),
       invoiceDate: draft.invoiceDate,
       note: draft.note.trim() || undefined,
       lines: filledLines(draft.lines).map((line) => ({
@@ -119,7 +144,10 @@ export async function postGoodsReceipt(draft: GoodsReceiptDraft): Promise<Posted
         unitCost: line.unitCost.toFixed(2),
       })),
     },
-    crypto.randomUUID(),
+    /* The caller's key, held until the server confirms. A key minted here was a
+       new key on every attempt, so a retry after a lost answer received the
+       same delivery a second time. */
+    idempotencyKey,
   )
 
   /* Written after the stock, never before: a delivery that is already on the
@@ -140,12 +168,12 @@ export async function postGoodsReceipt(draft: GoodsReceiptDraft): Promise<Posted
   return { receipt, photo }
 }
 
-/** `GET /goods-receipts` — summaries, newest first, with the whole count. */
+/** `GET /goods-receipts`. summaries, newest first, with the whole count. */
 export async function listGoodsReceipts(params: ListGoodsReceiptsParams = {}) {
   return getApiClient().listGoodsReceiptsPage({ limit: 50, ...params })
 }
 
-/** `GET /goods-receipts/:id` — one document with its lines. */
+/** `GET /goods-receipts/:id`. one document with its lines. */
 export async function getGoodsReceipt(id: string): Promise<ApiGoodsReceipt> {
   return getApiClient().getGoodsReceipt(id)
 }

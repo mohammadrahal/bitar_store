@@ -24,7 +24,7 @@ function paymentLabel(cash: number, whish: number): string {
   if (cash > 0 && whish > 0) return 'Cash + Whish'
   if (whish > 0) return 'Whish'
   if (cash > 0) return 'Cash'
-  return '—'
+  return ''
 }
 
 function branchNameOf(branchId: string, fallback?: string): string {
@@ -37,7 +37,7 @@ function branchNameOf(branchId: string, fallback?: string): string {
  *
  * `GET /sales/history` is the right endpoint and the only one that crosses shop
  * days, but it has to be registered before `GET /sales/:id` or the server looks
- * up a sale whose id is the word "history" — which is exactly what this
+ * up a sale whose id is the word "history". which is exactly what this
  * deployment does. So a `404` falls back to today's `GET /sales` per branch,
  * and the panel says it is showing today only rather than silently appearing
  * empty on a quiet morning.

@@ -1,13 +1,7 @@
-import { Suspense } from 'react'
-import { NewWholesaleInvoiceView } from '@/components/sales/new-wholesale-invoice-view'
-import { Skeleton } from '@/components/shared/skeleton'
+import { CreateInvoiceGateway } from '@/components/sales/create-invoice-gateway'
 
-export const metadata = { title: 'New wholesale invoice' }
+export const metadata = { title: 'Create invoice' }
 
-export default function NewWholesaleInvoicePage() {
-  return (
-    <Suspense fallback={<Skeleton rows={1} stats={0} />}>
-      <NewWholesaleInvoiceView />
-    </Suspense>
-  )
+export default function CreateInvoicePage() {
+  return <CreateInvoiceGateway />
 }

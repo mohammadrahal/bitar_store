@@ -49,7 +49,7 @@ function ActiveLocationSwitcher() {
     const branch = branches?.find((candidate) => candidate.id === entry.locationId)
     return {
       value: entry.locationId,
-      label: `${branch?.name ?? 'Location'}${entry.access === 'view_only' ? ' — view only' : ''}`,
+      label: `${branch?.name ?? 'Location'}${entry.access === 'view_only' ? ' (view only)' : ''}`,
     }
   })
 
@@ -79,7 +79,7 @@ function ActiveLocationSwitcher() {
 }
 
 /**
- * Search, scope, what needs attention, theme, account — left to right, in the
+ * Search, scope, what needs attention, theme, account. left to right, in the
  * order they are reached for. Search leads because it is the fastest way to any
  * record in the app and a barcode scanner types straight into it.
  */

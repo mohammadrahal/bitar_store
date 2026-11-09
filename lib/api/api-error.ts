@@ -9,3 +9,13 @@ export class ApiError extends Error {
     this.name = 'ApiError'
   }
 }
+
+/** Duck-type check so HMR does not break `instanceof ApiError` in query retry handlers. */
+export function isApiError(error: unknown): error is ApiError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as ApiError).name === 'ApiError' &&
+    typeof (error as ApiError).status === 'number'
+  )
+}

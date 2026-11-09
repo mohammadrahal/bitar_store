@@ -2,64 +2,15 @@
 
 import Link from 'next/link'
 import { Menu } from '@base-ui/react/menu'
-import { ChevronDown, LogOut, Moon, Settings, Sun, UserCog } from 'lucide-react'
-import { useBranches } from '@/hooks/use-branches'
+import { ChevronDown, LogOut, Settings, UserCog } from 'lucide-react'
 import { useLogout } from '@/hooks/use-auth'
 import { usePermission } from '@/hooks/use-permission'
-import { useUserPreferences } from '@/hooks/use-user-preferences'
 import { initials } from '@/lib/format'
-import { ROLE_LABELS } from '@/lib/permissions'
-import { applyResolvedTheme, resolveThemePreference } from '@/lib/theme'
-import type { ThemePreference } from '@/services/user-preferences.service'
-import { useUIStore } from '@/store/ui-store'
-
-function ThemeMenuToggle() {
-  const { preferences, update } = useUserPreferences()
-  const setTheme = useUIStore((state) => state.setTheme)
-
-  const cycle = () => {
-    const order: ThemePreference[] = ['light', 'dark', 'system']
-    const index = order.indexOf(preferences.theme)
-    const next = order[(index + 1) % order.length]
-    update({ theme: next })
-    const resolved = resolveThemePreference(next)
-    setTheme(resolved)
-    applyResolvedTheme(resolved)
-  }
-
-  const icon =
-    preferences.theme === 'dark' ? (
-      <Moon size={16} aria-hidden="true" />
-    ) : preferences.theme === 'light' ? (
-      <Sun size={16} aria-hidden="true" />
-    ) : (
-      <Sun size={16} aria-hidden="true" />
-    )
-
-  const label =
-    preferences.theme === 'system'
-      ? 'Theme: System'
-      : preferences.theme === 'dark'
-        ? 'Theme: Dark'
-        : 'Theme: Light'
-
-  return (
-    <Menu.Item className="menu-item" onClick={cycle}>
-      {icon}
-      {label}
-    </Menu.Item>
-  )
-}
+import { adminHubHref } from '@/lib/admin-hub'
 
 export function UserMenu() {
-  const { user, locationScoped, can } = usePermission()
-  const { data: branches } = useBranches()
+  const { user, can } = usePermission()
   const logout = useLogout()
-
-  const where = locationScoped
-    ? (branches?.find((branch) => branch.id === user.branchId)?.name ??
-      (user.branchId ? 'Unknown branch' : 'No branch assigned'))
-    : 'All locations'
 
   return (
     <Menu.Root>
@@ -71,7 +22,6 @@ export function UserMenu() {
             </span>
             <span className="user-menu-text">
               <strong>{user.name}</strong>
-              <small>{ROLE_LABELS[user.role]}</small>
             </span>
             <ChevronDown size={16} className="user-menu-chevron" aria-hidden="true" />
           </button>
@@ -82,9 +32,6 @@ export function UserMenu() {
           <Menu.Popup className="menu-popup">
             <div className="menu-header">
               <strong>{user.name}</strong>
-              <small>{ROLE_LABELS[user.role]}</small>
-              <small>{user.email}</small>
-              <small>{where}</small>
             </div>
             <Menu.LinkItem
               className="menu-item"
@@ -99,14 +46,13 @@ export function UserMenu() {
               <Menu.LinkItem
                 className="menu-item"
                 render={(props) => (
-                  <Link href="/settings" {...props}>
+                  <Link href={adminHubHref('settings')} {...props}>
                     <Settings size={16} aria-hidden="true" />
                     Store settings
                   </Link>
                 )}
               />
             )}
-            <ThemeMenuToggle />
             <Menu.Item className="menu-item danger" onClick={() => logout.mutate()} disabled={logout.isPending}>
               <LogOut size={16} aria-hidden="true" />
               Sign out

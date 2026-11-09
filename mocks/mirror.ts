@@ -1,7 +1,7 @@
 import { writeDb, type MockDb } from '@/mocks/store'
 import type { Branch, Product, Variant } from '@/types'
 
-/** Runs after either mirror. Only `kind: "warehouse"` counts — names are not a guess. */
+/** Runs after either mirror. Only `kind: "warehouse"` counts. names are not a guess. */
 function settle(db: MockDb) {
   const marked = db.branches.find((branch) => branch.kind === 'warehouse')
   if (marked) db.warehouseId = marked.id
@@ -18,7 +18,7 @@ function settle(db: MockDb) {
 export function mirrorBranches(branches: Branch[], { prune = false } = {}): void {
   writeDb((db) => {
     if (branches.length === 0) {
-      /* An empty API answer with prune means the network really has none — drop
+      /* An empty API answer with prune means the network really has none. drop
          stale rows left from an older session. Scoped users never prune. */
       if (prune) {
         db.branches = []

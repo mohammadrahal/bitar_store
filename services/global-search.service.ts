@@ -28,7 +28,7 @@ export function looksScanned(term: string): boolean {
  * the models above them.
  *
  * Variants come from `searchVariants`, which reads the mirrored catalog and
- * falls back to `GET /skus/lookup` for a barcode it has never seen — so a code
+ * falls back to `GET /skus/lookup` for a barcode it has never seen. so a code
  * printed on a tag finds its variant even on a fresh session.
  *
  * Sale references are **not** searched: the API has no route that resolves a

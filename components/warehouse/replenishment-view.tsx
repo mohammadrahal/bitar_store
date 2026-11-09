@@ -1,8 +1,8 @@
 'use client'
 
-import Link from 'next/link'
 import { useState } from 'react'
 import { PackageSearch, Truck } from 'lucide-react'
+import { QuickTransferDrawer, type QuickTransferVariant } from '@/components/inventory/quick-transfer-drawer'
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -14,25 +14,45 @@ import { SkuTableCell } from '@/components/shared/table-empty'
 import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { Pagination } from '@/components/shared/pagination'
 import { usePagination } from '@/hooks/use-pagination'
+import { usePermission } from '@/hooks/use-permission'
 import { useReplenishment } from '@/hooks/use-warehouse'
 import { formatNumber } from '@/lib/format'
+import { variantLabel } from '@/lib/variant-label'
 
-export function ReplenishmentView() {
+/** What one suggestion becomes when it is sent: the row, already filled in. */
+interface Fill {
+  variant: QuickTransferVariant
+  destinationId: string
+  quantity: number
+}
+
+export function ReplenishmentView({ embedded = false }: { embedded?: boolean } = {}) {
   const allowPageBranchFilter = useAllowPageBranchFilter()
   const [pageBranchId, setPageBranchId] = useState('')
   const branchId = useEffectiveListBranchId(pageBranchId)
+  const { canRequestTransfer } = usePermission()
 
   const query = useReplenishment(branchId)
   const rows = query.data?.suggestions ?? []
   const pagination = usePagination(rows, 20, branchId)
+  const warehouseId = query.data?.warehouse?.id
+  /**
+   * Filling a suggestion used to mean a blank `/transfers/new`: the branch, the
+   * variant and the quantity were all on the row being read and all three had
+   * to be found again by hand. This hands the same three to the drawer, which
+   * is the only screen involved now.
+   */
+  const [filling, setFilling] = useState<Fill | null>(null)
 
   return (
     <>
-      <PageHeader
-        eyebrow="Warehouse"
-        title="What to send"
-        description="Branches below their minimum, ranked by need. Fillable is what the warehouse can ship now."
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Warehouse"
+          title="What to send"
+          description="Branches below their minimum, ranked by need. Fillable is what the warehouse can ship now."
+        />
+      ) : null}
 
       <Panel
         title="Suggestions"
@@ -119,11 +139,33 @@ export function ReplenishmentView() {
                     <td className="num">{formatNumber(row.suggested)}</td>
                     <td className="num">{formatNumber(row.fillable)}</td>
                     <td className="row-actions">
-                      {row.fillable > 0 ? (
-                        <Link href="/transfers/new" className="btn btn-secondary btn-sm">
+                      {row.fillable > 0 && canRequestTransfer() ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          title={`Send ${formatNumber(Math.min(row.suggested, row.fillable))} to ${row.branch.name}`}
+                          onClick={() =>
+                            setFilling({
+                              variant: {
+                                variantId: row.sku.id,
+                                label: variantLabel({
+                                  productName: row.sku.styleName,
+                                  color: row.sku.color,
+                                  size: row.sku.size,
+                                }),
+                                sku: row.sku.code,
+                              },
+                              destinationId: row.branch.id,
+                              /* The warehouse cannot send what it has not got,
+                                 so the suggestion is capped at what is fillable
+                                 before anyone sees it. */
+                              quantity: Math.max(1, Math.min(row.suggested, row.fillable)),
+                            })
+                          }
+                        >
                           <Truck size={14} aria-hidden="true" />
-                          Prepare
-                        </Link>
+                          Send
+                        </button>
                       ) : null}
                     </td>
                   </MotionTr>
@@ -141,6 +183,17 @@ export function ReplenishmentView() {
           </>
         )}
       </Panel>
+
+      {filling && (
+        <QuickTransferDrawer
+          variants={[filling.variant]}
+          initialSourceId={warehouseId}
+          initialDestinationId={filling.destinationId}
+          initialQuantities={{ [filling.variant.variantId]: filling.quantity }}
+          onClose={() => setFilling(null)}
+          onDone={() => void query.refetch()}
+        />
+      )}
     </>
   )
 }

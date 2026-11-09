@@ -12,7 +12,7 @@ import { formatBadgeCount, formatNumber } from '@/lib/format'
  * The same rows as the overview's attention list, reachable from every screen.
  *
  * It shares one query with that list rather than counting anything itself, so
- * the bell and the page can never disagree — and a figure that only appears in
+ * the bell and the page can never disagree. and a figure that only appears in
  * the header would be a second source of truth for the same question.
  *
  * The badge counts items, not rows: "3" where three transfers are waiting, not
@@ -22,7 +22,7 @@ export function NotificationsBell() {
   const scope = useBranchScope()
   /* The badge is a count, so the closed bell asks for counts only. The "sent
      over N days ago" clause costs a walk through the shipment list, and this
-     sits in the header of every screen — so it is fetched when the popup opens,
+     sits in the header of every screen. so it is fetched when the popup opens,
      which is the only moment it is read. */
   const [open, setOpen] = useState(false)
   const { rows, total, isPending } = useAttention(scope, { detail: open })

@@ -174,7 +174,7 @@ export function BranchForm({ branch, onClose }: { branch?: Branch; onClose: () =
           hint={
             isEdit
               ? 'Fixed after creation'
-              : 'Taken from the name — type over it for a different code'
+              : 'Taken from the name. Type over it for a different code'
           }
           className="full"
         >

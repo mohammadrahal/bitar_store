@@ -1,4 +1,5 @@
 import { priceOf } from '@/lib/api/map-catalog'
+import type { ApiSalesSummary } from '@/lib/api/types'
 import type { DateRange } from '@/lib/dashboard-range'
 import { readDb } from '@/mocks/store'
 import { fetchSalesSummary, fetchTopSkus } from '@/services/reports-api.service'
@@ -30,8 +31,46 @@ function seriesFromBranches(
 }
 
 /**
+ * One row per branch over the whole window.
+ *
+ * `byBranch` is the server's own split (9 Nov) and includes branches that sold
+ * nothing. Before it existed this read `rows`, which is a **day x branch**
+ * grid: a branch that sold on five days arrived as five rows and was charted
+ * five times, each with one day's revenue. The fallback folds that grid by
+ * branch so an older server gives the same answer rather than a wrong one.
+ *
+ * Revenue is never summed across the splits: `inStore + socialMedia` and
+ * `cash + whish` are two views of the same money.
+ */
+function branchTotalsOf(summary: ApiSalesSummary) {
+  const nameOf = (branch: ApiSalesSummary['rows'][number]['branch']) =>
+    'name' in branch ? branch.name : branch.id
+
+  const folded = new Map<string, { branchId: string; branchName: string; units: number; revenue: number }>()
+  const source = summary.byBranch ?? summary.rows
+  for (const row of source) {
+    const existing = folded.get(row.branch.id)
+    if (existing) {
+      existing.units += row.items
+      existing.revenue += priceOf(row.revenue)
+    } else {
+      folded.set(row.branch.id, {
+        branchId: row.branch.id,
+        branchName: nameOf(row.branch),
+        units: row.items,
+        revenue: priceOf(row.revenue),
+      })
+    }
+  }
+
+  return [...folded.values()].sort(
+    (a, b) => b.revenue - a.revenue || a.branchName.localeCompare(b.branchName),
+  )
+}
+
+/**
  * Admin/manager charts: two report calls instead of one `GET /sales` per
- * branch. Both take the window the page is showing — without `from` and `to`
+ * branch. Both take the window the page is showing. without `from` and `to`
  * the server answers for today alone, which made "best sellers over 90 days"
  * a list of whatever happened to sell this morning.
  */
@@ -46,14 +85,7 @@ export async function getSalesAnalyticsFromReports(
     fetchTopSkus({ ...params, limit: TOP_PRODUCTS }),
   ])
 
-  const named = summary.rows
-    .map((row) => ({
-      branchId: row.branch.id,
-      branchName: 'name' in row.branch ? row.branch.name : row.branch.id,
-      units: row.items,
-      revenue: priceOf(row.revenue),
-    }))
-    .sort((a, b) => b.revenue - a.revenue || a.branchName.localeCompare(b.branchName))
+  const named = branchTotalsOf(summary)
 
   const series = seriesFromBranches(named)
   const bucketId = series[0]?.id ?? OTHER_BRANCH_ID
@@ -82,7 +114,7 @@ export async function getSalesAnalyticsFromReports(
 }
 
 /**
- * What sold, read from `GET /sales` per branch — used when the caller lacks
+ * What sold, read from `GET /sales` per branch. used when the caller lacks
  * `reports.financial`.
  */
 export async function getSalesAnalyticsFromBranchSales(scope: BranchScope = ALL_BRANCHES): Promise<SalesAnalytics> {
@@ -141,7 +173,7 @@ export async function getSalesAnalyticsFromBranchSales(scope: BranchScope = ALL_
   /**
    * Series order is by name, never by revenue: a colour has to follow the
    * branch, so a good day cannot repaint the chart. Rows are still sorted by
-   * revenue for reading — that is ordering, not recolouring. The same rule
+   * revenue for reading. that is ordering, not recolouring. The same rule
    * decides which branches keep a hue when the tail folds.
    */
   const series = seriesFromBranches(named)

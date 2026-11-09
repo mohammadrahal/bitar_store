@@ -6,7 +6,7 @@ import { Field } from '@/components/shared/field'
 import type { ProductDetailsFormValues } from '@/schemas/product.schema'
 
 /**
- * Name, category, cost and sell price — shared by the new-model page and the edit drawer.
+ * Name, category, cost and sell price. shared by the new-model page and the edit drawer.
  */
 export function ProductDetailsFields({
   register,

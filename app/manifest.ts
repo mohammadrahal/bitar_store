@@ -9,7 +9,7 @@ import type { MetadataRoute } from 'next'
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Bitar Fashion — Inventory',
+    name: 'Bitar Fashion Inventory',
     short_name: 'Bitar',
     description: 'Stock, sales and transfers for Bitar Fashion.',
     start_url: '/',

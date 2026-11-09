@@ -24,7 +24,7 @@ export function ActiveLocationGate({ children }: { children: React.ReactNode }) 
     <EmptyState
       icon={MapPin}
       title="Where are you working today?"
-      description="You are assigned to more than one location. Pick the one you are at — every sale and movement is recorded against it. You can switch from the header later."
+      description="You are assigned to more than one location. Pick the one you are at. Every sale and movement is recorded against it. You can switch from the header later."
       action={
         <div className="row-actions">
           {user.locations.map((entry) => {

@@ -12,7 +12,7 @@ import {
 
 const listeners = new Set<() => void>()
 
-/** Stable reference for SSR and the first client paint — required by useSyncExternalStore. */
+/** Stable reference for SSR and the first client paint. required by useSyncExternalStore. */
 const SERVER_SNAPSHOT: UserPreferences = { ...defaultUserPreferences }
 
 let clientSnapshot: UserPreferences = SERVER_SNAPSHOT

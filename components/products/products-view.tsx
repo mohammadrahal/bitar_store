@@ -57,8 +57,8 @@ export function ProductsView() {
   const { data: branches } = useBranches()
 
   /**
-   * The catalog is network-wide — a model exists whether or not any one
-   * location holds it — so picking a location in the header narrows the Units
+   * The catalog is network-wide. a model exists whether or not any one
+   * location holds it. so picking a location in the header narrows the Units
    * column and nothing else. That left no way to ask the obvious question:
    * which of these are actually on the shelf here?
    *

@@ -1,17 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { FadeIn } from '@/components/motion/fade-in'
 import { SettingsCard, SettingsRow, SettingsSectionTitle } from '@/components/account/settings-row'
 import { PageHeader } from '@/components/shared/page-header'
-import { useExchangeRate, useExchangeRateHistory, useSaveExchangeRate } from '@/hooks/use-exchange-rate'
+import { useSettings, useSaveExchangeRate, useUpdateSettings } from '@/hooks/use-settings'
 import { useModalBehavior } from '@/hooks/use-modal-behavior'
-import { formatDocumentDate, formatLbp, formatPrice, formatSettingsDateTime, formatUsdLbpRate } from '@/lib/format'
+import { formatLbp, formatPrice, formatUsdLbpRate } from '@/lib/format'
 import { clampExchangeRate, MAX_EXCHANGE_RATE_LBP } from '@/lib/input-limits'
 import { ErrorState } from '@/components/shared/error-state'
+import { SwitchToggle } from '@/components/shared/switch'
 import { usePermission } from '@/hooks/use-permission'
+import { adminHubHref } from '@/lib/admin-hub'
+import { SETTINGS_FALLBACK } from '@/services/settings.service'
+import type { ApiSettings } from '@/lib/api/types'
 
 function UpdateRateDialog({ initial, onClose }: { initial: number; onClose: (saved: boolean) => void }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -71,27 +75,99 @@ function UpdateRateDialog({ initial, onClose }: { initial: number; onClose: (sav
   )
 }
 
-export function StoreSettingsView() {
+/**
+ * A whole-number rule on `PUT /settings`, saved from the row it sits on.
+ *
+ * It commits on blur rather than behind a Save button: the row holds one
+ * number, and a button per row would be two clicks for a one-character change.
+ * An unchanged or unparseable value sends nothing.
+ */
+function NumberSettingRow({
+  label,
+  description,
+  value,
+  min,
+  max,
+  unit,
+  onCommit,
+  saving,
+}: {
+  label: string
+  description: string
+  value: number
+  min: number
+  max: number
+  unit: string
+  onCommit: (next: number) => void
+  saving: boolean
+}) {
+  const [draft, setDraft] = useState(String(value))
+
+  /* The server's answer wins: another manager may have changed it, and a failed
+     save has to put the real figure back in the box. */
+  useEffect(() => setDraft(String(value)), [value])
+
+  const commit = () => {
+    const parsed = Math.round(Number(draft))
+    if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+      setDraft(String(value))
+      return
+    }
+    if (parsed === value) return
+    onCommit(parsed)
+  }
+
+  return (
+    <SettingsRow label={`${label} (${unit})`} description={description}>
+      <input
+        className="settings-input tabular"
+        inputMode="numeric"
+        value={draft}
+        disabled={saving}
+        onChange={(event) => setDraft(event.target.value.replace(/[^\d]/g, ''))}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            event.currentTarget.blur()
+          }
+          if (event.key === 'Escape') setDraft(String(value))
+        }}
+        aria-label={`${label} in ${unit}`}
+      />
+    </SettingsRow>
+  )
+}
+
+export function StoreSettingsView({ embedded = false }: { embedded?: boolean } = {}) {
   const { can } = usePermission()
-  const rateQuery = useExchangeRate()
-  const historyQuery = useExchangeRateHistory()
+  const settingsQuery = useSettings()
+  const update = useUpdateSettings()
   const [dialogOpen, setDialogOpen] = useState(false)
 
   if (!can('settings.manage')) {
     return (
-      <ErrorState title="Store settings are for Super Admins" error={new Error('Missing permission: settings.manage')} />
+      <ErrorState title="Store settings need the settings permission" error={new Error('Missing permission: settings.manage')} />
     )
   }
 
-  const rate = rateQuery.data
+  if (settingsQuery.isError) {
+    return <ErrorState title="Could not load the store settings" error={settingsQuery.error as Error} />
+  }
+
+  const settings: ApiSettings = settingsQuery.data ?? SETTINGS_FALLBACK
+  const rate = settings.exchangeRateUsdLbp
+  const loading = settingsQuery.isPending
 
   return (
     <>
-      <PageHeader
-        eyebrow="Admin"
-        title="Store settings"
-        description="Rates and rules that every branch uses on the till."
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Admin"
+          title="Store settings"
+          description="Rates and rules that every branch uses on the till."
+        />
+      ) : null}
 
       <FadeIn className="settings-page">
         <SettingsSectionTitle
@@ -100,74 +176,65 @@ export function StoreSettingsView() {
         />
         <SettingsCard>
           <div className="settings-currency-hero">
-            <p className="settings-rate-large tabular">{rate ? formatUsdLbpRate(rate.usdToLbp) : 'No rate set yet'}</p>
-            {rate && (
-              <p className="settings-row-desc">
-                Last updated {formatSettingsDateTime(rate.updatedAt)}
-                {rate.updatedByName ? ` by ${rate.updatedByName}` : ''}
-              </p>
-            )}
-            <button type="button" className="btn btn-primary" onClick={() => setDialogOpen(true)}>
-              Update rate
+            <p className="settings-rate-large tabular">
+              {loading ? '…' : rate !== null ? formatUsdLbpRate(rate) : 'No rate set yet'}
+            </p>
+            <button type="button" className="btn btn-primary" onClick={() => setDialogOpen(true)} disabled={loading}>
+              {rate !== null ? 'Update rate' : 'Set rate'}
             </button>
             <p className="settings-row-desc">
-              Stored on this browser until the server settings API is connected. Use the same rate on each till device.
+              Saved on the server, so every till and every employee reads the same rate. Who changed it and when is in
+              the audit log.
             </p>
-          </div>
-
-          <div className="settings-subsection">
-            <h3 className="settings-section-title">Rate history</h3>
-            <div className="table-wrap">
-              <table>
-                <caption className="sr-only">Recent exchange rate changes</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Date</th>
-                    <th scope="col" className="num">
-                      Rate
-                    </th>
-                    <th scope="col">Changed by</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(historyQuery.data ?? []).length === 0 ? (
-                    <tr>
-                      <td colSpan={3} className="muted">
-                        No history yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    (historyQuery.data ?? []).map((row) => (
-                      <tr key={`${row.updatedAt}-${row.usdToLbp}`}>
-                        <td>{formatDocumentDate(row.updatedAt)}</td>
-                        <td className="num tabular">{formatUsdLbpRate(row.usdToLbp)}</td>
-                        <td>{row.updatedByName ?? '—'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
         </SettingsCard>
 
         <SettingsSectionTitle title="Sales rules" description="Return windows and reservation defaults for social orders." />
         <SettingsCard>
-          <SettingsRow label="Return period (days)" description="Coming soon — requires a store settings API.">
-            <input className="settings-input" disabled placeholder="Coming soon" aria-disabled="true" />
-          </SettingsRow>
+          <NumberSettingRow
+            label="Return period"
+            description="How long after a sale a customer may bring the goods back. Every return screen reads this."
+            value={settings.returnPeriodDays}
+            min={0}
+            max={365}
+            unit="days"
+            saving={update.isPending || loading}
+            onCommit={(returnPeriodDays) => update.mutate({ returnPeriodDays })}
+          />
+          <NumberSettingRow
+            label="Default reservation period"
+            description="How long a social-media order holds its stock before the reservation lapses."
+            value={settings.defaultReservationDays}
+            min={0}
+            max={90}
+            unit="days"
+            saving={update.isPending || loading}
+            onCommit={(defaultReservationDays) => update.mutate({ defaultReservationDays })}
+          />
+        </SettingsCard>
+
+        <SettingsSectionTitle
+          title="Cash drawer"
+          description="Whether a branch has to open a drawer before it can sell."
+        />
+        <SettingsCard>
           <SettingsRow
-            label="Default reservation period (hours)"
-            description="For social media orders. Coming soon — requires a store settings API."
+            label="Require an open cash session"
+            description="When on, a till with no open drawer cannot complete a sale: it is sent to open one first."
           >
-            <input className="settings-input" disabled placeholder="Coming soon" aria-disabled="true" />
+            <SwitchToggle
+              checked={settings.requireOpenCashSession}
+              disabled={update.isPending || loading}
+              onCheckedChange={(requireOpenCashSession) => update.mutate({ requireOpenCashSession })}
+              label="Require an open cash session before a sale"
+            />
           </SettingsRow>
         </SettingsCard>
 
         <SettingsSectionTitle title="Locations" description="Branches and the warehouse." />
         <SettingsCard>
           <SettingsRow label="Manage locations" description="Open the locations list to add or edit branches.">
-            <Link href="/branches" className="btn btn-secondary settings-inline-link">
+            <Link href={adminHubHref('locations')} className="btn btn-secondary settings-inline-link">
               Locations
               <ArrowRight size={16} aria-hidden="true" />
             </Link>
@@ -175,9 +242,7 @@ export function StoreSettingsView() {
         </SettingsCard>
       </FadeIn>
 
-      {dialogOpen && (
-        <UpdateRateDialog initial={rate?.usdToLbp ?? 0} onClose={() => setDialogOpen(false)} />
-      )}
+      {dialogOpen && <UpdateRateDialog initial={rate ?? 0} onClose={() => setDialogOpen(false)} />}
     </>
   )
 }

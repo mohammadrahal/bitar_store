@@ -1,22 +1,45 @@
 'use client'
 
 import { useState } from 'react'
-import { PackageSearch } from 'lucide-react'
+import { ArrowLeftRight, ClipboardCheck, PackageSearch } from 'lucide-react'
+import { CorrectStockDrawer } from '@/components/inventory/correct-stock-drawer'
+import { QuickTransferDrawer, type QuickTransferVariant } from '@/components/inventory/quick-transfer-drawer'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { StockStatusPill } from '@/components/shared/status-pill'
+import { usePermission } from '@/hooks/use-permission'
 import { useBranchStockRows } from '@/hooks/use-stock'
 import { formatPrice } from '@/lib/format'
+import { variantLabel } from '@/lib/variant-label'
+import type { BranchStockRow } from '@/types'
 
 const PAGE_SIZE = 10
 
-/** Everything one branch holds, from `GET /stock`. Sales move these figures. */
+const asTransferVariant = (row: BranchStockRow): QuickTransferVariant => ({
+  variantId: row.variantId,
+  label: variantLabel(row),
+  sku: row.sku,
+})
+
+/**
+ * Everything one branch holds, from `GET /stock`. Sales move these figures.
+ *
+ * Each row carries the two things anyone reading this list does next — send
+ * some of it on, or correct what it claims — with this branch already set as
+ * the location, because that is the whole subject of the page.
+ */
 export function BranchStockPanel({ branchId }: { branchId: string }) {
   const { data: rows, isPending, isError, error, refetch } = useBranchStockRows(branchId)
   const [page, setPage] = useState(1)
+  const { can, canRequestTransfer } = usePermission()
+  const maySend = canRequestTransfer()
+  const mayCorrect = can('stock.adjust', branchId)
+  const [sending, setSending] = useState<QuickTransferVariant | null>(null)
+  const [correcting, setCorrecting] = useState<QuickTransferVariant | null>(null)
+  const actionable = maySend || mayCorrect
 
   if (isPending) {
     return (
@@ -70,6 +93,11 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
                     Available
                   </th>
                   <th scope="col">Status</th>
+                  {actionable && (
+                    <th scope="col" className="num">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -93,6 +121,35 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
                     <td>
                       <StockStatusPill status={row.status} />
                     </td>
+                    {actionable && (
+                      <td className="num td-row-actions">
+                        <div className="row-actions">
+                          {maySend && (
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              title={`Send ${row.sku} from here`}
+                              disabled={row.available <= 0}
+                              onClick={() => setSending(asTransferVariant(row))}
+                            >
+                              <ArrowLeftRight size={16} aria-hidden="true" />
+                              <span className="sr-only">Send stock</span>
+                            </button>
+                          )}
+                          {mayCorrect && (
+                            <button
+                              type="button"
+                              className="icon-btn"
+                              title={`Correct the balance for ${row.sku} here`}
+                              onClick={() => setCorrecting(asTransferVariant(row))}
+                            >
+                              <ClipboardCheck size={16} aria-hidden="true" />
+                              <span className="sr-only">Correct stock</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -106,6 +163,24 @@ export function BranchStockPanel({ branchId }: { branchId: string }) {
             onPage={setPage}
           />
         </>
+      )}
+
+      {sending && (
+        <QuickTransferDrawer
+          variants={[sending]}
+          initialSourceId={branchId}
+          onClose={() => setSending(null)}
+        />
+      )}
+
+      {correcting && (
+        <CorrectStockDrawer
+          variantId={correcting.variantId}
+          label={correcting.label}
+          code={correcting.sku}
+          initialBranchId={branchId}
+          onClose={() => setCorrecting(null)}
+        />
       )}
     </Panel>
   )

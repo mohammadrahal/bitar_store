@@ -1,6 +1,6 @@
 import { readPersistentJson, writePersistentJson } from '@/lib/session-storage'
 
-/** Per-SKU and per-style costs — no catalog cost field on the API yet (see ARCHITECTURE.md §9). */
+/** Per-SKU and per-style costs. no catalog cost field on the API yet (see ARCHITECTURE.md §9). */
 const STORAGE_KEY = 'bitar:catalog-costs:v1'
 
 interface CostStore {

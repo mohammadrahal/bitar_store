@@ -27,7 +27,13 @@ export function useBranchScope(): BranchScope {
 export function useDefaultBranchId(): string {
   const scope = useBranchScope()
   const { data: branches } = useBranches()
-  if (scope !== ALL_BRANCHES) return scope
+  const { user } = usePermission()
+  if (scope !== ALL_BRANCHES) {
+    if (scope === '__none__' || !scope) {
+      return user.locations[0]?.locationId ?? user.branchIds[0] ?? branches?.[0]?.id ?? ''
+    }
+    return scope
+  }
   return branches?.[0]?.id ?? ''
 }
 

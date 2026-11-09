@@ -7,10 +7,11 @@ import { ProfilePasswordForm } from '@/components/profile/profile-password-form'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { usePermission } from '@/hooks/use-permission'
+import { adminHubHref } from '@/lib/admin-hub'
 import { ROLE_LABELS } from '@/lib/permissions'
 
 export function ProfileView() {
-  const { user, locationScoped, superAdmin, can } = usePermission()
+  const { user, locationScoped, can } = usePermission()
 
   return (
     <>
@@ -28,7 +29,7 @@ export function ProfileView() {
         title="Locations"
         description={
           locationScoped
-            ? 'Only a super admin can change where you work.'
+            ? 'Only an admin or business manager can change where you work.'
             : 'Your role reaches every location, so nothing is assigned one by one.'
         }
       >
@@ -45,10 +46,10 @@ export function ProfileView() {
         <ProfilePasswordForm />
       </Panel>
 
-      {(superAdmin || can('settings.manage')) && (
+      {can('settings.manage') && (
         <Panel title="Store settings" description="Rates and options that every branch uses on the till.">
           <div className="panel-body">
-            <Link href="/settings/exchange" className="btn btn-secondary">
+            <Link href={adminHubHref('settings')} className="btn btn-secondary">
               USD / LBP exchange rate
             </Link>
           </div>

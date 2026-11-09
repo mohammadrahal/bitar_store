@@ -29,7 +29,7 @@ function branchIdsInScope(scope: BranchScope): string[] {
  *
  * What is left is the part that is still only an adjustment:
  *
- * - **Corrections** — `postStockCorrection`, one SKU at one location. The only
+ * - **Corrections**. `postStockCorrection`, one SKU at one location. The only
  *   way to change a balance after a SKU has been opened there, and the way a
  *   mistake on a posted receipt is put right.
  * - **Reading the old receipts**, so nobody loses their history. Their
@@ -88,7 +88,7 @@ export interface ReceiptPhotoMeta {
   width: number
   height: number
   bytes: number
-  /** False when the blob could not be written — a full or blocked store. */
+  /** False when the blob could not be written. a full or blocked store. */
   stored: boolean
 }
 
@@ -216,18 +216,50 @@ export interface StockCorrection {
  * while the box was open. The form asks for the counted total and works out the
  * difference, so what reaches the server is the change the person meant.
  */
-export async function postStockCorrection(input: StockCorrection) {
+/**
+ * Which reasons the server accepts in which direction, read off `API_GUIDE.md`:
+ * `found` only adds, `loss` and `damage` only remove, the rest go either way.
+ * Checked here so the form can say so, instead of the server answering `400`
+ * once the person has already committed.
+ */
+const REASON_DIRECTION: Record<ApiAdjustmentReason, 'add' | 'remove' | 'both'> = {
+  count_correction: 'both',
+  data_entry_error: 'both',
+  other: 'both',
+  found: 'add',
+  loss: 'remove',
+  damage: 'remove',
+}
+
+/** Why this reason cannot carry this sign, in the words the form will show. */
+export function reasonDirectionProblem(reason: ApiAdjustmentReason, quantityDelta: number): string | null {
+  const allowed = REASON_DIRECTION[reason]
+  if (allowed === 'both' || quantityDelta === 0) return null
+  if (allowed === 'add' && quantityDelta < 0) {
+    return `“${REASON_LABELS[reason]}” can only add pieces. Pick another reason to take pieces out.`
+  }
+  if (allowed === 'remove' && quantityDelta > 0) {
+    return `“${REASON_LABELS[reason]}” can only take pieces out. Pick another reason to add pieces.`
+  }
+  return null
+}
+
+export async function postStockCorrection(input: StockCorrection, idempotencyKey: string) {
   if (!Number.isInteger(input.quantityDelta) || input.quantityDelta === 0) {
     throw new Error('Enter a counted quantity that differs from what is on hand.')
   }
   if (Math.abs(input.quantityDelta) > 100_000) {
     throw new Error('A single correction cannot exceed 100,000 pieces.')
   }
+  const direction = reasonDirectionProblem(input.reason, input.quantityDelta)
+  if (direction) throw new Error(direction)
   const note = input.note.trim()
   if (note.length < 5) throw new Error('Say what happened, in at least five characters.')
 
   const api = getApiClient()
-  return api.createStockAdjustment({ ...input, note: note.slice(0, 200) }, crypto.randomUUID())
+  /* The key belongs to the caller and is held across retries. Generating one
+     here meant a second tap after a lost answer posted the correction twice. */
+  return api.createStockAdjustment({ ...input, note: note.slice(0, 200) }, idempotencyKey)
 }
 
 /** Plain words for the server's reason codes. Never show the raw value. */
@@ -243,7 +275,7 @@ export const REASON_LABELS: Record<ApiAdjustmentReason, string> = {
 export async function deleteStockReceipt(id: string): Promise<void> {
   /* Deletes this device's copy of the paperwork only. The stock it placed and
      the audit entries behind it are the server's and stay where they are.
-     The photograph goes with it — an orphaned blob would hold megabytes for a
+     The photograph goes with it. an orphaned blob would hold megabytes for a
      record nothing can reach any more. */
   writeAll(readAll().filter((row) => row.id !== id))
   await deleteBlob(receiptPhotoKey(id))

@@ -14,7 +14,7 @@ export function isScopedBranch(scope: BranchScope): scope is string {
  *
  * The brief asked for six rows. Three of them have no endpoint on this API —
  * supplier receipts, discount and refund requests, and social media orders with
- * a pickup time — so they are absent here rather than stubbed: a row that
+ * a pickup time. so they are absent here rather than stubbed: a row that
  * always reads zero tells a manager everything is handled when nobody can know
  * that. The missing routes are listed in `ARCHITECTURE.md` section 9.
  */
@@ -30,7 +30,7 @@ export interface AttentionCount {
 /**
  * How long a dispatched transfer may sit before the list calls it overdue.
  *
- * The API carries no expected-arrival date — `dispatchedAt` is all there is —
+ * The API carries no expected-arrival date. `dispatchedAt` is all there is —
  * so this is the frontend's own threshold rather than a fact from the server,
  * and the row says "on the road over N days" instead of implying a missed date
  * the backend knows about.
@@ -66,7 +66,7 @@ function branchParam(scope: BranchScope) {
  * two-byte `[]` and no transfer document is transferred to show a number.
  *
  * The rail lives in the dashboard layout, so this runs on every screen. That is
- * what makes the payload worth caring about — see {@link getOverdueTransfers},
+ * what makes the payload worth caring about. see {@link getOverdueTransfers},
  * which is the part that does need the documents and is asked for separately.
  */
 export async function getTransferAttention(scope: BranchScope): Promise<TransferAttention> {

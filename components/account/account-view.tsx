@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { AccountIdentityDossier } from '@/components/users/user-profile-dossier'
 import { ProfileTab } from '@/components/account/profile-tab'
 import { PreferencesTab } from '@/components/account/preferences-tab'
 import { SecurityTab } from '@/components/account/security-tab'
@@ -35,7 +36,8 @@ export function AccountView() {
 
   return (
     <>
-      <PageHeader eyebrow="Your account" title="Account" description="Profile, security, and how this browser behaves." />
+      <PageHeader eyebrow="Your account" title="Account" description="Identity dossier, security, and how this browser behaves." />
+      <AccountIdentityDossier />
       <Tabs value={tab} onValueChange={setTab} className="account-tabs">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>

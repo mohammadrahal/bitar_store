@@ -1,9 +1,25 @@
 import { syncCatalog } from '@/services/catalog-sync.service'
 import { branchSellableMapForStyle, listBranchStockFromApi } from '@/services/stock-api.service'
+import { draftReservedQuantities, reservedAtBranch } from '@/services/transfer-reservations.service'
 import { isRetired, readDb } from '@/mocks/store'
 import type { SaleModelOption, VariantOption } from '@/types'
 
-/** Active styles for the till model row — from the API catalog, not a variant page slice. */
+/**
+ * What the till may actually sell at one branch: sellable, less the units
+ * already promised on a transfer leaving it (BL-04 rule 21). `GET /stock`
+ * knows nothing of our reservations, so offering its `sellable` figure sells
+ * stock twice — once here and once when the transfer is dispatched.
+ */
+async function reservedAt(branchId: string) {
+  const map = await draftReservedQuantities(branchId, [branchId])
+  return (skuId: string) => reservedAtBranch(map, branchId, skuId)
+}
+
+function sellableLessReserved(sellable: number, reserved: number): number {
+  return Math.max(0, sellable - reserved)
+}
+
+/** Active styles for the till model row. from the API catalog, not a variant page slice. */
 export async function listSaleModels(search: string, limit = 24): Promise<SaleModelOption[]> {
   if (!readDb().catalogSynced) await syncCatalog()
   const term = search.trim().toLowerCase()
@@ -36,7 +52,10 @@ export async function listSaleModels(search: string, limit = 24): Promise<SaleMo
 /** Every sellable SKU on a style at this branch, with sellable counts from the API. */
 export async function listSaleVariants(branchId: string, productId: string): Promise<VariantOption[]> {
   if (!readDb().catalogSynced) await syncCatalog()
-  const sellable = await branchSellableMapForStyle(branchId, productId)
+  const [sellable, reservedFor] = await Promise.all([
+    branchSellableMapForStyle(branchId, productId),
+    reservedAt(branchId),
+  ])
   const db = readDb()
   const product = db.products.find((candidate) => candidate.id === productId)
   if (!product || product.archived) return []
@@ -66,7 +85,7 @@ export async function listSaleVariants(branchId: string, productId: string): Pro
       size: variant.size,
       color: variant.color,
       sellPrice: variant.sellPrice,
-      available: resolveAvailable(variant),
+      available: sellableLessReserved(resolveAvailable(variant), reservedFor(variant.id)),
     }))
     .sort((a, b) => a.color.localeCompare(b.color) || a.size.localeCompare(b.size) || a.sku.localeCompare(b.sku))
 }
@@ -92,7 +111,7 @@ export async function listSaleModelsAtBranch(
     }
     byProduct.set(row.productId, {
       productId: row.productId,
-      productCode: product?.code ?? row.sku.split('-')[0] ?? '—',
+      productCode: product?.code ?? row.sku.split('-')[0] ?? '',
       productName: row.productName,
       variantCount: 1,
       count: 1,
@@ -107,7 +126,7 @@ export async function listSaleModelsAtBranch(
 
 /** SKUs with on-hand stock at this branch for one model. */
 export async function listSaleVariantsAtBranch(branchId: string, productId: string): Promise<VariantOption[]> {
-  const rows = await listBranchStockFromApi(branchId, '')
+  const [rows, reservedFor] = await Promise.all([listBranchStockFromApi(branchId, ''), reservedAt(branchId)])
   const db = readDb()
   const product = db.products.find((candidate) => candidate.id === productId)
 
@@ -123,7 +142,7 @@ export async function listSaleVariantsAtBranch(branchId: string, productId: stri
       size: row.size,
       color: row.color,
       sellPrice: row.sellPrice,
-      available: row.available,
+      available: sellableLessReserved(row.available, reservedFor(row.variantId)),
     }))
     .sort((a, b) => a.color.localeCompare(b.color) || a.size.localeCompare(b.size) || a.sku.localeCompare(b.sku))
 }

@@ -88,7 +88,7 @@ export async function updateBranch(branchId: string, input: UpdateBranchInput): 
   if (!BRANCH_WRITES.update) throw new Error('Branch editing is not available.')
   const patched = mapApiBranch(await getApiClient().updateBranch(branchId, input))
   let branches = await refreshBranchesAfterWrite()
-  /* Trust the PATCH body for fields we just sent — some list responses lag role changes. */
+  /* Trust the PATCH body for fields we just sent. some list responses lag role changes. */
   const index = branches.findIndex((candidate) => candidate.id === branchId)
   if (index !== -1) {
     branches = branches.map((candidate, i) => (i === index ? { ...candidate, ...patched } : candidate))

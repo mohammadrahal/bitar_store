@@ -1,6 +1,7 @@
 import { formatBarcode } from '@/lib/barcode'
 import { ean13Svg } from '@/lib/ean13-svg'
 import { printHtmlDocument } from '@/lib/print-document'
+import { BARCODE_PRINT_CSS } from '@/lib/print-styles'
 
 export interface BarcodeLabel {
   productName: string
@@ -25,21 +26,9 @@ function escapeHtml(value: string) {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-const PRINT_STYLES = `
-  @page { margin: 12mm; }
-  body { font-family: system-ui, sans-serif; margin: 0; color: #000; }
-  .barcode-sheet { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-  .barcode-label { break-inside: avoid; border: 1px solid #ccc; padding: 12px; text-align: center; }
-  .barcode-label-product { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
-  .barcode-label-variant { margin: 0 0 10px; font-size: 11px; color: #444; }
-  .barcode-label-bars { display: flex; justify-content: center; margin: 0 0 6px; }
-  .barcode-label-code { margin: 0; font-size: 14px; letter-spacing: 0.12em; font-variant-numeric: tabular-nums; }
-  @media print { .barcode-label { border-color: #999; } }
-`
-
 export function printBarcodeLabels(labels: BarcodeLabel[]) {
   const printable = labels.filter((label) => label.code.trim())
   if (printable.length === 0) return
-  const body = `<style>${PRINT_STYLES}</style><div class="barcode-sheet">${printable.map(labelHtml).join('')}</div>`
+  const body = `<style>${BARCODE_PRINT_CSS}</style><div class="barcode-sheet">${printable.map(labelHtml).join('')}</div>`
   printHtmlDocument('Barcode labels', body)
 }

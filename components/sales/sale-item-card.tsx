@@ -12,7 +12,7 @@ import type { VariantOption } from '@/types'
 
 /**
  * Pick a model from the catalog, then color and size. Availability comes from
- * `GET /stock` for every SKU on that style — not from a truncated variant search.
+ * `GET /stock` for every SKU on that style. not from a truncated variant search.
  */
 export function SaleItemCard({
   branchId,
@@ -165,7 +165,7 @@ export function SaleItemCard({
                 >
                   {entry}
                   {!option ? (
-                    <span className="chip-count">—</span>
+                    <span className="chip-count" />
                   ) : enforceStock && available === 0 ? (
                     <span className="chip-count">Out of stock</span>
                   ) : (
@@ -182,7 +182,7 @@ export function SaleItemCard({
             }) && (
               <p className="field-hint">
                 Counts come from <code>GET /stock</code> for the selected branch (sellable units). If everything is zero
-                but you expect stock, check Inventory for that branch or post opening stock — the backend owns these
+                but you expect stock, check Inventory for that branch or post opening stock. the backend owns these
                 numbers, not the browser cache.
               </p>
             )}
@@ -192,7 +192,7 @@ export function SaleItemCard({
               return option && leftOf(option) === 0
             }) && (
               <p className="field-hint">
-                Zero here means your branch has none on hand (from the API). You can still add lines — that is what a
+                Zero here means your branch has none on hand (from the API). You can still add lines. that is what a
                 replenishment request is for.
               </p>
             )}

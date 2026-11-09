@@ -47,7 +47,7 @@ export function InvoicePaymentReadout({ payment, total }: { payment?: PaymentDra
             </div>
             <div>
               <dt>Whish reference</dt>
-              <dd>{payment.whishReference.trim() || '—'}</dd>
+              <dd>{payment.whishReference.trim() || ''}</dd>
             </div>
           </>
         )}

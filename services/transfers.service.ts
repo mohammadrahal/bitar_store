@@ -1,6 +1,7 @@
 import type { ApiPage } from '@/lib/api/client'
 import { getApiClient } from '@/lib/api'
 import type { ApiTransfer, CreateTransferInput, ListTransfersParams, TransferStatus } from '@/lib/api/types'
+import { normalizeTransfer } from '@/services/transfer-normalize'
 
 export type { ApiTransfer as Transfer, TransferStatus } from '@/lib/api/types'
 
@@ -21,7 +22,8 @@ function needsDraftScopeFilter(branchId: string, status: TransferStatus | ''): b
 }
 
 export async function listTransfersPage(params: ListTransfersParams = {}) {
-  return getApiClient().listTransfersPage({ limit: 20, ...params })
+  const page = await getApiClient().listTransfersPage({ limit: 20, ...params })
+  return { ...page, items: page.items.map(normalizeTransfer) }
 }
 
 /** Lists transfers for the UI, hiding inbound drafts at the receiving branch. */
@@ -61,11 +63,11 @@ export async function listTransfersPageForScope(
 }
 
 export async function getTransfer(id: string): Promise<ApiTransfer> {
-  return getApiClient().getTransfer(id)
+  return normalizeTransfer(await getApiClient().getTransfer(id))
 }
 
 export async function createTransfer(input: CreateTransferInput, idempotencyKey: string): Promise<ApiTransfer> {
-  return getApiClient().createTransfer(input, idempotencyKey)
+  return normalizeTransfer(await getApiClient().createTransfer(input, idempotencyKey))
 }
 
 export async function dispatchTransfer(
@@ -73,15 +75,30 @@ export async function dispatchTransfer(
   idempotencyKey: string,
   lines?: { skuId: string; quantity: number }[],
 ): Promise<ApiTransfer> {
-  return getApiClient().dispatchTransfer(id, idempotencyKey, lines)
+  return normalizeTransfer(await getApiClient().dispatchTransfer(id, idempotencyKey, lines))
 }
 
+/**
+ * Count a shipment in. `note` is the inspector's remark on this pass, which the
+ * server keeps on `transfer.receipts[]` rather than this browser keeping it.
+ */
 export async function receiveTransfer(
   id: string,
   lines: { skuId: string; accepted: number; damaged?: number }[],
   idempotencyKey: string,
+  note?: string,
 ): Promise<ApiTransfer> {
-  return getApiClient().receiveTransfer(id, lines, idempotencyKey)
+  return normalizeTransfer(await getApiClient().receiveTransfer(id, lines, idempotencyKey, note))
+}
+
+/** The receiving passes, oldest first, for the report and the audit trail. */
+export function receiptsOf(transfer: ApiTransfer) {
+  return transfer.receipts ?? []
+}
+
+/** Every note left across the receiving passes, oldest first. */
+export function receivingNotesOf(transfer: ApiTransfer) {
+  return receiptsOf(transfer).filter((receipt) => Boolean(receipt.note?.trim()))
 }
 
 export async function acceptTransfer(
@@ -89,7 +106,7 @@ export async function acceptTransfer(
   lines: { skuId: string; quantity: number }[],
   idempotencyKey: string,
 ): Promise<ApiTransfer> {
-  return getApiClient().acceptTransfer(id, lines, idempotencyKey)
+  return normalizeTransfer(await getApiClient().acceptTransfer(id, lines, idempotencyKey))
 }
 
 export async function resolveTransfer(
@@ -98,9 +115,9 @@ export async function resolveTransfer(
   idempotencyKey: string,
   lines?: { skuId: string; quantity: number }[],
 ): Promise<ApiTransfer> {
-  return getApiClient().resolveTransfer(id, reason, idempotencyKey, lines)
+  return normalizeTransfer(await getApiClient().resolveTransfer(id, reason, idempotencyKey, lines))
 }
 
 export async function cancelTransfer(id: string): Promise<ApiTransfer> {
-  return getApiClient().cancelTransfer(id)
+  return normalizeTransfer(await getApiClient().cancelTransfer(id))
 }

@@ -14,7 +14,7 @@ import type { Balances, LocationBalance } from '@/types'
  *
  * The compact card drops the In transit column to keep four numbers instead of
  * five, which left it the one view that showed a destination as nothing on hand,
- * nothing available, and no sign that a transfer was coming — a reader could
+ * nothing available, and no sign that a transfer was coming. a reader could
  * fairly conclude nothing was on its way. The column stays dropped; the figure
  * comes back as a line under the location name, where it does not disturb the
  * alignment of the numeric columns.
@@ -34,16 +34,22 @@ export function LocationBalancesTable({
   totals,
   compact = false,
   onAdjust,
+  onSend,
 }: {
   locations: LocationBalance[]
   totals: Balances
   /**
    * The side card shows four numbers; the full page shows all five. In transit
-   * is not lost on the card — it appears under the location name instead.
+   * is not lost on the card. it appears under the location name instead.
    */
   compact?: boolean
   /** Given when the viewer may correct a balance; adds a per-location action. */
   onAdjust?: (location: LocationBalance) => void
+  /**
+   * Given when the viewer may move stock; sends from this row, so the source is
+   * settled by the click instead of being picked again on another screen.
+   */
+  onSend?: (location: LocationBalance) => void
 }) {
   const hrefOf = useBranchHref()
   const { visible, page, pageCount, total, pageSize, setPage } = usePagination(locations, 10)
@@ -61,9 +67,9 @@ export function LocationBalancesTable({
             <th scope="col" className="num">On hold</th>
             <th scope="col" className="num">Available</th>
             {!compact && <th scope="col" className="num">In transit</th>}
-            {onAdjust && (
+            {(onAdjust || onSend) && (
               <th scope="col" className="num">
-                <span className="sr-only">Correct the balance</span>
+                <span className="sr-only">Actions for this location</span>
               </th>
             )}
           </tr>
@@ -95,12 +101,32 @@ export function LocationBalancesTable({
               {!compact && (
                 <td className="num tabular" data-label="In transit">{formatNumber(location.inTransit)}</td>
               )}
-              {onAdjust && (
-                <td className="num">
-                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAdjust(location)}>
-                    Correct
-                    <span className="sr-only"> the balance at {location.branchName}</span>
-                  </button>
+              {(onAdjust || onSend) && (
+                <td className="num td-row-actions">
+                  <div className="row-actions">
+                    {onSend && (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => onSend(location)}
+                        disabled={location.available <= 0}
+                        title={
+                          location.available > 0
+                            ? `Send units from ${location.branchName}`
+                            : `Nothing sellable at ${location.branchName} to send`
+                        }
+                      >
+                        Send
+                        <span className="sr-only"> stock from {location.branchName}</span>
+                      </button>
+                    )}
+                    {onAdjust && (
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => onAdjust(location)}>
+                        Correct
+                        <span className="sr-only"> the balance at {location.branchName}</span>
+                      </button>
+                    )}
+                  </div>
                 </td>
               )}
             </tr>
@@ -122,7 +148,7 @@ export function LocationBalancesTable({
               <td className="num tabular" data-label="On hold">{balanceText(totals.onHold, formatNumber)}</td>
               <td className="num tabular" data-label="Available">{formatNumber(totals.available)}</td>
               {!compact && <td className="num tabular" data-label="In transit">{formatNumber(totals.inTransit)}</td>}
-              {onAdjust && <td />}
+              {(onAdjust || onSend) && <td />}
             </tr>
           </tfoot>
         )}

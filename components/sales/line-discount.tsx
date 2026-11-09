@@ -34,7 +34,7 @@ export function LineDiscountField({
     const off = (lineTotal * value.percent) / 100
     return (
       <p className="muted">
-        <BadgePercent size={14} aria-hidden="true" /> {value.percent}% off — {formatPrice(off)} · {value.reason}{' '}
+        <BadgePercent size={14} aria-hidden="true" /> {value.percent}% off. {formatPrice(off)} · {value.reason}{' '}
         <button type="button" className="text-btn" onClick={() => onChange(undefined)}>
           Remove
         </button>

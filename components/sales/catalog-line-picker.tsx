@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ChevronRight, Plus } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronRight, Plus } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { QtyStepper } from '@/components/sales/qty-stepper'
 import { SearchInput } from '@/components/shared/search-input'
 import { Pagination } from '@/components/shared/pagination'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
@@ -30,18 +31,32 @@ function skuSearchReady(term: string): boolean {
 /**
  * What the count in the row means for adding a line.
  *
- * - `enforce` — the till. `POST /sales` refuses a line it cannot cover, so a
+ * - `enforce`. the till. `POST /sales` refuses a line it cannot cover, so a
  *   row at zero cannot be added at all.
- * - `warn` — preparing a transfer. `POST /transfers` only writes a draft and
+ * - `warn`. preparing a transfer. `POST /transfers` only writes a draft and
  *   moves nothing; the stock is checked at `POST /transfers/:id/dispatch`,
  *   which also accepts sending fewer than asked. So a draft for stock that has
  *   not arrived yet is allowed, and the row says what is there today.
- * - `ignore` — receiving, and anything else where on-hand is context only.
+ * - `ignore`. receiving, and anything else where on-hand is context only.
  */
 export type Availability = 'enforce' | 'warn' | 'ignore'
 
 function leftToSell(option: VariantOption, inCart: Record<string, number>): number {
   return Math.max(0, (option.available ?? 0) - (inCart[option.variantId] ?? 0))
+}
+
+/** Column count of the model table, so a nested row can span it. */
+const MODEL_COLUMNS = 4
+
+function swatchClass(color: string): string {
+  const key = color.trim().toLowerCase()
+  if (key.includes('red')) return 'catalog-color-swatch catalog-color-swatch--red'
+  if (key.includes('blue')) return 'catalog-color-swatch catalog-color-swatch--blue'
+  if (key.includes('green')) return 'catalog-color-swatch catalog-color-swatch--green'
+  if (key.includes('black')) return 'catalog-color-swatch catalog-color-swatch--black'
+  if (key.includes('white')) return 'catalog-color-swatch catalog-color-swatch--white'
+  if (key.includes('gold')) return 'catalog-color-swatch catalog-color-swatch--gold'
+  return 'catalog-color-swatch'
 }
 
 function VariantRows({
@@ -53,6 +68,8 @@ function VariantRows({
   availability,
   addLabel,
   itemLabel,
+  nested = false,
+  pickerUi = 'default',
 }: {
   rows: VariantOption[]
   inCart: Record<string, number>
@@ -62,32 +79,34 @@ function VariantRows({
   availability: Availability
   addLabel: string
   itemLabel: string
+  /** Inside an expanded model row: drop the outer border, the row has one. */
+  nested?: boolean
+  pickerUi?: 'default' | 'till'
 }) {
   const enforceStock = availability === 'enforce'
   const showsStock = availability !== 'ignore'
+  const till = pickerUi === 'till'
   if (rows.length === 0) {
     return <p className="invoice-picker-hint">No variants to add for this model.</p>
   }
   return (
-    <div className="invoice-picker-table-wrap">
+    <div className={nested ? 'catalog-picker-variants-wrap' : 'invoice-picker-table-wrap'}>
       <table className="invoice-picker-table">
-        <caption className="sr-only">Variants — {itemLabel}</caption>
+        <caption className="sr-only">Variants. {itemLabel}</caption>
         <thead>
           <tr>
-            <th scope="col">Color / size</th>
+            <th scope="col">{till ? 'Item' : 'Color / size'}</th>
             <th scope="col">SKU</th>
             <th scope="col" className="num">
-              {showsStock ? 'Available' : 'On hand'}
+              {till && showsStock ? 'Stock' : showsStock ? 'Available' : 'On hand'}
             </th>
             <th scope="col" className="num">
-              Unit
+              {till ? 'Price' : 'Unit'}
             </th>
             <th scope="col" className="num">
               Qty
             </th>
-            <th scope="col">
-              <span className="sr-only">Add</span>
-            </th>
+            <th scope="col">{till ? 'Action' : <span className="sr-only">Add</span>}</th>
           </tr>
         </thead>
         <tbody>
@@ -98,7 +117,7 @@ function VariantRows({
             const maxQty = enforceStock ? left : 9999
             /* A disabled row with a bare "0" in it reads as a broken form. Say
                which of the two it is: nothing here to sell, or more asked for
-               than is here — which a transfer is allowed to do. */
+               than is here. which a transfer is allowed to do. */
             const note =
               !showsStock || left > qtyFor(option.variantId)
                 ? null
@@ -108,36 +127,74 @@ function VariantRows({
                     : 'None here yet'
                   : 'More than is here'
             return (
-              <tr key={option.variantId}>
+              <tr key={option.variantId} className={inBasket > 0 ? 'catalog-picker-row--added' : undefined}>
                 <td>
-                  {option.color} / {option.size}
+                  {till ? (
+                    <span className="catalog-variant-label">
+                      <span className={swatchClass(option.color)} aria-hidden="true" />
+                      <span>
+                        {option.color} / {option.size}
+                      </span>
+                    </span>
+                  ) : (
+                    <>
+                      {option.color} / {option.size}
+                    </>
+                  )}
                 </td>
                 <td className="tabular invoice-muted">{option.sku}</td>
-                <td className="num tabular">
-                  {showsStock ? left : (option.available ?? 0)}
-                  {note && <small className="invoice-muted catalog-picker-note"> {note}</small>}
+                <td className="num tabular catalog-stock-cell">
+                  {till && showsStock ? (
+                    <>
+                      {left} in stock
+                      {note && <small className="invoice-muted catalog-picker-note"> {note}</small>}
+                    </>
+                  ) : (
+                    <>
+                      {showsStock ? left : (option.available ?? 0)}
+                      {note && <small className="invoice-muted catalog-picker-note"> {note}</small>}
+                    </>
+                  )}
                 </td>
                 <td className="num tabular">{formatPrice(option.sellPrice)}</td>
-                <td className="num">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    step={1}
-                    className="invoice-qty-input tabular"
-                    min={1}
-                    max={maxQty}
-                    disabled={!canAdd}
-                    value={qtyFor(option.variantId)}
-                    onChange={(event) =>
-                      setQty(option.variantId, Number(event.target.value) || 1, enforceStock ? maxQty : undefined)
-                    }
-                    aria-label={`Quantity for ${option.sku}`}
-                  />
+                <td className="num catalog-qty-cell">
+                  {till ? (
+                    <QtyStepper
+                      compact
+                      hideHint
+                      value={qtyFor(option.variantId)}
+                      max={maxQty}
+                      label={`Quantity for ${option.sku}`}
+                      onChange={(qty) =>
+                        setQty(option.variantId, qty, enforceStock ? maxQty : undefined)
+                      }
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      step={1}
+                      className="invoice-qty-input tabular"
+                      min={1}
+                      max={maxQty}
+                      disabled={!canAdd}
+                      value={qtyFor(option.variantId)}
+                      onChange={(event) =>
+                        setQty(option.variantId, Number(event.target.value) || 1, enforceStock ? maxQty : undefined)
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key !== 'Enter') return
+                        event.preventDefault()
+                        if (canAdd) onAdd(option)
+                      }}
+                      aria-label={`Quantity for ${option.sku}`}
+                    />
+                  )}
                 </td>
                 <td>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm invoice-picker-add"
+                    className={`btn btn-ghost btn-sm invoice-picker-add${till ? ' btn-sale-catalog-add' : ''}`}
                     disabled={!canAdd}
                     onClick={() => onAdd(option)}
                   >
@@ -155,6 +212,19 @@ function VariantRows({
   )
 }
 
+/**
+ * Catalog picker: search, open a model, add its variants.
+ *
+ * The model list and the variants of the open model sit on **one** screen. The
+ * earlier version swapped the whole picker for one model's variants, which cost
+ * a click in (Select), a click out (All products) and the scroll position on
+ * every line. six clicks to add two variants of neighbouring models. Expanding
+ * in place keeps the search, the list and the chosen row where they were, so
+ * every line after the first is one click. A search that narrows to a single
+ * model opens it on its own: there is no choice left to make. Matching SKUs
+ * stay listed while a model is open, so a scanned or typed code is still a
+ * direct add.
+ */
 export function CatalogLinePicker({
   branchId,
   inCart,
@@ -167,6 +237,7 @@ export function CatalogLinePicker({
   searchAriaLabel = 'Filter products',
   itemLabel = 'add line',
   className = 'invoice-picker',
+  pickerUi = 'default',
 }: {
   branchId: string
   inCart: Record<string, number>
@@ -178,20 +249,28 @@ export function CatalogLinePicker({
   searchAriaLabel?: string
   itemLabel?: string
   className?: string
+  pickerUi?: 'default' | 'till'
 }) {
+  const till = pickerUi === 'till'
   const [input, setInput] = useState('')
   const search = useDebouncedValue(input, 220)
   const [productPage, setProductPage] = useState(1)
-  const [selected, setSelected] = useState<SaleModelOption | null>(null)
+  const [openProductId, setOpenProductId] = useState('')
   const [qtyByVariant, setQtyByVariant] = useState<Record<string, number>>({})
   const mirrored = useMirroredBranches()
   const enforceStock = availability === 'enforce'
 
   const branchStock = modelScope === 'branchStock'
 
+  /* One match left is not a choice. Open it so the variants are already there.
+     Keyed on the id so closing it by hand is not undone on the next render,
+     and cleared with the search so the same term can open it again later. */
+  const autoOpened = useRef('')
+
   useEffect(() => {
     setProductPage(1)
-    setSelected(null)
+    setOpenProductId('')
+    autoOpened.current = ''
   }, [search, branchId, modelScope])
 
   const modelsQuery = useQuery({
@@ -204,15 +283,25 @@ export function CatalogLinePicker({
     staleTime: 60_000,
   })
 
+  const products = modelsQuery.data ?? []
+
+  useEffect(() => {
+    if (products.length !== 1 || !search.trim()) return
+    const only = products[0]!.productId
+    if (autoOpened.current === only) return
+    autoOpened.current = only
+    setOpenProductId(only)
+  }, [products, search])
+
   const variantsQuery = useQuery({
     queryKey: branchStock
-      ? ['catalog', 'variants-at-branch', branchId, selected?.productId ?? '']
-      : ['catalog', 'variants', branchId, selected?.productId ?? ''],
+      ? ['catalog', 'variants-at-branch', branchId, openProductId]
+      : ['catalog', 'variants', branchId, openProductId],
     queryFn: () =>
       branchStock
-        ? listSaleVariantsAtBranch(branchId, selected!.productId)
-        : listSaleVariants(branchId, selected!.productId),
-    enabled: mirrored !== null && Boolean(branchId && selected?.productId),
+        ? listSaleVariantsAtBranch(branchId, openProductId)
+        : listSaleVariants(branchId, openProductId),
+    enabled: mirrored !== null && Boolean(branchId && openProductId),
     staleTime: 30_000,
   })
 
@@ -222,11 +311,10 @@ export function CatalogLinePicker({
       const matches = await searchVariants(search, SKU_SEARCH_LIMIT, branchId)
       return branchStock ? matches.filter((option) => (option.available ?? 0) > 0) : matches
     },
-    enabled: mirrored !== null && Boolean(branchId) && skuSearchReady(search) && !selected,
+    enabled: mirrored !== null && Boolean(branchId) && skuSearchReady(search),
     staleTime: 15_000,
   })
 
-  const products = modelsQuery.data ?? []
   const productPageCount = Math.max(1, Math.ceil(products.length / PRODUCT_PAGE_SIZE))
   const currentProductPage = Math.min(productPage, productPageCount)
   const visibleProducts = products.slice(
@@ -251,9 +339,9 @@ export function CatalogLinePicker({
   }
 
   const skuMatches = useMemo(() => {
-    if (!skuSearchReady(search) || selected) return []
+    if (!skuSearchReady(search)) return []
     return skuSearchQuery.data ?? []
-  }, [search, selected, skuSearchQuery.data])
+  }, [search, skuSearchQuery.data])
 
   const showSkuMatches = skuMatches.length > 0 && skuSearchReady(search)
 
@@ -265,6 +353,7 @@ export function CatalogLinePicker({
     availability,
     addLabel,
     itemLabel,
+    pickerUi,
   }
 
   return (
@@ -277,103 +366,149 @@ export function CatalogLinePicker({
         aria-label={searchAriaLabel}
       />
 
-      {selected ? (
-        <>
-          <button type="button" className="invoice-picker-back" onClick={() => setSelected(null)}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            All products
-          </button>
-          <p className="invoice-picker-context">
-            <span className="tabular">{selected.productCode}</span> · {selected.productName}
-          </p>
-          {variantsQuery.isPending ? (
-            <p className="invoice-picker-hint">Loading variants…</p>
-          ) : variantsQuery.isError ? (
-            <p className="field-error">Could not load variants for this model.</p>
-          ) : (
-            <VariantRows rows={variantsQuery.data ?? []} {...variantRowProps} />
-          )}
-        </>
-      ) : (
-        <>
-          {modelsQuery.isPending && <p className="invoice-picker-hint">Loading catalog…</p>}
-          {modelsQuery.isError && <p className="field-error">Could not load products.</p>}
+      {modelsQuery.isPending && <p className="invoice-picker-hint">Loading catalog…</p>}
+      {modelsQuery.isError && <p className="field-error">Could not load products.</p>}
 
-          {!modelsQuery.isPending && products.length === 0 && (
+      {!modelsQuery.isPending && products.length === 0 && !showSkuMatches && (
+        <p className="invoice-picker-hint">
+          {branchStock
+            ? 'Nothing on hand at this location matches your search. Receive stock or post an opening count first.'
+            : 'No active models match this filter.'}
+        </p>
+      )}
+
+      {products.length > 0 && (
+        <>
+          {!till && (
             <p className="invoice-picker-hint">
               {branchStock
-                ? 'Nothing on hand at this location matches your search. Receive stock or post an opening count first.'
-                : 'No active models match this filter.'}
+                ? `${products.length} ${products.length === 1 ? 'model' : 'models'} with stock here. Open one to pick size and color.`
+                : `${products.length} ${products.length === 1 ? 'model' : 'models'}. Open one to pick color and size.`}
             </p>
           )}
-
-          {products.length > 0 && (
-            <>
-              <p className="invoice-picker-hint">
-                {branchStock
-                  ? `${products.length} ${products.length === 1 ? 'model' : 'models'} with stock here — choose one to pick size and color.`
-                  : `${products.length} ${products.length === 1 ? 'model' : 'models'} — choose one to pick color and size.`}
-              </p>
-              <div className="invoice-picker-table-wrap invoice-picker-table-wrap--catalog">
-                <table className="invoice-picker-table">
-                  <caption className="sr-only">Product catalog</caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Code</th>
-                      <th scope="col">Product</th>
-                      <th scope="col" className="num">
-                        Variants
-                      </th>
-                      <th scope="col">
-                        <span className="sr-only">Open</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visibleProducts.map((product) => (
-                      <tr key={product.productId}>
-                        <td className="tabular">{product.productCode}</td>
-                        <td>
-                          <strong>{product.productName}</strong>
-                        </td>
-                        <td className="num tabular">{product.variantCount ?? '—'}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm invoice-picker-add"
-                            onClick={() => setSelected(product)}
-                          >
-                            Select
-                            <ChevronRight size={14} aria-hidden="true" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <Pagination
-                page={currentProductPage}
-                pageCount={productPageCount}
-                total={products.length}
-                pageSize={PRODUCT_PAGE_SIZE}
-                onPage={setProductPage}
-              />
-            </>
-          )}
-
-          {showSkuMatches && (
-            <section className="invoice-picker-sku-section" aria-label="SKU matches">
-              <h3 className="invoice-picker-subhead">Matching SKUs</h3>
-              {skuSearchQuery.isFetching && skuMatches.length === 0 ? (
-                <p className="invoice-picker-hint">Searching SKUs…</p>
-              ) : (
-                <VariantRows rows={skuMatches} {...variantRowProps} />
-              )}
-            </section>
-          )}
+          <div
+            className={`invoice-picker-table-wrap invoice-picker-table-wrap--catalog${till ? ' invoice-picker-table-wrap--till' : ''}`}
+          >
+            <table className="invoice-picker-table">
+              <caption className="sr-only">Product catalog</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Code</th>
+                  <th scope="col">Product</th>
+                  <th scope="col" className="num">
+                    Variants
+                  </th>
+                  <th scope="col">{till ? 'Action' : <span className="sr-only">Open</span>}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleProducts.map((product) => {
+                  const open = product.productId === openProductId
+                  const toggle = () => setOpenProductId(open ? '' : product.productId)
+                  return (
+                    <ModelRow
+                      key={product.productId}
+                      product={product}
+                      open={open}
+                      onToggle={toggle}
+                      variants={
+                        variantsQuery.isPending ? (
+                          <p className="invoice-picker-hint">Loading variants…</p>
+                        ) : variantsQuery.isError ? (
+                          <p className="field-error">Could not load variants for this model.</p>
+                        ) : (
+                          <VariantRows rows={variantsQuery.data ?? []} {...variantRowProps} nested />
+                        )
+                      }
+                      tillOpen={till}
+                    />
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            page={currentProductPage}
+            pageCount={productPageCount}
+            total={products.length}
+            pageSize={PRODUCT_PAGE_SIZE}
+            onPage={setProductPage}
+          />
         </>
       )}
+
+      {showSkuMatches && (
+        <section className="invoice-picker-sku-section" aria-label="SKU matches">
+          <h3 className="invoice-picker-subhead">Matching SKUs. Add without opening the model</h3>
+          {skuSearchQuery.isFetching && skuMatches.length === 0 ? (
+            <p className="invoice-picker-hint">Searching SKUs…</p>
+          ) : (
+            <VariantRows rows={skuMatches} {...variantRowProps} />
+          )}
+        </section>
+      )}
     </div>
+  )
+}
+
+/**
+ * A model and, when open, its variants in the row underneath.
+ *
+ * Two `<tr>` from one component, so React keys stay on the pair rather than on
+ * an array the parent has to flatten.
+ */
+function ModelRow({
+  product,
+  open,
+  onToggle,
+  variants,
+  tillOpen = false,
+}: {
+  product: SaleModelOption
+  open: boolean
+  onToggle: () => void
+  variants: React.ReactNode
+  tillOpen?: boolean
+}) {
+  const panelId = `catalog-variants-${product.productId}`
+  return (
+    <>
+      <tr
+        className={`catalog-picker-model${open ? ' catalog-picker-model--open' : ''}`}
+        onClick={onToggle}
+      >
+        <td className="tabular">{product.productCode}</td>
+        <td>
+          <strong>{product.productName}</strong>
+        </td>
+        <td className="num tabular">{product.variantCount ?? ''}</td>
+        <td>
+          <button
+            type="button"
+            className={`btn btn-ghost btn-sm invoice-picker-add${tillOpen ? ' btn-sale-catalog-open' : ''}`}
+            aria-expanded={open}
+            aria-controls={panelId}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggle()
+            }}
+          >
+            {open ? 'Close' : 'Open'}
+            <ChevronRight
+              size={14}
+              aria-hidden="true"
+              className={`catalog-picker-chevron${open ? ' catalog-picker-chevron--open' : ''}`}
+            />
+          </button>
+        </td>
+      </tr>
+      {open && (
+        <tr className="catalog-picker-variants">
+          <td colSpan={MODEL_COLUMNS} id={panelId}>
+            {variants}
+          </td>
+        </tr>
+      )}
+    </>
   )
 }

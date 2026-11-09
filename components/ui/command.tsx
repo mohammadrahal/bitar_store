@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * A command palette, in the shadcn shape but built on `@base-ui/react`'s
- * Autocomplete rather than cmdk — base-ui is this project's primitive layer
+ * Autocomplete rather than cmdk. base-ui is this project's primitive layer
  * (see `components/ui/select.tsx`), and it already owns the parts a palette
  * needs: the input/list relationship, `aria-activedescendant` roving focus and
  * arrow-key navigation.

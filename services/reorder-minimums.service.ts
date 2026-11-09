@@ -28,7 +28,7 @@ async function fetchPages(branchId: string): Promise<Minimums> {
  * What a branch should keep of each variant, from `GET /reorder-levels`.
  *
  * A `403` is an answer about who is asking, and `409` is the warehouse saying it
- * keeps no minimums at all — neither means "nothing is low". Both come back as
+ * keeps no minimums at all. neither means "nothing is low". Both come back as
  * `null` so a caller can hide the figure instead of showing a zero that reads
  * as good news.
  */

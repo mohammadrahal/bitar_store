@@ -15,13 +15,36 @@ import {
 
 export const GOODS_RECEIPTS_PAGE = 20
 
-/** `GET /goods-receipts` — every supplier delivery, newest first. */
-export function useGoodsReceipts(search: string, offset: number) {
+/**
+ * BL-06 rule 63: history filterable by supplier, date and product. The server
+ * takes all three (plus the supplier's own invoice number), so the UI passes
+ * them rather than filtering a page it has already fetched — a date range
+ * narrower than one page would otherwise appear to lose records.
+ */
+export interface GoodsReceiptFilters {
+  /** Matches the supplier's name or their invoice number. */
+  search: string
+  /** `yyyy-mm-dd`, inclusive. */
+  from?: string
+  to?: string
+  /** One variant, so "when did this last come in" is answerable. */
+  skuId?: string
+}
+
+/** `GET /goods-receipts`. every supplier delivery, newest first. */
+export function useGoodsReceipts(filters: GoodsReceiptFilters, offset: number) {
+  const search = filters.search.trim()
   return useQuery({
-    queryKey: queryKeys.stock.goodsReceipts(search, offset),
+    queryKey: queryKeys.stock.goodsReceipts(
+      `${search}|${filters.from ?? ''}|${filters.to ?? ''}|${filters.skuId ?? ''}`,
+      offset,
+    ),
     queryFn: () =>
       listGoodsReceipts({
-        supplier: search.trim() || undefined,
+        supplier: search || undefined,
+        from: filters.from || undefined,
+        to: filters.to || undefined,
+        skuId: filters.skuId || undefined,
         limit: GOODS_RECEIPTS_PAGE,
         offset,
       }),
@@ -46,7 +69,8 @@ export function useGoodsReceipt(id: string) {
 export function usePostGoodsReceipt() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (draft: GoodsReceiptDraft) => postGoodsReceipt(draft),
+    mutationFn: ({ draft, idempotencyKey }: { draft: GoodsReceiptDraft; idempotencyKey: string }) =>
+      postGoodsReceipt(draft, idempotencyKey),
     onSuccess: ({ receipt, photo }: PostedGoodsReceipt) => {
       void queryClient.invalidateQueries({ queryKey: ['stock', 'goods-receipts'] })
       void queryClient.invalidateQueries({ queryKey: ['stock', 'adjustments'] })
@@ -57,7 +81,7 @@ export function usePostGoodsReceipt() {
         `${receipt.reference}: ${units} ${units === 1 ? 'piece' : 'pieces'} received into ${receipt.warehouse.name}`,
       )
       /* The stock landed either way, so a lost photograph is a note and not a
-         failure — but it is never silent. */
+         failure. but it is never silent. */
       if (photo && !photo.stored) {
         toast.warning('The invoice photo could not be saved in this browser. The delivery itself was recorded.')
       }

@@ -149,7 +149,7 @@ export async function branchSellableMap(branchId: string): Promise<Map<string, n
   return new Map([...bySkuId, ...bySkuCode])
 }
 
-/** Sellable at one branch for a single style — matches `GET /stock?styleId=`. */
+/** Sellable at one branch for a single style. matches `GET /stock?styleId=`. */
 export async function branchSellableMapForStyle(branchId: string, styleId: string): Promise<{
   bySkuId: Map<string, number>
   bySkuCode: Map<string, number>

@@ -15,11 +15,23 @@ export function createTransfersApi(request: RequestFn, pageRequest: PageRequestF
       request<ApiTransfer>('/transfers', 'POST', input, { idempotencyKey }),
     dispatchTransfer: (id: string, idempotencyKey: string, lines?: { skuId: string; quantity: number }[]) =>
       request<ApiTransfer>(`/transfers/${id}/dispatch`, 'POST', lines ? { lines } : {}, { idempotencyKey }),
+    /**
+     * `note` is the inspector's remark on this receiving pass (1 to 500
+     * characters, 9 Nov). It comes back on `transfer.receipts[]`, which is what
+     * the receiving report prints from.
+     */
     receiveTransfer: (
       id: string,
       lines: { skuId: string; accepted: number; damaged?: number }[],
       idempotencyKey: string,
-    ) => request<ApiTransfer>(`/transfers/${id}/receive`, 'POST', { lines }, { idempotencyKey }),
+      note?: string,
+    ) =>
+      request<ApiTransfer>(
+        `/transfers/${id}/receive`,
+        'POST',
+        { lines, ...(note?.trim() ? { note: note.trim() } : {}) },
+        { idempotencyKey },
+      ),
     acceptTransfer: (
       id: string,
       lines: { skuId: string; quantity: number }[],

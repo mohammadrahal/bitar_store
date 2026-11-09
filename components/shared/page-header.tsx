@@ -9,6 +9,15 @@ export function LocationEyebrow({ label, name }: { label: string; name: string }
   )
 }
 
+/** Page title with the user’s first name in brand gold. */
+export function WelcomeTitle({ name }: { name: string }) {
+  return (
+    <>
+      Welcome back, <span className="welcome-name">{name}</span>
+    </>
+  )
+}
+
 export function PageHeader({
   eyebrow,
   title,
@@ -16,7 +25,7 @@ export function PageHeader({
   actions,
 }: {
   eyebrow?: React.ReactNode
-  title: string
+  title: React.ReactNode
   description?: string
   actions?: React.ReactNode
 }) {

@@ -16,8 +16,10 @@ import {
   can,
   canAccessLocation,
   canAny,
+  canViewBranchSalesTelemetry,
+  canViewInvoicesLedger,
+  canViewNetworkSalesTelemetry,
   isLocationScoped,
-  isSuperAdmin,
   isViewOnlyAt,
   locationAccess,
   type Permission,
@@ -39,7 +41,6 @@ export function usePermission() {
     () => ({
       user,
       role: user.role,
-      superAdmin: isSuperAdmin(user),
       locationScoped: isLocationScoped(user),
       activeLocationId,
       can: (permission: Permission, locationId = activeLocationId ?? undefined) => can(user, permission, locationId),
@@ -57,6 +58,10 @@ export function usePermission() {
       canManageMinimums: () => canManageMinimums(user),
       canViewFinancialReports: () => canViewFinancialReports(user),
       canViewAdminWarehouseTools: () => canViewAdminWarehouseTools(user),
+      canViewInvoicesLedger: () => canViewInvoicesLedger(user),
+      canViewBranchSalesTelemetry: (locationId = activeLocationId ?? undefined) =>
+        canViewBranchSalesTelemetry(user, locationId),
+      canViewNetworkSalesTelemetry: () => canViewNetworkSalesTelemetry(user),
     }),
     [user, activeLocationId],
   )

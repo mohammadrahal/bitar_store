@@ -96,7 +96,7 @@ async function syncLocations(userId: string, role: Role, locations: LocationAssi
 
   const kept = getUserAccess(userId).grants
   /* A catalog key is held for the business, not at a location, and `can()` only
-     reads those from the `*` bucket — so the defaults have to be split the same
+     reads those from the `*` bucket. so the defaults have to be split the same
      way or a key like `catalog.create` would be stored where nothing looks. */
   const defaults = splitByScope(DEFAULT_EMPLOYEE_PERMISSIONS)
   const grants: StoredUserAccess['grants'] = {
@@ -304,12 +304,41 @@ export async function saveUserGrants(userId: string, grants: Record<string, stri
 }
 
 /**
- * The last door into the system. Blocking this in the UI is a courtesy — the
+ * The last door into the system. Blocking this in the UI is a courtesy. the
  * check that matters is the backend's.
  */
 export function isOnlyActiveSuperAdmin(users: StaffUser[], userId: string): boolean {
-  const actives = users.filter((user) => user.role === 'super_admin' && user.isActive)
+  return isOnlyActiveHolderOf('super_admin', users, userId)
+}
+
+function isOnlyActiveHolderOf(role: Role, users: StaffUser[], userId: string): boolean {
+  const actives = users.filter((user) => user.role === role && user.isActive)
   return actives.length === 1 && actives[0].id === userId
+}
+
+/**
+ * Why this account cannot be switched off, or null when it can.
+ *
+ * Rule 8 protects **both** owner roles: the last active Admin *and* the last
+ * active Business Manager. Guarding only the Admin left a network where nobody
+ * could approve a discount, confirm a receipt or decide a return, because the
+ * one manager had been deactivated. Naming the role in the message is the point
+ * — "the only active manager" tells the person what to create before retrying.
+ */
+export function undeactivatableReason(users: StaffUser[], userId: string): string | null {
+  if (isOnlyActiveHolderOf('super_admin', users, userId)) return 'the only active admin'
+  if (isOnlyActiveHolderOf('manager', users, userId)) return 'the only active manager'
+  return null
+}
+
+/** Every account rule 8 protects, mapped to why. */
+export function undeactivatableUsers(users: StaffUser[]): Map<string, string> {
+  const locked = new Map<string, string>()
+  for (const user of users) {
+    const reason = undeactivatableReason(users, user.id)
+    if (reason) locked.set(user.id, reason)
+  }
+  return locked
 }
 
 export async function grantBranchAccess(userId: string, branchId: string): Promise<void> {

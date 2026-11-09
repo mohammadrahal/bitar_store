@@ -35,21 +35,32 @@ function parseStatus(value: string | null): TransferStatus | 'all' {
   return STATUS_VALUES.includes(value as TransferStatus) ? (value as TransferStatus) : 'all'
 }
 
-export function TransfersView() {
+export function TransfersView({
+  embedded = false,
+  initialStatus,
+}: {
+  /** When true, skip the page chrome (used inside the inventory hub). */
+  embedded?: boolean
+  /** Lock the status filter (e.g. receiving tab = on the road only). */
+  initialStatus?: TransferStatus
+} = {}) {
   const { canDispatchTransfers, canRequestTransfer } = usePermission()
   const requestOnly = canRequestTransfer() && !canDispatchTransfers()
   const allowPageBranchFilter = useAllowPageBranchFilter()
   const searchParams = useSearchParams()
   const [pageBranchId, setPageBranchId] = useState('')
   const branchId = useEffectiveListBranchId(pageBranchId)
-  const [status, setStatus] = useState<TransferStatus | 'all'>(() => parseStatus(searchParams.get('status')))
+  const [status, setStatus] = useState<TransferStatus | 'all'>(() => {
+    if (initialStatus) return initialStatus
+    return parseStatus(searchParams.get('status'))
+  })
   const [page, setPage] = useState(1)
   const offset = (page - 1) * 20
 
   useEffect(() => {
-    setStatus(parseStatus(searchParams.get('status')))
+    if (!initialStatus) setStatus(parseStatus(searchParams.get('status')))
     setPage(1)
-  }, [searchParams])
+  }, [searchParams, initialStatus])
 
   const query = useTransfersList(branchId, status === 'all' ? '' : status, offset)
   const total = query.data?.total ?? 0
@@ -58,14 +69,21 @@ export function TransfersView() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Warehouse"
-        title={requestOnly ? 'Stock requests & incoming' : 'Transfers'}
-        description={
-          requestOnly
-            ? 'Replenishment you asked for and shipments still on the way to your branch.'
-            : 'Stock moving between the warehouse and branches, or between shops.'
-        }
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Warehouse"
+          title={requestOnly ? 'Stock requests & incoming' : 'Transfers'}
+          description={
+            requestOnly
+              ? 'Replenishment you asked for and shipments still on the way to your branch.'
+              : 'Stock moving between the warehouse and branches, or between shops.'
+          }
+        />
+      ) : null}
+
+      <Panel
+        title="Transfer list"
+        description={query.isPending ? undefined : `${total} transfers`}
         actions={
           canRequestTransfer() ? (
             <Link href="/transfers/new" className="btn btn-primary">
@@ -74,10 +92,8 @@ export function TransfersView() {
             </Link>
           ) : undefined
         }
-      />
-
-      <Panel title="Transfer list" description={query.isPending ? undefined : `${total} transfers`}>
-        <div className="toolbar">
+      >
+        <div className={`toolbar${embedded ? ' toolbar--inventory-embedded' : ''}`}>
           {allowPageBranchFilter && (
             <div className="toolbar-field">
               <LocationSelect
@@ -92,15 +108,17 @@ export function TransfersView() {
               />
             </div>
           )}
-          <FilterChips
-            label="Status"
-            options={STATUSES}
-            value={status}
-            onChange={(value) => {
-              setStatus(value)
-              setPage(1)
-            }}
-          />
+          {!initialStatus ? (
+            <FilterChips
+              label="Status"
+              options={STATUSES}
+              value={status}
+              onChange={(value) => {
+                setStatus(value)
+                setPage(1)
+              }}
+            />
+          ) : null}
         </div>
 
         {query.isPending ? (

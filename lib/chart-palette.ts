@@ -1,7 +1,7 @@
 /**
  * Chart series colours, as CSS variables so light and dark swap in one place.
  *
- * The order is fixed and assigned in sequence — it is what keeps adjacent
+ * The order is fixed and assigned in sequence. it is what keeps adjacent
  * segments apart under colour blindness, so it is never shuffled or cycled.
  * Both modes were checked with the data-viz validator (OKLab ΔE ×100):
  *

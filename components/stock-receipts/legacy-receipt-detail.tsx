@@ -20,13 +20,14 @@ import {
   receiptTotal,
   receiptUnits,
 } from '@/services/stock-receipts.service'
+import { inventoryHubHref } from '@/lib/inventory-hub'
 
 /**
  * A delivery recorded before `POST /goods-receipts` was wired up.
  *
  * Kept read-only so nobody loses their history. Its quantities went to the
  * server as one `/stock/adjustments` call per line, which is why a line here
- * can say "Refused" while the others landed — the new path cannot do that.
+ * can say "Refused" while the others landed. the new path cannot do that.
  */
 export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
   const router = useRouter()
@@ -43,7 +44,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
   if (!receipt) {
     return (
       <>
-        <Link href="/stock-receipts" className="back-link">
+        <Link href={inventoryHubHref('receive-stock')} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -52,7 +53,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
           title="This receipt is not on this device"
           description="Receipt paperwork is saved in the browser that recorded it. The stock it placed is on the server and is unaffected."
           action={
-            <Link href="/stock-receipts" className="btn btn-secondary">
+            <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary">
               Back to receipts
             </Link>
           }
@@ -71,7 +72,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
 
   return (
     <>
-      <Link href="/stock-receipts" className="back-link">
+      <Link href={inventoryHubHref('receive-stock')} className="back-link">
         <ArrowLeft size={16} aria-hidden="true" />
         Receive stock
       </Link>
@@ -84,7 +85,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
           <>
             {/* The next step in the chain. Stock lands at the warehouse and
                 reaches a shop by transfer, so the receipt that just put it
-                there is where that journey starts — with From already filled
+                there is where that journey starts. with From already filled
                 in. Absent when nothing was actually received, or when there is
                 nowhere to send it to. */}
             {units > 0 && canSend && (
@@ -110,7 +111,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
             <ul className="section-note-list">
               {failed.map((line) => (
                 <li key={line.skuId}>
-                  <strong>{line.label}</strong> ({line.code}) — {line.error ?? 'did not post'}
+                  <strong>{line.label}</strong> ({line.code}). {line.error ?? 'did not post'}
                 </li>
               ))}
             </ul>
@@ -190,12 +191,12 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
                     <td className="num tabular" data-label="Pieces">{formatNumber(line.quantity)}</td>
                     {showCosts && (
                       <td className="num tabular" data-label="Unit cost">
-                        {line.unitCost > 0 ? formatPrice(line.unitCost) : '—'}
+                        {line.unitCost > 0 ? formatPrice(line.unitCost) : ''}
                       </td>
                     )}
                     {showCosts && (
                       <td className="num tabular" data-label="Line total">
-                        {line.unitCost > 0 ? formatPrice(line.quantity * line.unitCost) : '—'}
+                        {line.unitCost > 0 ? formatPrice(line.quantity * line.unitCost) : ''}
                       </td>
                     )}
                     <td data-label="Posted">
@@ -221,7 +222,8 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
           tone="danger"
           onResolve={(confirmed) => {
             setConfirming(false)
-            if (confirmed) remove.mutate(receipt.id, { onSuccess: () => router.push('/stock-receipts') })
+            if (confirmed)
+              remove.mutate(receipt.id, { onSuccess: () => router.push(inventoryHubHref('receive-stock')) })
           }}
         />
       )}

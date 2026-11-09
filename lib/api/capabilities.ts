@@ -29,7 +29,7 @@ export function isApiFeatureMissing(feature: ApiFeature): boolean {
    Which routes a server has cannot change under a live token, so the probes are
    worth exactly one run per sign-in. They used to run inside `bootstrapSession`,
    which is also called on every page load and on every window focus: that put
-   five speculative requests — `/categories` and `/permissions` among them — in
+   five speculative requests. `/categories` and `/permissions` among them. in
    front of screens such as Inventory, which ask for none of them. The answers
    now survive a reload in `sessionStorage`, beside the token they belong to. */
 

@@ -6,7 +6,7 @@ import { variantLabel } from '@/lib/variant-label'
  * the SKU in small muted text underneath.
  *
  * One component rather than the same two lines written out in each table, so
- * the order never drifts between screens — and because the colour and the size
+ * the order never drifts between screens. and because the colour and the size
  * are the only things telling two rows of the same model apart, they are not
  * optional detail that a tight column can drop.
  */

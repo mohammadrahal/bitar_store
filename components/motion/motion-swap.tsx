@@ -4,8 +4,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { SWAP_DURATION } from '@/components/motion/transition'
 
 /**
- * Crossfades one state of a panel into the next — skeleton to rows, rows to an
- * empty state — with `mode="wait"` so the two never sit on top of each other.
+ * Crossfades one state of a panel into the next. skeleton to rows, rows to an
+ * empty state. with `mode="wait"` so the two never sit on top of each other.
  * `state` names what is on screen ('loading', 'ready', 'empty').
  */
 export function MotionSwap({

@@ -28,7 +28,7 @@ type Dialog =
 
 export function ProductDetailView({ productId }: { productId: string }) {
   /* `?created=1` is set by the new-model form. It only changes the wording and
-     which button is dark — the page is the same page either way. */
+     which button is dark. the page is the same page either way. */
   const justCreated = useSearchParams().get('created') === '1'
   const { can } = usePermission()
   const { data: product, isPending, isError, error, refetch } = useProduct(productId)

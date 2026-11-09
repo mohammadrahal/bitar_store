@@ -3,13 +3,15 @@
 import { Drawer } from '@/components/shared/drawer'
 import { UserPermissionFields } from '@/components/users/user-permission-fields'
 import { usePermissionDraft, useSetUserPermissions } from '@/hooks/use-user-permissions'
+import { isOwnerRole } from '@/lib/permissions'
 import type { StaffUser } from '@/services/users.service'
 
 /** Extra permissions on top of the role, saved with `PUT /users/:id/permissions`. */
 export function UserPermissionsForm({ user, onClose }: { user: StaffUser; onClose: () => void }) {
   const draft = usePermissionDraft(user.role, user.id)
   const save = useSetUserPermissions()
-  const blocked = user.role === 'super_admin'
+  /* Both owner roles hold everything, so there is nothing to edit for either. */
+  const blocked = isOwnerRole(user.role)
 
   const submit = () => {
     if (blocked) {

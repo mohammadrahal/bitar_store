@@ -3,7 +3,7 @@ import type { Branch } from '@/types'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /*
- * A branch page is addressed by the store code — `/branches/hamra` rather than
+ * A branch page is addressed by the store code. `/branches/hamra` rather than
  * `/branches/01647dfc-…`. Codes are unique across the network and fixed once
  * created, which is what makes them safe in a URL. An id still resolves, so
  * every link ever shared keeps working; the page then rewrites the address.

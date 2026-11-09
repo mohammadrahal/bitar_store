@@ -63,12 +63,12 @@ export function SkuTable({
                 </td>
                 <td className="td-code" data-label="SKU">{variant.sku}</td>
                 <td className="tabular" data-label="Barcodes">
-                  {barcodes.length === 0 ? '—' : formatBarcode(barcodes[0].code)}
+                  {barcodes.length === 0 ? '' : formatBarcode(barcodes[0].code)}
                   {barcodes.length > 1 && <small> +{barcodes.length - 1}</small>}
                 </td>
                 {showCost ? (
                   <td className="num tabular" data-label="Cost">
-                    {variant.unitCost != null && variant.unitCost > 0 ? formatPrice(variant.unitCost) : '—'}
+                    {variant.unitCost != null && variant.unitCost > 0 ? formatPrice(variant.unitCost) : ''}
                   </td>
                 ) : null}
                 <td className="num tabular" data-label="Sell price">{formatPrice(variant.sellPrice)}</td>

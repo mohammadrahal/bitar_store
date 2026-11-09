@@ -1,6 +1,7 @@
 import { fetchHealth, fetchMe } from '@/lib/api/auth.api'
 import { createBranchesApi } from '@/lib/api/branches.api'
 import { createCatalogApi } from '@/lib/api/catalog.api'
+import { createCashSessionsApi } from '@/lib/api/cash-sessions.api'
 import { createCategoriesApi } from '@/lib/api/categories.api'
 import { createDashboardApi } from '@/lib/api/dashboard.api'
 import { createGoodsReceiptsApi } from '@/lib/api/goods-receipts.api'
@@ -9,7 +10,9 @@ import { createPageRequest, createRequest, createTotalRequest } from '@/lib/api/
 import { createReorderLevelsApi } from '@/lib/api/reorder-levels.api'
 import { createReportsApi } from '@/lib/api/reports.api'
 import { createSalesApi } from '@/lib/api/sales.api'
+import { createSettingsApi } from '@/lib/api/settings.api'
 import { createStockApi } from '@/lib/api/stock.api'
+import { createSuppliersApi } from '@/lib/api/suppliers.api'
 import { createTransfersApi } from '@/lib/api/transfers.api'
 import { createUsersApi } from '@/lib/api/users.api'
 
@@ -33,6 +36,9 @@ export function createApi(token: string) {
     ...createTransfersApi(request, pageRequest),
     ...createGoodsReceiptsApi(request, pageRequest),
     ...createInvoicesApi(request, pageRequest, token),
+    ...createSettingsApi(request),
+    ...createSuppliersApi(request, pageRequest),
+    ...createCashSessionsApi(request, pageRequest),
     health: fetchHealth,
   }
 }

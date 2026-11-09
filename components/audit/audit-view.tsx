@@ -10,11 +10,33 @@ import { Panel } from '@/components/shared/panel'
 import { Pagination } from '@/components/shared/pagination'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useAuditEvents } from '@/hooks/use-reports-api'
-import { formatRelativeDateTime } from '@/lib/format'
+import { formatAuditAction, formatAuditEntityType, formatRelativeDateTime } from '@/lib/format'
 
 const PAGE_SIZE = 50
 
-export function AuditView() {
+function AuditEntityCell({ entityType, entityId }: { entityType: string; entityId: string | null }) {
+  const label = formatAuditEntityType(entityType)
+  const tip = entityId?.trim()
+    ? `Entity ID: ${entityId.trim()}`
+    : undefined
+  return (
+    <td className={tip ? 'audit-entity-cell audit-entity-cell--has-tip' : 'audit-entity-cell'} title={tip}>
+      {label}
+    </td>
+  )
+}
+
+function AuditByCell({ by }: { by: { id: string; name: string | null } }) {
+  const display = by.name?.trim() || (by.id.length > 8 ? `${by.id.slice(0, 8)}…` : by.id)
+  const tip = `User ID: ${by.id}`
+  return (
+    <td className="audit-by-cell audit-by-cell--has-tip" title={tip}>
+      {display}
+    </td>
+  )
+}
+
+export function AuditView({ embedded = false }: { embedded?: boolean } = {}) {
   const [page, setPage] = useState(1)
   const offset = (page - 1) * PAGE_SIZE
   const query = useAuditEvents(offset)
@@ -23,11 +45,13 @@ export function AuditView() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Administration"
-        title="Audit log"
-        description="Who changed minimums, branches and other settings. Admin only on the server."
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Administration"
+          title="Audit log"
+          description="Who changed minimums, branches and other settings. Admin only on the server."
+        />
+      ) : null}
 
       <Panel title="Recent events">
         {query.isPending ? (
@@ -45,7 +69,7 @@ export function AuditView() {
         ) : (
           <>
             <div className="table-wrap">
-              <table className="card-table">
+              <table className="card-table card-table--audit-log">
                 <caption className="sr-only">Audit log</caption>
                 <thead>
                   <tr>
@@ -59,12 +83,9 @@ export function AuditView() {
                   {rows.map((event, index) => (
                     <MotionTr key={event.id} index={index}>
                       <td>{formatRelativeDateTime(event.occurredAt)}</td>
-                      <td>{event.action}</td>
-                      <td>
-                        {event.entityType}
-                        {event.entityId ? ` · ${event.entityId.slice(0, 8)}…` : ''}
-                      </td>
-                      <td>{event.by.name ?? event.by.id.slice(0, 8)}</td>
+                      <td>{formatAuditAction(event.action)}</td>
+                      <AuditEntityCell entityType={event.entityType} entityId={event.entityId} />
+                      <AuditByCell by={event.by} />
                     </MotionTr>
                   ))}
                 </MotionTbody>

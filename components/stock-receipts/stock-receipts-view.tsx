@@ -16,6 +16,7 @@ import { useBranchScope } from '@/hooks/use-branch-scope'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { GOODS_RECEIPTS_PAGE, useGoodsReceipts } from '@/hooks/use-goods-receipts'
 import { useStockAdjustments, useStockReceipts } from '@/hooks/use-stock-receipts'
+import { useSkuIdFromCode } from '@/hooks/use-skus'
 import { formatDateInput, formatNumber, formatPrice, formatRelativeDateTime, formatSigned } from '@/lib/format'
 import { ApiError } from '@/lib/api/api-error'
 import { receiptTotalCost } from '@/services/goods-receipts.service'
@@ -33,18 +34,32 @@ import {
  *
  * **Deliveries** are `GET /goods-receipts`: the shared document, with the
  * supplier, their invoice number and the cost per piece, which every device
- * sees. **Corrections** are `GET /stock/adjustments` — every balance change
+ * sees. **Corrections** are `GET /stock/adjustments`. every balance change
  * anyone has made, at every location in scope. **On this device** is what the
  * old build wrote before the deliveries endpoint was wired up; it is kept so
  * nobody loses their history, and labelled so nobody mistakes it for shared.
  */
-export function StockReceiptsView() {
+export function StockReceiptsView({ embedded = false }: { embedded?: boolean } = {}) {
   const [searchInput, setSearchInput] = useState('')
   const search = useDebouncedValue(searchInput)
+  /* Rule 63: supplier, date and product. All three are server-side parameters,
+     so a range narrower than one page still returns every match. */
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [skuSearch, setSkuSearch] = useState('')
+  const skuTerm = useDebouncedValue(skuSearch)
   const [page, setPage] = useState(1)
   const offset = (page - 1) * GOODS_RECEIPTS_PAGE
 
-  const deliveries = useGoodsReceipts(search, offset)
+  /* The product filter takes a SKU code off a tag, which the server wants as an
+     id. The catalog mirror already holds the pairing, so no extra request. */
+  const skuId = useSkuIdFromCode(skuTerm)
+  const skuUnknown = skuTerm.trim().length > 0 && skuId === null
+
+  const deliveries = useGoodsReceipts(
+    { search, from, to, ...(skuId ? { skuId } : {}) },
+    offset,
+  )
   const receipts = useStockReceipts()
   const adjustments = useStockAdjustments()
   const { data: branches } = useBranches()
@@ -65,30 +80,32 @@ export function StockReceiptsView() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Stock"
-        title="Receive stock"
-        description={
-          scoped
-            ? `Supplier deliveries into the warehouse, and the balance corrections at ${scoped}.`
-            : 'Supplier deliveries into the warehouse, and every balance correction the server knows about.'
-        }
-        actions={
-          <Can permission="stock.adjust">
-            <Link href="/stock-receipts/new" className="btn btn-primary">
-              <PackagePlus size={16} aria-hidden="true" />
-              Receive stock
-            </Link>
-          </Can>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Stock"
+          title="Receive stock"
+          description={
+            scoped
+              ? `Supplier deliveries into the warehouse, and the balance corrections at ${scoped}.`
+              : 'Supplier deliveries into the warehouse, and every balance correction the server knows about.'
+          }
+          actions={
+            <Can permission="stock.adjust">
+              <Link href="/stock-receipts/new" className="btn btn-primary">
+                <PackagePlus size={16} aria-hidden="true" />
+                Receive stock
+              </Link>
+            </Can>
+          }
+        />
+      ) : null}
 
-      <div className="stack">
+      <div className={embedded ? 'stack embedded-stock-receipts' : 'stack'}>
         <Panel
           title="Supplier deliveries"
           description={
             scoped
-              ? `One document per delivery: supplier, their invoice number, and the price paid per piece. Deliveries arrive at the warehouse, so this list stays warehouse-wide — it is not narrowed to ${scoped}.`
+              ? `One document per delivery: supplier, their invoice number, and the price paid per piece. Deliveries arrive at the warehouse, so this list stays warehouse-wide. it is not narrowed to ${scoped}.`
               : 'One document per delivery: supplier, their invoice number, and the price paid per piece. Recorded on the server, so every device sees the same list.'
           }
         >
@@ -102,6 +119,78 @@ export function StockReceiptsView() {
               placeholder="Search by supplier"
               aria-label="Search supplier deliveries"
             />
+            <div className="toolbar-field">
+              <label className="sr-only" htmlFor="receipts-sku">
+                Filter by SKU or barcode
+              </label>
+              <input
+                id="receipts-sku"
+                className="input"
+                value={skuSearch}
+                onChange={(event) => {
+                  setSkuSearch(event.target.value)
+                  setPage(1)
+                }}
+                placeholder="SKU or barcode"
+                autoComplete="off"
+                spellCheck={false}
+                aria-invalid={skuUnknown}
+              />
+            </div>
+            <div className="toolbar-field">
+              <label className="sr-only" htmlFor="receipts-from">
+                Delivered from
+              </label>
+              <input
+                id="receipts-from"
+                type="date"
+                className="input tabular"
+                value={from}
+                max={to || undefined}
+                onChange={(event) => {
+                  setFrom(event.target.value)
+                  setPage(1)
+                }}
+              />
+            </div>
+            <div className="toolbar-field">
+              <label className="sr-only" htmlFor="receipts-to">
+                Delivered to
+              </label>
+              <input
+                id="receipts-to"
+                type="date"
+                className="input tabular"
+                value={to}
+                min={from || undefined}
+                onChange={(event) => {
+                  setTo(event.target.value)
+                  setPage(1)
+                }}
+              />
+            </div>
+            {(from || to || skuSearch) && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setFrom('')
+                  setTo('')
+                  setSkuSearch('')
+                  setPage(1)
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+            {embedded ? (
+              <Can permission="stock.adjust">
+                <Link href="/stock-receipts/new" className="btn btn-primary">
+                  <PackagePlus size={16} aria-hidden="true" />
+                  New receipt
+                </Link>
+              </Can>
+            ) : null}
           </div>
 
           {deliveries.isPending ? (
@@ -109,7 +198,7 @@ export function StockReceiptsView() {
           ) : forbidden ? (
             /* A branch manager cannot reach the warehouse, so the server will
                not show them its deliveries. That is the rule working, not a
-               fault — and the corrections below are still theirs to read. */
+               fault. and the corrections below are still theirs to read. */
             <div className="panel-body">
               <p className="muted">
                 Deliveries are recorded into the warehouse, and your account does not reach it. Ask an admin if you
@@ -166,7 +255,11 @@ export function StockReceiptsView() {
                             <span className="tabular">{receipt.reference}</span>
                           </Link>
                           <small>
-                            <span className="tabular">their inv {receipt.supplierInvoiceNumber}</span>
+                            {receipt.supplierInvoiceNumber ? (
+                              <span className="tabular">their inv {receipt.supplierInvoiceNumber}</span>
+                            ) : (
+                              <span>no invoice number</span>
+                            )}
                             {` · into ${receipt.warehouse.name}`}
                           </small>
                         </td>
@@ -251,7 +344,7 @@ export function StockReceiptsView() {
                         <td className="num tabular" data-label="Lines">{formatNumber(receipt.lines.length)}</td>
                         <td className="num tabular" data-label="Pieces">{formatNumber(receiptUnits(receipt))}</td>
                         <td className="num tabular" data-label="Value">
-                          {receiptHasCosts(receipt) ? formatPrice(receiptTotal(receipt)) : '—'}
+                          {receiptHasCosts(receipt) ? formatPrice(receiptTotal(receipt)) : ''}
                         </td>
                       </tr>
                     )

@@ -13,12 +13,12 @@ import { useBranches } from '@/hooks/use-branches'
 import { usePermission } from '@/hooks/use-permission'
 import { useBranchAccess, useCreateUser, useUpdateUser, useUserAccess } from '@/hooks/use-users'
 import { usePermissionDraft } from '@/hooks/use-user-permissions'
-import { ROLE_LABELS } from '@/lib/permissions'
+import { isOwnerRole, ROLE_LABELS } from '@/lib/permissions'
 import type { StaffUser } from '@/services/users.service'
 import { emptyUserValues, toUserFormValues, userFormSchema, type UserFormValues } from '@/schemas/user.schema'
 import type { LocationAssignment, Role } from '@/types'
 
-/** Only a super admin may hand out the owner roles. */
+/** Only a holder of `users.role.change` may hand out the owner roles. */
 function roleOptions(mayChangeRoles: boolean) {
   const roles: Role[] = mayChangeRoles ? ['super_admin', 'manager', 'employee'] : ['employee']
   return roles.map((value) => ({ value, label: ROLE_LABELS[value] }))
@@ -30,7 +30,7 @@ function managerLocations(branchIds: string[]): LocationAssignment[] {
 
 export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => void }) {
   const isEdit = Boolean(user)
-  const { user: currentUser, can, superAdmin } = usePermission()
+  const { user: currentUser, can } = usePermission()
   const mayChangeRoles = can('users.role.change')
   const isSelf = currentUser.id === user?.id
   const create = useCreateUser()
@@ -72,7 +72,8 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
   const role = watch('role')
   const draft = usePermissionDraft(role, user?.id)
   const pending = create.isPending || update.isPending
-  const permissionsApply = !isSelf && role !== 'super_admin'
+  /* Neither owner role has grantable permissions: both hold every key. */
+  const permissionsApply = !isSelf && !isOwnerRole(role)
   const waitingOnPermissions = permissionsApply && !draft.ready && !draft.catalog.isError
 
   const submit = form.handleSubmit((values) => {
@@ -160,7 +161,10 @@ export function UserForm({ user, onClose }: { user?: StaffUser; onClose: () => v
               )}
             />
 
-            {superAdmin && role === 'manager' && !isApiFeatureMissing('branchAccess') && (
+            {/* Setting another manager's branch reach is a `users.manage` job,
+                which both owner roles hold. It was gated on the Admin role
+                while that role outranked the managers. */}
+            {can('users.manage') && role === 'manager' && !isApiFeatureMissing('branchAccess') && (
               <Controller
                 control={control}
                 name="branchAccess"

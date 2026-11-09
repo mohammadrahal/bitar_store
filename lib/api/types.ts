@@ -185,7 +185,7 @@ export interface OpeningStockResult {
 }
 
 /**
- * `POST /stock/adjustments` — the one way to change a balance after a SKU has
+ * `POST /stock/adjustments`. the one way to change a balance after a SKU has
  * been opened at a location. One SKU per call, so a document with several lines
  * is several calls.
  *
@@ -203,7 +203,7 @@ export interface StockAdjustmentInput {
 }
 
 /**
- * Every reason the server accepts. They are all corrections — there is no
+ * Every reason the server accepts. They are all corrections. there is no
  * `purchase` or `receipt` among them, which is why a goods receipt is posted as
  * `other` with the document's reference in the note. See `ARCHITECTURE.md`
  * section 9.
@@ -362,14 +362,31 @@ export interface ApiSalesSummaryRow {
   socialMedia: string
 }
 
+/**
+ * `GET /reports/sales-summary`.
+ *
+ * Four views of **the same revenue**, never to be added together:
+ *
+ * - `totals`: every branch in scope, as one figure.
+ * - `byBranch`: one entry per branch, including branches that sold nothing.
+ * - `byDay`: every branch in scope, split by day.
+ * - `rows`: the original day x branch grid.
+ *
+ * Within one row, `inStore + socialMedia` and `cash + whish` are two different
+ * splits of `revenue`. Summing a channel with a payment method double-counts.
+ */
 export interface ApiSalesSummary {
   from: string
   to: string
   totals: ApiSalesSummaryRow
+  /** One entry per branch in scope. Added 9 Nov; absent on older servers. */
+  byBranch?: (ApiSalesSummaryRow & { branch: ApiLocation | { id: string } })[]
+  /** One entry per day, all branches in scope together. Added 9 Nov. */
+  byDay?: (ApiSalesSummaryRow & { day: string })[]
   rows: (ApiSalesSummaryRow & { day: string; branch: ApiLocation | { id: string } })[]
 }
 
-/** `GET /dashboard/overview` — needs `reports.financial`. Omit `branchId` to aggregate accessible branches. */
+/** `GET /dashboard/overview`. needs `reports.financial`. Omit `branchId` to aggregate accessible branches. */
 export interface ApiDashboardOverview {
   stock: {
     products: number
@@ -494,6 +511,32 @@ export interface ApiTransferLine {
   onTheRoad: number
 }
 
+/**
+ * The live supply invoice of a transfer, on `GET /transfers` and
+ * `GET /transfers/:id` (9 Nov). `null` when none exists or the only one was
+ * voided; `reference` is `null` while it is still a draft.
+ *
+ * Dispatching raises this draft by itself, with the quantities really sent, so
+ * **never gate receiving or "Confirm for sale" on it**: in BL-03 the invoice is
+ * finalized after the movement is reconciled, and the receiving branch does not
+ * wait for it.
+ */
+export interface ApiTransferSupplyInvoice {
+  id: string
+  reference: string | null
+  status: ApiInvoiceStatus
+  total: string
+}
+
+/** One receiving pass on a transfer, from `POST /transfers/:id/receive`. Oldest first. */
+export interface ApiTransferReceipt {
+  id: string
+  at: string
+  by: { id: string; name: string | null }
+  note: string | null
+  lines: { skuId: string; accepted: number; damaged: number }[]
+}
+
 export interface ApiTransfer {
   id: string
   reference: string
@@ -505,6 +548,10 @@ export interface ApiTransfer {
   requestedAt: string
   dispatchedBy: { id: string; name: string | null } | null
   dispatchedAt: string | null
+  /** Added 9 Nov. `undefined` on an older server, `null` when there is none. */
+  supplyInvoice?: ApiTransferSupplyInvoice | null
+  /** Added 9 Nov: the receiving passes, with the inspector's note. */
+  receipts?: ApiTransferReceipt[]
   lines: ApiTransferLine[]
   totals: {
     requested: number
@@ -548,6 +595,9 @@ export interface ApiSale {
   soldAt: string
   businessDate: string
   note: string | null
+  /** Optional on the sale; also mirrored on the B2C fiscal invoice recipient when issued. */
+  customerName?: string | null
+  customerPhone?: string | null
   lines: ApiSaleLine[]
   payments: ApiSalePayment[]
 }
@@ -572,6 +622,8 @@ export interface CreateSaleInput {
   channel?: ApiSaleChannel
   socialPlatform?: ApiSocialPlatform
   note?: string | null
+  customerName?: string | null
+  customerPhone?: string | null
   lines: CreateSaleLineInput[]
   payments: CreateSalePaymentInput[]
 }
@@ -677,15 +729,56 @@ export interface ApiBranchAccess {
 /** `GET /places`: active locations for transfer forms (warehouse first). */
 export type ApiPlace = ApiLocation
 
+/* ---- suppliers (9 Nov) ------------------------------------------------------------------------- */
+
+/** `GET /suppliers`. Admin or manager only. */
+export interface ApiSupplier {
+  id: string
+  name: string
+  phone: string | null
+  note: string | null
+  isActive: boolean
+  createdAt: string
+}
+
+export interface CreateSupplierInput {
+  name: string
+  phone: string
+  note?: string
+}
+
+export interface UpdateSupplierInput {
+  name?: string
+  phone?: string
+  note?: string
+  isActive?: boolean
+}
+
+export interface ListSuppliersParams {
+  search?: string
+  active?: boolean
+  limit?: number
+  offset?: number
+}
+
 export interface GoodsReceiptLineInput {
   skuId: string
   quantity: number
   unitCost: string | number
 }
 
+/**
+ * `POST /goods-receipts`.
+ *
+ * Name the supplier **either** by `supplierId` (picked from `GET /suppliers`,
+ * preferred since 9 Nov) **or** by `supplierName`, which still works for one
+ * typed in by hand. `supplierInvoiceNumber` became optional on 9 Nov: a
+ * delivery that arrives with no paperwork no longer needs an invented number.
+ */
 export interface CreateGoodsReceiptInput {
-  supplierName: string
-  supplierInvoiceNumber: string
+  supplierId?: string
+  supplierName?: string
+  supplierInvoiceNumber?: string
   invoiceDate?: string
   currency?: string
   note?: string
@@ -696,8 +789,12 @@ export interface ApiGoodsReceiptSummary {
   id: string
   reference: string
   warehouse: { id: string; code: string; name: string }
+  /** The supplier record, when the receipt was filed against one (9 Nov). */
+  supplier?: { id: string; phone: string | null } | null
+  /** The supplier's name **on the day**, kept even if the record is renamed later. */
   supplierName: string
-  supplierInvoiceNumber: string
+  /** Optional since 9 Nov: `null` when the delivery came with no invoice number. */
+  supplierInvoiceNumber: string | null
   invoiceDate: string
   currency: string
   note: string | null
@@ -718,7 +815,10 @@ export interface ApiGoodsReceipt extends ApiGoodsReceiptSummary {
 }
 
 export interface ListGoodsReceiptsParams {
+  /** Free-text match on the name kept on the receipt. */
   supplier?: string
+  /** Every receipt filed against one supplier record (9 Nov). */
+  supplierId?: string
   invoiceNumber?: string
   skuId?: string
   from?: string
@@ -755,6 +855,20 @@ export interface ApiInvoiceSummary {
   lineCount: number
 }
 
+/**
+ * Where the unit price on a supply invoice line came from (9 Nov).
+ *
+ * A supply invoice is priced at **cost**, not at the shop's selling price.
+ *
+ * - `cost`: the warehouse's average purchase cost.
+ * - `manual`: typed into the draft with `PATCH /invoices/:id`.
+ * - `missing`: no cost is known, so the price is `0.00`. Warn on these lines:
+ *   `POST /invoices/:id/finalize` answers **409** while one is left.
+ * - `sale`: the line comes from a sale (b2c invoice).
+ * - `null`: an invoice raised before this field existed.
+ */
+export type ApiInvoicePriceSource = 'cost' | 'manual' | 'missing' | 'sale' | null
+
 export interface ApiInvoiceLine {
   lineNo: number
   sku: { id: string; code: string }
@@ -763,6 +877,8 @@ export interface ApiInvoiceLine {
   unitPrice: string
   discount: string
   lineTotal: string
+  /** Added 9 Nov; `undefined` on an older server. */
+  priceSource?: ApiInvoicePriceSource
 }
 
 export interface ApiInvoice extends ApiInvoiceSummary {
@@ -775,6 +891,198 @@ export interface ListInvoicesParams {
   status?: ApiInvoiceStatus
   branchId?: string
   search?: string
+  /** 9 Nov: returns exactly that transfer's invoice (0 or 1). Add `status: 'void'` to see voided ones. */
+  transferId?: string
+  /** 9 Nov: returns exactly that sale's invoice (0 or 1). */
+  saleId?: string
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+}
+
+/* ---- store settings (9 Nov) --------------------------------------------------------------------- */
+
+/**
+ * `GET /settings`, readable by any signed-in user; `PUT /settings` needs admin
+ * or manager (`settings.manage`).
+ *
+ * This replaces the device-local exchange rate and the return window that used
+ * to be a constant in the UI. One row for the whole business, so every till
+ * shows the same figures.
+ */
+export interface ApiSettings {
+  /** Whole pounds. `null` when no rate has been set: show USD only. */
+  exchangeRateUsdLbp: number | null
+  /** How many days a sale may be returned within. Read this, never hardcode 14. */
+  returnPeriodDays: number
+  /** Default hold for a social-media order. */
+  defaultReservationDays: number
+  /** When true, `POST /sales` answers 409 unless the branch has an open cash session. */
+  requireOpenCashSession: boolean
+}
+
+/**
+ * Partial body for `PUT /settings`. Whole numbers only, and an unknown key is a
+ * **400** — so send only the fields that changed. `exchangeRateUsdLbp: null`
+ * clears the rate.
+ */
+export interface UpdateSettingsInput {
+  exchangeRateUsdLbp?: number | null
+  returnPeriodDays?: number
+  defaultReservationDays?: number
+  requireOpenCashSession?: boolean
+}
+
+/* ---- cash sessions, "the drawer" (9 Nov) -------------------------------------------------------- */
+
+export type CashSessionStatus = 'open' | 'closed'
+
+/** Cash out of the drawer, or cash into it, outside of a sale. */
+export type CashMovementDirection = 'in' | 'out'
+
+export interface ApiCashMovement {
+  id: string
+  direction: CashMovementDirection
+  amount: string
+  reason: string
+  at: string
+  by: { id: string; name: string | null }
+}
+
+/** One person taking the drawer from another. Counted by the person TAKING it. */
+export interface ApiCashHandover {
+  id: string
+  at: string
+  /** Who handed it over. */
+  from: { id: string; name: string | null }
+  /** Who counted and took it. */
+  to: { id: string; name: string | null }
+  countedCash: string
+  expectedCash: string
+  difference: string
+  note: string | null
+}
+
+/** A manager's correction to a closed session. The original closing is kept. */
+export interface ApiCashCorrection {
+  id: string
+  field: 'openingCash' | 'countedCash' | 'cashRemoved'
+  value: string
+  reason: string
+  at: string
+  by: { id: string; name: string | null }
+}
+
+export interface ApiCashClosing {
+  at: string
+  by: { id: string; name: string | null }
+  countedCash: string
+  cashRemoved: string
+  /** counted - removed: what stays in the drawer for tomorrow. */
+  cashLeft: string
+  expectedCash: string
+  difference: string
+  differenceNote: string | null
+}
+
+/**
+ * **Expected cash** = opening + cash payments + cash in - cash out.
+ *
+ * Whish never touches the drawer, so `whishPayments` is reported but is not in
+ * `expectedCash`.
+ */
+export interface ApiCashSessionTotals {
+  salesCount: number
+  salesTotal: string
+  cashPayments: string
+  whishPayments: string
+  cashIn: string
+  cashOut: string
+  expectedCash: string
+}
+
+/** What one person sold during the session. */
+export interface ApiCashSessionByUser {
+  user: { id: string; name: string | null }
+  salesCount: number
+  salesTotal: string
+  cashPayments: string
+  whishPayments: string
+}
+
+/** A manager's sign-off on a flagged session. */
+export interface ApiCashSessionReview {
+  /** Why the session wants a manager's eye, e.g. a count that did not match. */
+  flagged: boolean
+  reviewedAt: string | null
+  reviewedBy: { id: string; name: string | null } | null
+  note: string | null
+}
+
+export interface ApiCashSessionSummary {
+  id: string
+  status: CashSessionStatus
+  branch: ApiLocation
+  openingCash: string
+  note: string | null
+  openedAt: string
+  openedBy: { id: string; name: string | null }
+  closedAt: string | null
+  totals: ApiCashSessionTotals
+  review: ApiCashSessionReview
+}
+
+export interface ApiCashSession extends ApiCashSessionSummary {
+  byUser: ApiCashSessionByUser[]
+  movements: ApiCashMovement[]
+  handovers: ApiCashHandover[]
+  corrections: ApiCashCorrection[]
+  /** The closing as it was first recorded. */
+  closing: ApiCashClosing | null
+  /** The same closing with every correction applied. Show both side by side. */
+  effective: ApiCashClosing | null
+}
+
+export interface OpenCashSessionInput {
+  branchId: string
+  openingCash: string | number
+  note?: string
+}
+
+export interface CashMovementInput {
+  direction: CashMovementDirection
+  amount: string | number
+  reason: string
+}
+
+/** The note is **required** when the count differs from `totals.expectedCash` (400 otherwise). */
+export interface CashHandoverInput {
+  countedCash: string | number
+  note?: string
+}
+
+/**
+ * `differenceNote` is required when the count differs from the expected cash,
+ * but a difference never blocks the closing.
+ */
+export interface CloseCashSessionInput {
+  countedCash: string | number
+  cashRemoved?: string | number
+  differenceNote?: string
+}
+
+export interface CashCorrectionInput {
+  field: ApiCashCorrection['field']
+  value: string | number
+  reason: string
+}
+
+export interface ListCashSessionsParams {
+  branchId?: string
+  status?: CashSessionStatus
+  /** `'flagged'` is the manager's "to review" list. */
+  review?: 'flagged'
   from?: string
   to?: string
   limit?: number

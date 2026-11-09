@@ -7,6 +7,7 @@ import { isApiFeatureMissing } from '@/lib/api/capabilities'
 import { queryKeys } from '@/lib/query-keys'
 import { toApiRole } from '@/services/session.service'
 import { getPermissionCatalog, getUserPermissions, setUserPermissions } from '@/services/users.service'
+import { isOwnerRole } from '@/lib/permissions'
 import type { Role } from '@/types'
 
 export function permissionChanges(original: Record<string, boolean>, wanted: Record<string, boolean>) {
@@ -39,14 +40,15 @@ export function useUserPermissions(userId: string) {
  * An existing user starts from `GET /users/:id/permissions`.
  */
 export function usePermissionDraft(role: Role, userId: string | undefined) {
-  const catalog = usePermissionCatalog(role !== 'super_admin')
-  const saved = useUserPermissions(role !== 'super_admin' && userId ? userId : '')
+  const owner = isOwnerRole(role)
+  const catalog = usePermissionCatalog(!owner)
+  const saved = useUserPermissions(!owner && userId ? userId : '')
   const [wanted, setWanted] = useState<Record<string, boolean> | null>(null)
   const originalRef = useRef<Record<string, boolean>>({})
   const signatureRef = useRef('')
 
   useEffect(() => {
-    if (role === 'super_admin') {
+    if (owner) {
       originalRef.current = {}
       setWanted({})
       return
@@ -73,14 +75,14 @@ export function usePermissionDraft(role: Role, userId: string | undefined) {
     }
     originalRef.current = next
     setWanted(next)
-  }, [catalog.data, role, saved.data, saved.dataUpdatedAt, saved.isPending, userId])
+  }, [catalog.data, owner, role, saved.data, saved.dataUpdatedAt, saved.isPending, userId])
 
   return {
     catalog,
     saved,
     wanted,
     setWanted,
-    ready: role === 'super_admin' || wanted !== null,
+    ready: owner || wanted !== null,
     changes: () => permissionChanges(originalRef.current, wanted ?? {}),
   }
 }
@@ -92,7 +94,7 @@ export function useSetUserPermissions() {
       setUserPermissions(id, permissions),
     onSuccess: (_data, { id, name }) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.users.permissions(id) })
-      toast.success(`Permissions saved for ${name}. They take effect on their next request — refresh the page if they are already signed in.`)
+      toast.success(`Permissions saved for ${name}. They take effect on their next request. Refresh the page if they are already signed in.`)
     },
     onError: (error: Error) => toast.error(error.message),
   })

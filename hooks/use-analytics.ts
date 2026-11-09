@@ -19,11 +19,11 @@ import type { BranchScope } from '@/types'
  * day, so a viewer without `reports.financial` gets today and the panel says so
  * rather than labelling today's figures with the chosen period.
  */
-export function useSalesAnalytics(scope: BranchScope, days?: RangeDays) {
+export function useSalesAnalytics(scope: BranchScope, days?: RangeDays, telemetryAllowed = true) {
   const branches = useBranchesKey()
   const { canViewFinancialReports } = usePermission()
   const useReports = canViewFinancialReports()
-  const ready = branches !== null
+  const ready = branches !== null && telemetryAllowed
   const range = days ? rangeOf(days) : undefined
 
   const reports = useQuery({

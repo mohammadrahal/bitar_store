@@ -6,6 +6,7 @@ import { ArrowLeft } from 'lucide-react'
 import { AdjustStockDialog } from '@/components/inventory/adjust-stock-dialog'
 import { BalanceTiles } from '@/components/inventory/balance-tiles'
 import { LocationBalancesTable } from '@/components/inventory/location-balances-table'
+import { QuickTransferDrawer } from '@/components/inventory/quick-transfer-drawer'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
@@ -18,13 +19,15 @@ import type { LocationBalance } from '@/types'
 
 export function VariantDetailView({ variantId }: { variantId: string }) {
   const { data, isPending, isError, error, refetch } = useVariantDetail(variantId)
-  const { can } = usePermission()
+  const { can, locationAccess, canRequestTransfer } = usePermission()
   const [adjusting, setAdjusting] = useState<LocationBalance | null>(null)
+  const [sendingFrom, setSendingFrom] = useState<LocationBalance | null>(null)
   useDocumentTitle(data && `${data.productName} ${data.color} / ${data.size}`)
 
   /* Correcting a balance is a manager's job and is audited under their name, so
      the action is absent for everyone else rather than shown and refused. */
   const mayAdjust = can('stock.adjust')
+  const maySend = canRequestTransfer()
 
   return (
     <>
@@ -54,7 +57,7 @@ export function VariantDetailView({ variantId }: { variantId: string }) {
               title="By location"
               description={
                 mayAdjust
-                  ? 'Only locations you can see are listed. Correct a figure against a physical count.'
+                  ? 'Only locations you can see are listed. Correct a figure against a physical count, or send units on from where they are.'
                   : 'Only locations you can see are listed.'
               }
             >
@@ -62,6 +65,9 @@ export function VariantDetailView({ variantId }: { variantId: string }) {
                 locations={data.locations}
                 totals={data.totals}
                 onAdjust={mayAdjust ? setAdjusting : undefined}
+                /* Sending starts at the row someone is reading, so the source is
+                   decided by the click and only the destination is left to pick. */
+                onSend={maySend ? setSendingFrom : undefined}
               />
             </Panel>
           </div>
@@ -71,10 +77,25 @@ export function VariantDetailView({ variantId }: { variantId: string }) {
               variantLabel={variantLabel({ productName: data.productName, color: data.color, size: data.size })}
               skuId={data.variantId}
               code={data.sku}
-              branchId={adjusting.branchId}
-              branchName={adjusting.branchName}
-              onHand={adjusting.onHand}
+              locations={data.locations.filter(
+                (location) => locationAccess(location.branchId) === 'full' && can('stock.adjust', location.branchId),
+              )}
+              initialBranchId={adjusting.branchId}
               onClose={() => setAdjusting(null)}
+            />
+          )}
+
+          {sendingFrom && (
+            <QuickTransferDrawer
+              variants={[
+                {
+                  variantId: data.variantId,
+                  label: variantLabel({ productName: data.productName, color: data.color, size: data.size }),
+                  sku: data.sku,
+                },
+              ]}
+              initialSourceId={sendingFrom.branchId}
+              onClose={() => setSendingFrom(null)}
             />
           )}
         </>

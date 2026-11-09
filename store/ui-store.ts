@@ -34,6 +34,14 @@ interface UIState {
   /** The location an employee with several assignments is working in. */
   activeLocationId: string | null
   setActiveLocationId: (locationId: string | null) => void
+  /**
+   * The last place stock was sent to from this device, offered as the default
+   * destination next time. A warehouse spends a morning filling one branch's
+   * order, so re-picking it per variant is pure typing; it is a default and
+   * never a lock — the select still shows every location.
+   */
+  lastTransferDestinationId: string | null
+  setLastTransferDestinationId: (locationId: string) => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -56,15 +64,18 @@ export const useUIStore = create<UIState>()(
       setBranchScope: (branchScope) => set({ branchScope }),
       activeLocationId: null,
       setActiveLocationId: (activeLocationId) => set({ activeLocationId }),
+      lastTransferDestinationId: null,
+      setLastTransferDestinationId: (lastTransferDestinationId) => set({ lastTransferDestinationId }),
     }),
     {
       name: 'bitar-fashion:ui:v1',
       skipHydration: true,
-      partialize: ({ theme, sidebarCollapsed, branchScope, activeLocationId }) => ({
+      partialize: ({ theme, sidebarCollapsed, branchScope, activeLocationId, lastTransferDestinationId }) => ({
         theme,
         sidebarCollapsed,
         branchScope,
         activeLocationId,
+        lastTransferDestinationId,
       }),
     },
   ),

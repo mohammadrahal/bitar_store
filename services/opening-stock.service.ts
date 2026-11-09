@@ -29,7 +29,7 @@ export interface OpeningStockState {
 /**
  * What can still be opened at a location. `POST /stock/opening` accepts a SKU
  * that has never moved at that branch and refuses one that has, so the sheet
- * offers exactly the first set — which is how a model added later gets its
+ * offers exactly the first set. which is how a model added later gets its
  * first units at a location that opened months ago.
  */
 export async function openingStateFor(branchId: string): Promise<OpeningStockState> {

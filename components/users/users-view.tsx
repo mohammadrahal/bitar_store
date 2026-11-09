@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { UserForm } from '@/components/users/user-form'
-import { UserPermissionsForm } from '@/components/users/user-permissions-form'
 import { UserTable } from '@/components/users/user-table'
 import { MotionSwap } from '@/components/motion/motion-swap'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
@@ -14,17 +13,16 @@ import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useBranches } from '@/hooks/use-branches'
 import { useDeleteUser, useSetUserActive, useUsers } from '@/hooks/use-users'
-import { isOnlyActiveSuperAdmin, type StaffUser } from '@/services/users.service'
+import { undeactivatableUsers, type StaffUser } from '@/services/users.service'
 import { useCurrentUser } from '@/store/user-store'
 
 type Dialog =
   | { kind: 'create' }
   | { kind: 'edit'; user: StaffUser }
-  | { kind: 'permissions'; user: StaffUser }
   | { kind: 'deactivate'; user: StaffUser }
   | { kind: 'delete'; user: StaffUser }
 
-export function UsersView() {
+export function UsersView({ embedded = false }: { embedded?: boolean } = {}) {
   const currentUser = useCurrentUser()
   const { data: users, isPending, isError, error, refetch } = useUsers()
   const { data: branches } = useBranches()
@@ -40,7 +38,8 @@ export function UsersView() {
     return users.filter((user) => user.branchIds.includes(branchFilter))
   }, [users, branchFilter])
 
-  const lastSuperAdminId = users?.find((user) => isOnlyActiveSuperAdmin(users, user.id))?.id ?? null
+  /* Rule 8: the last active admin AND the last active manager are both locked. */
+  const undeactivatable = useMemo(() => undeactivatableUsers(users ?? []), [users])
 
   const handleActiveChange = (user: StaffUser, isActive: boolean) => {
     if (isActive) {
@@ -52,17 +51,19 @@ export function UsersView() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Administration"
-        title="Employees"
-        description="Deactivating blocks sign-in and can be undone. Deleting removes the account; sales they rang up keep their name."
-        actions={
-          <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
-            <Plus size={16} aria-hidden="true" />
-            Add employee
-          </button>
-        }
-      />
+      {!embedded ? (
+        <PageHeader
+          eyebrow="Administration"
+          title="Employees"
+          description="Deactivating blocks sign-in and can be undone. Deleting removes the account; sales they rang up keep their name."
+          actions={
+            <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
+              <Plus size={16} aria-hidden="true" />
+              Add employee
+            </button>
+          }
+        />
+      ) : null}
 
       <MotionSwap state={isPending ? 'loading' : isError ? 'error' : 'ready'}>
         {isPending ? (
@@ -80,6 +81,14 @@ export function UsersView() {
               branchFilter
                 ? `${visibleUsers.length} of ${users.length} at ${branches?.find((b) => b.id === branchFilter)?.name ?? 'branch'}`
                 : `${users.length} ${users.length === 1 ? 'employee' : 'employees'}`
+            }
+            actions={
+              embedded ? (
+                <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: 'create' })}>
+                  <Plus size={16} aria-hidden="true" />
+                  Add employee
+                </button>
+              ) : undefined
             }
           >
             <div className="toolbar toolbar--align-center">
@@ -106,11 +115,10 @@ export function UsersView() {
               branches={branches}
               branchFilter={branchFilter}
               currentUserId={currentUser.id}
-              lastSuperAdminId={lastSuperAdminId}
+              undeactivatable={undeactivatable}
               pendingUserId={setActive.isPending ? setActive.variables?.id : null}
               onCreate={() => setDialog({ kind: 'create' })}
               onEdit={(user) => setDialog({ kind: 'edit', user })}
-              onPermissions={(user) => setDialog({ kind: 'permissions', user })}
               onDelete={(user) => setDialog({ kind: 'delete', user })}
               onActiveChange={handleActiveChange}
             />
@@ -120,8 +128,6 @@ export function UsersView() {
 
       {dialog?.kind === 'create' && <UserForm onClose={close} />}
       {dialog?.kind === 'edit' && <UserForm user={dialog.user} onClose={close} />}
-      {dialog?.kind === 'permissions' && <UserPermissionsForm user={dialog.user} onClose={close} />}
-
       {dialog?.kind === 'delete' && (
         <ConfirmDialog
           title={`Delete ${dialog.user.fullName}?`}
@@ -139,7 +145,7 @@ export function UsersView() {
       {dialog?.kind === 'deactivate' && (
         <ConfirmDialog
           title={`Deactivate ${dialog.user.fullName}?`}
-          description="They will not be able to sign in. The account and its history stay in the system — turn Active back on to restore access."
+          description="They will not be able to sign in. The account and its history stay in the system. Turn Active back on to restore access."
           confirmLabel="Deactivate"
           tone="danger"
           onResolve={(confirmed) => {

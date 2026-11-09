@@ -41,9 +41,27 @@ function emptyBalances(): Balances {
   return { onHand: 0, nonSellable: 0, reserved: 0, onHold: 0, available: 0, inTransit: 0 }
 }
 
+/**
+ * The last step on every balance row: BL-02 rule 10.
+ *
+ * `GET /stock` reports `sellable` with no knowledge of our reservations, so
+ * `available` arrives as "everything not damaged". Reserved units are promised
+ * elsewhere and must come off it, or the till offers stock that is already
+ * spoken for (rule 21). On hold is the API's non-sellable bucket, which
+ * `sellable` already excludes, so it is not subtracted twice:
+ *
+ *     available = onHand - onHold - reserved
+ *               = (sellable + nonSellable) - nonSellable - reserved
+ *               = sellable - reserved
+ *
+ * Clamped at zero: a reservation larger than what is on the shelf is a real
+ * state (stock sold after the draft was written) and must not read as negative
+ * stock.
+ */
 function applyHoldAndReserved(balances: Balances, reserved: number) {
   balances.onHold = balances.nonSellable
   balances.reserved = reserved
+  balances.available = Math.max(0, balances.available - reserved)
 }
 
 /**
@@ -54,8 +72,14 @@ function applyHoldAndReserved(balances: Balances, reserved: number) {
  */
 function statusFor(balances: Balances, archived: boolean, belowMinimum: boolean): InventoryStatus {
   if (archived) return 'archived'
-  if (balances.available === 0 && balances.inTransit === 0) return 'out'
-  if (balances.available === 0) return 'in_transit'
+  /* Read off the shelf, not off `available`. Since `available` nets off
+     reserved units (rule 10), a variant whose whole sellable balance is
+     promised to a transfer would otherwise lead with "out of stock" and send
+     someone to reorder what is already in the stockroom. What is physically
+     sellable here is `onHand - onHold`, which is the API's own `sellable`. */
+  const onShelf = balances.onHand - (balances.onHold ?? balances.nonSellable)
+  if (onShelf === 0 && balances.inTransit === 0) return 'out'
+  if (onShelf === 0) return 'in_transit'
   if (belowMinimum) return 'low'
   if (balances.nonSellable > 0) return 'on_hold'
   return 'in_stock'
@@ -65,7 +89,7 @@ function matchesFilter(row: InventoryRow, filter: InventoryFilter, carried: bool
   if (filter === 'archived') return row.archived
   if (row.archived) return false
   /* These two are counted over the whole catalog, so a variant no location has
-     ever held still belongs in the list — that is precisely what being out of
+     ever held still belongs in the list. that is precisely what being out of
      stock means. Every other view shows only what somewhere carries. */
   if (filter === 'out') return row.status === 'out'
   if (filter === 'low') return row.belowMinimum
@@ -201,7 +225,7 @@ export async function listInventory(query: InventoryQuery): Promise<InventoryRow
   const rows: InventoryRow[] = []
 
   /* Network-wide "out" / "low" include every catalog SKU. One branch selected:
-     only variants that branch holds or has a minimum for — not the whole catalog. */
+     only variants that branch holds or has a minimum for. not the whole catalog. */
   const variantIds = needsWholeCatalog(query.filter)
     ? scope === ALL_BRANCHES
       ? [...new Set([...db.variants.map((variant) => variant.id), ...positions.keys()])]

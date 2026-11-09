@@ -10,7 +10,8 @@ import { RANGE_PRESETS, rangeLabel, type RangeDays } from '@/lib/dashboard-range
  */
 export function RangeFilter({ value, onChange }: { value: RangeDays; onChange: (days: RangeDays) => void }) {
   return (
-    <div className="segmented compact" role="radiogroup" aria-label="Date range">
+    <div className="range-filter-shell">
+      <div className="segmented compact overview-range" role="radiogroup" aria-label="Date range">
       {RANGE_PRESETS.map((days) => (
         <button
           key={days}
@@ -23,6 +24,7 @@ export function RangeFilter({ value, onChange }: { value: RangeDays; onChange: (
           {rangeLabel(days)}
         </button>
       ))}
+      </div>
     </div>
   )
 }

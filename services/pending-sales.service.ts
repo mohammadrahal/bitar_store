@@ -12,6 +12,8 @@ export interface PendingSale {
   id: string
   branchId: string
   note: string
+  customerName?: string
+  customerPhone?: string
   createdAt: string
   lines: PendingSaleLine[]
 }
@@ -51,6 +53,8 @@ export function savePendingSale(input: Omit<PendingSale, 'id' | 'createdAt'> & {
     id: input.id ?? crypto.randomUUID(),
     branchId: input.branchId,
     note: input.note,
+    customerName: input.customerName?.trim() || undefined,
+    customerPhone: input.customerPhone?.trim() || undefined,
     createdAt: input.id ? (all.find((row) => row.id === input.id)?.createdAt ?? createdAt) : createdAt,
     lines: input.lines,
   }

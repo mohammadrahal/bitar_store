@@ -35,7 +35,7 @@ export function receiptFromSale(sale: ApiSale, sellerName?: string): ReceiptPrin
     reference: sale.reference,
     status: sale.status === 'completed' ? 'completed' : 'pending',
     soldAt: sale.soldAt,
-    sellerName: sellerName ?? sale.soldBy.name ?? '—',
+    sellerName: sellerName ?? sale.soldBy.name ?? '',
     note: sale.note,
     total: Number(sale.total),
     lines: sale.lines.map((line) => ({

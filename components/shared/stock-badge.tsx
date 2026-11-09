@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { formatNumber } from '@/lib/format'
+import { inventoryVariantHref } from '@/lib/inventory-filters'
 import type { InventoryRow, InventoryStatus } from '@/types'
 
 const TONES: Record<InventoryStatus, string> = {
@@ -20,7 +22,7 @@ const LABELS: Record<InventoryStatus, string> = {
 }
 
 type BadgeRow = Pick<InventoryRow, 'status' | 'nonSellable' | 'inTransit'> &
-  Partial<Pick<InventoryRow, 'available' | 'minQuantity' | 'reserved' | 'onHold'>>
+  Partial<Pick<InventoryRow, 'available' | 'minQuantity' | 'reserved' | 'onHold' | 'variantId'>>
 
 /**
  * The chip carries the word as well as the colour, so the state survives a
@@ -47,11 +49,19 @@ function detailFor(row: BadgeRow): string | undefined {
 export function StockBadge({ row }: { row: BadgeRow }) {
   const detail = detailFor(row)
   const label = LABELS[row.status]
-  return (
+  const pill = (
     <span className={`pill ${TONES[row.status]}`} title={detail}>
       <span className="pill-dot" aria-hidden="true" />
       {label}
       {detail && <span className="sr-only">. {detail}</span>}
     </span>
   )
+  if (row.status === 'on_hold' && row.variantId) {
+    return (
+      <Link href={inventoryVariantHref(row.variantId, 'on_hold')} className="pill-link">
+        {pill}
+      </Link>
+    )
+  }
+  return pill
 }

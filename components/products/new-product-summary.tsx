@@ -2,18 +2,18 @@
 
 import { Panel } from '@/components/shared/panel'
 import { formatPrice } from '@/lib/format'
-import { buildVariantCode } from '@/lib/sku'
-
 export function NewProductSummary({
   name,
+  code,
   combos,
   unitCost,
   sellPrice,
-  prices = {},
   pending,
   error,
+  onSaveAndAddAnother,
 }: {
   name: string
+  code?: string
   combos: { color: string; size: string }[]
   unitCost?: number
   sellPrice: number
@@ -21,53 +21,48 @@ export function NewProductSummary({
   pending: boolean
   /** The first form error, repeated here because the button sits far from the field. */
   error?: string
+  /** Save and keep the form open for the next model in the same run. */
+  onSaveAndAddAnother?: () => void
 }) {
+  const codeLabel = code?.trim() ? code.trim() : 'Assigned on save'
+
   return (
-    <Panel title="Summary" description="The model code is assigned when you save.">
+    <Panel title="Summary" description="Review before you create variants on the server." className="new-model-summary-panel">
       <div className="panel-body stack">
-        <dl className="dl-grid">
+        <dl className="dl-grid new-model-summary-dl">
           <dt>Model</dt>
           <dd>{name.trim() || '—'}</dd>
           <dt>Code</dt>
-          <dd className="muted">Assigned on save</dd>
+          <dd className={code?.trim() ? 'tabular' : 'muted'}>{codeLabel}</dd>
           {unitCost !== undefined ? (
             <>
               <dt>Unit cost</dt>
-              <dd className="tabular">{Number.isFinite(unitCost) ? formatPrice(unitCost) : '—'}</dd>
+              <dd className="tabular">{Number.isFinite(unitCost) ? formatPrice(unitCost) : ''}</dd>
             </>
           ) : null}
           <dt>Sell price</dt>
-          <dd className="tabular">{Number.isFinite(sellPrice) ? formatPrice(sellPrice) : '—'}</dd>
+          <dd className="tabular new-model-summary-sell">{Number.isFinite(sellPrice) ? formatPrice(sellPrice) : '—'}</dd>
           <dt>Variants</dt>
           <dd className="tabular">{combos.length}</dd>
+          <dt>Media assets</dt>
+          <dd className="muted">Not uploaded yet</dd>
         </dl>
-        {combos.length > 0 && (
-          <ul className="summary-list" aria-label="Variants to create">
-            {combos.map((combo) => {
-              const key = `${combo.color}|${combo.size}`
-              const price = prices[key] ?? sellPrice
-              return (
-                <li key={key}>
-                  <span>
-                    {combo.color} / {combo.size}
-                  </span>
-                  <small className="tabular">
-                    {Number.isFinite(price) ? formatPrice(price) : '—'} · {buildVariantCode(combo.color, combo.size)}
-                  </small>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-        <p className="muted">Each variant is created with its own price. Opening units go only to the branches you picked.</p>
+        <p className="muted new-model-summary-foot">
+          Each active variant gets its own SKU and price. Opening stock only posts to the location you chose.
+        </p>
         {error && (
           <p className="field-error" role="alert">
             {error}
           </p>
         )}
-        <button type="submit" className="btn btn-primary" disabled={pending}>
+        <button type="submit" className="btn btn-primary new-model-summary-submit" disabled={pending}>
           {pending ? 'Saving…' : `Create model with ${combos.length} ${combos.length === 1 ? 'variant' : 'variants'}`}
         </button>
+        {onSaveAndAddAnother && (
+          <button type="button" className="btn btn-secondary new-model-summary-secondary" disabled={pending} onClick={onSaveAndAddAnother}>
+            Save and add another
+          </button>
+        )}
       </div>
     </Panel>
   )

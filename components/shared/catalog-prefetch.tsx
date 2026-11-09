@@ -11,6 +11,7 @@ import { useCatalogSync } from '@/hooks/use-stock'
    need the mirror share this query key and fetch it themselves. */
 const WITHOUT_CATALOG = new Set([
   '/dashboard',
+  '/admin',
   '/users',
   '/profile',
   '/account',

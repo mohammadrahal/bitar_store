@@ -13,7 +13,14 @@ export interface Balances {
   reserved: number | null
   /** Non-sellable units (damaged / on hold). */
   onHold: number | null
-  /** Sellable now. */
+  /**
+   * Sellable now, as rule 10 defines it: `onHand - onHold - reserved`.
+   *
+   * The API's `sellable` is only the first two terms — it knows nothing of our
+   * reservations — so `applyHoldAndReserved` in `inventory.service.ts` takes the
+   * reserved units off before this figure is shown or handed to the till.
+   * Offering the raw `sellable` sold reserved stock twice.
+   */
   available: number
   /** Dispatched towards the location and not received yet. */
   inTransit: number

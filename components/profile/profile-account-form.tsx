@@ -33,7 +33,7 @@ export function ProfileAccountForm({ user }: { user: User }) {
         <Field label="Full name" error={errors.fullName?.message} className="full">
           <input {...register('fullName')} autoComplete="name" />
         </Field>
-        <Field label="Email" hint="Your sign-in address. A super admin changes it." className="full">
+        <Field label="Email" hint="Your sign-in address. An admin or business manager changes it." className="full">
           <input value={user.email} readOnly disabled />
         </Field>
         <Field label="Role" hint="Roles are granted, never self-assigned." className="full">

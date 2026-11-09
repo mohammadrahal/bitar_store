@@ -16,6 +16,7 @@ import { ApiError } from '@/lib/api/api-error'
 import { formatDateInput, formatNumber, formatPrice, formatRelativeDateTime } from '@/lib/format'
 import { priceOf } from '@/lib/api/map-catalog'
 import type { ApiGoodsReceipt } from '@/lib/api/types'
+import { inventoryHubHref } from '@/lib/inventory-hub'
 
 /**
  * One delivery.
@@ -23,7 +24,7 @@ import type { ApiGoodsReceipt } from '@/lib/api/types'
  * The id can name either a `GET /goods-receipts/:id` document or a receipt the
  * old build left in this browser, and both are reachable from the same list, so
  * this asks the server first and falls back to the device. Only a `404` is a
- * reason to look locally — a `403` or a dead connection means the server's
+ * reason to look locally. a `403` or a dead connection means the server's
  * answer is unknown, and quietly showing a local record instead would present
  * paperwork as if it were the shared document.
  */
@@ -41,7 +42,7 @@ export function ReceiptDetailView({ receiptId }: { receiptId: string }) {
   if (notOnServer) {
     return (
       <>
-        <Link href="/stock-receipts" className="back-link">
+        <Link href={inventoryHubHref('receive-stock')} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -50,7 +51,7 @@ export function ReceiptDetailView({ receiptId }: { receiptId: string }) {
           title="No such receipt"
           description="It is not on the server, and this browser has no copy of it either."
           action={
-            <Link href="/stock-receipts" className="btn btn-secondary">
+            <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary">
               Back to receipts
             </Link>
           }
@@ -62,7 +63,7 @@ export function ReceiptDetailView({ receiptId }: { receiptId: string }) {
   if (server.isError || !server.data) {
     return (
       <>
-        <Link href="/stock-receipts" className="back-link">
+        <Link href={inventoryHubHref('receive-stock')} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -84,7 +85,7 @@ function GoodsReceiptDetail({ receipt }: { receipt: ApiGoodsReceipt }) {
 
   return (
     <>
-      <Link href="/stock-receipts" className="back-link">
+      <Link href={inventoryHubHref('receive-stock')} className="back-link">
         <ArrowLeft size={16} aria-hidden="true" />
         Receive stock
       </Link>
@@ -124,7 +125,10 @@ function GoodsReceiptDetail({ receipt }: { receipt: ApiGoodsReceipt }) {
           <dl className="detail-grid-fields detail-grid-fields--receipt">
             <div>
               <dt>Supplier</dt>
-              <dd>{receipt.supplierName}</dd>
+              <dd>
+                {receipt.supplierName}
+                {receipt.supplier?.phone ? <small className="muted"> · {receipt.supplier.phone}</small> : null}
+              </dd>
             </div>
             <div>
               <dt>Receipt number</dt>
@@ -132,7 +136,11 @@ function GoodsReceiptDetail({ receipt }: { receipt: ApiGoodsReceipt }) {
             </div>
             <div>
               <dt>Their invoice number</dt>
-              <dd className="tabular">{receipt.supplierInvoiceNumber}</dd>
+              {/* Optional since 9 Nov: say so rather than print an empty cell
+                  that reads as data gone missing. */}
+              <dd className={receipt.supplierInvoiceNumber ? 'tabular' : 'muted'}>
+                {receipt.supplierInvoiceNumber ?? 'None given'}
+              </dd>
             </div>
             <div>
               <dt>Date on the invoice</dt>
