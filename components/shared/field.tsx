@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useId, type ReactElement } from 'react'
+import { Children, cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from 'react'
 
 export function Field({
   label,
@@ -17,17 +17,21 @@ export function Field({
   icon?: React.ReactNode
   /** Control sitting inside the input, such as a password reveal toggle. */
   affix?: React.ReactNode
-  children: ReactElement<Record<string, unknown>>
+  children: ReactNode
 }) {
   const id = useId()
   const messageId = `${id}-message`
-  const control = isValidElement(children)
-    ? cloneElement(children, {
+  const items = Children.toArray(children)
+  const controlIndex = items.findIndex((child) => isValidElement(child))
+  const controlChild = controlIndex >= 0 ? items[controlIndex] : null
+  const extras = items.filter((_, index) => index !== controlIndex)
+  const control = isValidElement(controlChild)
+    ? cloneElement(controlChild as ReactElement<Record<string, unknown>>, {
         id,
         'aria-invalid': error ? true : undefined,
         'aria-describedby': error || hint ? messageId : undefined,
       })
-    : children
+    : controlChild
 
   return (
     <div className={`field ${className ?? ''}`}>
@@ -45,6 +49,7 @@ export function Field({
       ) : (
         control
       )}
+      {extras}
       {(error || hint) && (
         <span id={messageId} className={error ? 'field-error' : 'field-hint'}>
           {error ?? hint}

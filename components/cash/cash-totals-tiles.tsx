@@ -3,6 +3,7 @@
 import { ArrowDownLeft, ArrowUpRight, Banknote, Smartphone } from 'lucide-react'
 import { StatCard } from '@/components/dashboard/stat-cards'
 import { priceOf } from '@/lib/api/map-catalog'
+import { cashSessionTotals } from '@/lib/cash-display'
 import { formatNumber, formatPrice } from '@/lib/format'
 import type { ApiCashSessionSummary } from '@/lib/api/types'
 
@@ -20,7 +21,7 @@ import type { ApiCashSessionSummary } from '@/lib/api/types'
  * send every cashier hunting for money that was never there.
  */
 export function CashTotalsTiles({ session }: { session: ApiCashSessionSummary }) {
-  const { totals } = session
+  const totals = cashSessionTotals(session)
   const opening = priceOf(session.openingCash)
   const cashIn = priceOf(totals.cashIn)
   const cashOut = priceOf(totals.cashOut)
