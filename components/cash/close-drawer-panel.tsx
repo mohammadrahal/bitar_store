@@ -113,7 +113,7 @@ export function CloseDrawerPanel({ session, canClose }: { session: ApiCashSessio
             inputMode="decimal"
             className="tabular"
             value={removed}
-            placeholder="0.00"
+            placeholder="0"
             disabled={close.isPending}
             onChange={(event) => {
               setRemoved(event.target.value.replace(/[^\d.]/g, ''))

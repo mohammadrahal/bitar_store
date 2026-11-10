@@ -128,6 +128,14 @@ function GoodsReceiptDetail({ receipt }: { receipt: ApiGoodsReceipt }) {
               <dd>
                 {receipt.supplierName}
                 {receipt.supplier?.phone ? <small className="muted"> · {receipt.supplier.phone}</small> : null}
+                {receipt.supplier?.id ? (
+                  <small className="muted">
+                    {' · '}
+                    <Link href={`/suppliers`} className="link-subtle">
+                      Supplier record
+                    </Link>
+                  </small>
+                ) : null}
               </dd>
             </div>
             <div>

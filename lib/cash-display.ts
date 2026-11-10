@@ -10,6 +10,10 @@ export const EMPTY_CASH_SESSION_TOTALS: ApiCashSessionTotals = {
   expectedCash: '0.00',
 }
 
+export function cashSessionListTotalsMissing(session: ApiCashSessionSummary): boolean {
+  return session.totals == null
+}
+
 /** Some list payloads omit totals; the UI still shows the shift and reads 0 until detail loads. */
 export function cashSessionTotals(session: ApiCashSessionSummary): ApiCashSessionTotals {
   return session.totals ?? EMPTY_CASH_SESSION_TOTALS
@@ -27,6 +31,12 @@ export function shiftDisplayRef(sessionId: string): string {
 
 export function cashSessionHref(sessionId: string): string {
   return `/cash/${sessionId}`
+}
+
+export function actorName(actor?: { id?: string; name?: string | null } | null): string {
+  if (!actor) return 'Unknown'
+  const name = actor.name?.trim()
+  return name || 'Unknown'
 }
 
 export function shiftElapsed(openedAt: string, now = Date.now()): string {

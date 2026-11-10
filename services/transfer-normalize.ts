@@ -1,10 +1,12 @@
 import type { ApiTransfer, ApiTransferLine } from '@/lib/api/types'
 
-function lineHasHoldShape(line: ApiTransferLine): boolean {
-  return (
-    typeof line.onHold === 'number' ||
-    typeof line.releasedToSellable === 'number' ||
-    typeof line.damaged === 'number'
+/** Hold/release fields from the server, not legacy `damaged` (present before accept existed). */
+function transferUsesHoldReleaseApi(raw: ApiTransfer): boolean {
+  if (typeof raw.totals?.onHold === 'number' || typeof raw.totals?.releasedToSellable === 'number') {
+    return true
+  }
+  return raw.lines.some(
+    (line) => typeof line.onHold === 'number' || typeof line.releasedToSellable === 'number',
   )
 }
 
@@ -13,14 +15,14 @@ function normalizeLine(line: ApiTransferLine, apiHasHoldShape: boolean): ApiTran
   let releasedToSellable = line.releasedToSellable ?? 0
   let onHold = line.onHold
 
-  if (typeof onHold !== 'number') {
-    if (apiHasHoldShape) {
+  if (apiHasHoldShape) {
+    if (typeof onHold !== 'number') {
       onHold = Math.max(0, line.received - damaged - releasedToSellable)
-    } else {
-      // Older API: received good units went directly to sellable.
-      releasedToSellable = Math.max(0, line.received - damaged)
-      onHold = 0
     }
+  } else {
+    // Older API: good units landed on the sellable shelf at receive; no accept step.
+    releasedToSellable = Math.max(0, line.received - damaged)
+    onHold = 0
   }
 
   return { ...line, damaged, releasedToSellable, onHold }
@@ -28,7 +30,7 @@ function normalizeLine(line: ApiTransferLine, apiHasHoldShape: boolean): ApiTran
 
 /** Ensures hold / release columns exist for UI and accept flow. */
 export function normalizeTransfer(raw: ApiTransfer): ApiTransfer {
-  const apiHasHoldShape = raw.lines.some(lineHasHoldShape) || typeof raw.totals?.onHold === 'number'
+  const apiHasHoldShape = transferUsesHoldReleaseApi(raw)
   const lines = raw.lines.map((line) => normalizeLine(line, apiHasHoldShape))
   const sum = (pick: (l: ApiTransferLine) => number) => lines.reduce((total, l) => total + pick(l), 0)
 

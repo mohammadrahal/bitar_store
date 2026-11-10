@@ -9,19 +9,28 @@ export function PriceWithLbp({
   usd,
   className,
   strong,
+  /** Invoice sale rate; falls back to store settings when omitted. */
+  exchangeRateUsdLbp,
+  /** Exact pounds from the API (e.g. invoice `totalLbp`) instead of converting `usd`. */
+  lbpAmount,
 }: {
   usd: number
   className?: string
   strong?: boolean
+  exchangeRateUsdLbp?: number | null
+  lbpAmount?: number | null
 }) {
   const rateQuery = useExchangeRate()
-  const lbp = usdToLbp(usd, rateQuery.rate)
+  const rate = exchangeRateUsdLbp ?? rateQuery.rate
+  const lbp = lbpAmount ?? usdToLbp(usd, rate)
   const Tag = strong ? 'strong' : 'span'
 
   return (
     <span className={className ?? 'price-with-lbp'}>
       <Tag className="tabular">{formatPrice(usd)}</Tag>
-      {lbp !== null && <small className="price-lbp tabular">≈ {formatLbp(lbp)}</small>}
+      {lbp !== null && lbp > 0 && usd > 0 && (
+        <small className="price-lbp tabular">≈ {formatLbp(lbp)}</small>
+      )}
     </span>
   )
 }

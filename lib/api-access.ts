@@ -1,12 +1,28 @@
 import type { User } from '@/types'
 
-/** Permission strings returned by `GET /auth/me`. */
+/**
+ * Permission strings returned by `GET /auth/me`.
+ *
+ * The server's whole list, which is also the database's CHECK constraint. Two
+ * things it does **not** contain, and no screen should wait for:
+ *
+ * - **`costs.view`.** Seeing a cost depends on the role alone — admin or
+ *   manager — and is never granted or revoked. `useCanViewCosts` is the gate.
+ * - **`returns.approve`.** Approving, rejecting and releasing a return are a
+ *   manager's acts by role; `returns.create` and `returns.refund` are the only
+ *   two returns keys that can be granted.
+ */
 export type ApiPermission =
   | 'adjustments.create'
+  | 'cash.accept'
+  | 'cash.close'
+  | 'cash.move'
+  | 'cash.open'
   | 'catalog.create'
   | 'discounts.apply'
   | 'reports.financial'
   | 'returns.create'
+  | 'returns.refund'
   | 'sales.create'
   | 'transfers.dispatch'
   | 'transfers.receive'
@@ -66,4 +82,46 @@ export function canManageMinimums(user: User): boolean {
 
 export function canViewFinancialReports(user: User): boolean {
   return hasApiPermission(user, 'reports.financial')
+}
+
+/* ------------------------------ returns ------------------------------ */
+
+/** Take goods back into custody, and hand a rejected return to the customer. */
+export function canRecordReturns(user: User): boolean {
+  return hasApiPermission(user, 'returns.create')
+}
+
+/** Pay the refund on an approved return. A manager holds this by default. */
+export function canRefundReturns(user: User): boolean {
+  return hasApiPermission(user, 'returns.refund')
+}
+
+/**
+ * Approve, reject or release a return.
+ *
+ * **By role, not by permission.** The API reserves these three for managers and
+ * admins, and there is no key to grant: an employee with `returns.create` can
+ * take the goods in and gets a 403 on the decision. Showing them the approve
+ * button would promise something the server refuses.
+ */
+export function canDecideReturns(user: User): boolean {
+  return user.role !== 'employee'
+}
+
+/** Anyone with a returns key sees the returns list; a manager sees it by role. */
+export function canSeeReturns(user: User): boolean {
+  return canDecideReturns(user) || canRecordReturns(user) || canRefundReturns(user)
+}
+
+/* ------------------------------- costs ------------------------------- */
+
+/**
+ * See or set what a piece cost, and read `/costs/profit`.
+ *
+ * Like the returns decisions, this is **role-only**: `costs.view` is
+ * deliberately absent from the server's permission list, so cost visibility
+ * cannot be granted to an employee or taken from a manager.
+ */
+export function canViewCosts(user: User): boolean {
+  return user.role !== 'employee'
 }

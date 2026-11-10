@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { PackagePlus, Paperclip } from 'lucide-react'
+import { PackagePlus, Paperclip, Truck } from 'lucide-react'
 import { Can } from '@/components/shared/can'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -17,6 +17,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { GOODS_RECEIPTS_PAGE, useGoodsReceipts } from '@/hooks/use-goods-receipts'
 import { useStockAdjustments, useStockReceipts } from '@/hooks/use-stock-receipts'
 import { useSkuIdFromCode } from '@/hooks/use-skus'
+import { useActiveSuppliers } from '@/hooks/use-suppliers'
 import { formatDateInput, formatNumber, formatPrice, formatRelativeDateTime, formatSigned } from '@/lib/format'
 import { ApiError } from '@/lib/api/api-error'
 import { receiptTotalCost } from '@/services/goods-receipts.service'
@@ -42,6 +43,8 @@ import {
 export function StockReceiptsView({ embedded = false }: { embedded?: boolean } = {}) {
   const [searchInput, setSearchInput] = useState('')
   const search = useDebouncedValue(searchInput)
+  const [supplierId, setSupplierId] = useState('')
+  const suppliers = useActiveSuppliers()
   /* Rule 63: supplier, date and product. All three are server-side parameters,
      so a range narrower than one page still returns every match. */
   const [from, setFrom] = useState('')
@@ -57,7 +60,7 @@ export function StockReceiptsView({ embedded = false }: { embedded?: boolean } =
   const skuUnknown = skuTerm.trim().length > 0 && skuId === null
 
   const deliveries = useGoodsReceipts(
-    { search, from, to, ...(skuId ? { skuId } : {}) },
+    { search, from, to, ...(supplierId ? { supplierId } : {}), ...(skuId ? { skuId } : {}) },
     offset,
   )
   const receipts = useStockReceipts()
@@ -116,9 +119,30 @@ export function StockReceiptsView({ embedded = false }: { embedded?: boolean } =
                 setSearchInput(next)
                 setPage(1)
               }}
-              placeholder="Search by supplier"
+              placeholder="Search by supplier or invoice"
               aria-label="Search supplier deliveries"
             />
+            <div className="toolbar-field">
+              <label className="sr-only" htmlFor="receipts-supplier">
+                Supplier record
+              </label>
+              <select
+                id="receipts-supplier"
+                className="input"
+                value={supplierId}
+                onChange={(event) => {
+                  setSupplierId(event.target.value)
+                  setPage(1)
+                }}
+              >
+                <option value="">All suppliers</option>
+                {(suppliers.data ?? []).map((row) => (
+                  <option key={row.id} value={row.id}>
+                    {row.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="toolbar-field">
               <label className="sr-only" htmlFor="receipts-sku">
                 Filter by SKU or barcode
@@ -169,7 +193,7 @@ export function StockReceiptsView({ embedded = false }: { embedded?: boolean } =
                 }}
               />
             </div>
-            {(from || to || skuSearch) && (
+            {(from || to || skuSearch || supplierId) && (
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
@@ -177,12 +201,19 @@ export function StockReceiptsView({ embedded = false }: { embedded?: boolean } =
                   setFrom('')
                   setTo('')
                   setSkuSearch('')
+                  setSupplierId('')
                   setPage(1)
                 }}
               >
                 Clear filters
               </button>
             )}
+            <Can permission="stock.adjust">
+              <Link href="/suppliers" className="btn btn-secondary btn-sm">
+                <Truck size={16} aria-hidden="true" />
+                Suppliers
+              </Link>
+            </Can>
             {embedded ? (
               <Can permission="stock.adjust">
                 <Link href="/stock-receipts/new" className="btn btn-primary">

@@ -101,9 +101,13 @@ export function useReceiveTransfer() {
       /** The inspector's remark on this pass, 1 to 500 characters. */
       note?: string
     }) => receiveTransfer(id, lines, idempotencyKey, note),
-    onSuccess: async () => {
+    onSuccess: async (transfer) => {
       await invalidateTransfers(queryClient)
-      toast.success('Received. Stock is on hold until you accept it for sale')
+      toast.success(
+        transfer.totals.onHold > 0
+          ? 'Received. Stock is on hold until you confirm it for sale'
+          : 'Received. Stock is on the sellable shelf at the branch',
+      )
     },
     onError: (error: Error) => toast.error(error.message),
   })
@@ -126,12 +130,13 @@ export function useAcceptTransfer() {
       toast.success('Stock released to the sellable shelf')
     },
     onError: (error: Error) => {
-      const msg = error.message
-      if (/not found|404|accept/i.test(msg)) {
-        toast.error('Accept for sale needs the updated API (receive → on hold → accept). Restart or redeploy Bitar_Store.')
+      if (error instanceof ApiError && error.status === 404) {
+        toast.error(
+          'This server does not expose POST /transfers/:id/accept yet. Apply the latest Bitar_Store migration and restart the API.',
+        )
         return
       }
-      toast.error(msg)
+      toast.error(error.message)
     },
   })
 }

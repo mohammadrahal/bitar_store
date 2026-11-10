@@ -52,6 +52,42 @@ export function linesMissingPrice(invoice: ApiInvoice): ApiInvoice['lines'] {
   return invoice.lines.filter((line) => line.priceSource === 'missing')
 }
 
+/** Positive unit price from the form, or null when blank / zero / invalid. */
+export function draftUnitPrice(prices: Record<string, string>, line: ApiInvoice['lines'][number]): string | null {
+  const raw = (prices[line.sku.id] ?? line.unitPrice).trim()
+  if (!raw) return null
+  const n = Number.parseFloat(raw.replace(/,/g, ''))
+  if (!Number.isFinite(n) || n <= 0) return null
+  return raw.replace(/,/g, '')
+}
+
+/**
+ * Lines still treated as unpriced for finalize: server `missing`, unless the
+ * draft in the form is a positive price (even before Save draft).
+ */
+export function linesMissingPriceWithDraft(
+  invoice: ApiInvoice,
+  prices: Record<string, string>,
+): ApiInvoice['lines'] {
+  return invoice.lines.filter((line) => {
+    if (line.priceSource !== 'missing') return false
+    return draftUnitPrice(prices, line) === null
+  })
+}
+
+export function patchPayloadForMissingLines(
+  invoice: ApiInvoice,
+  prices: Record<string, string>,
+): { skuId: string; unitPrice: string }[] {
+  return invoice.lines
+    .map((line) => {
+      if (line.priceSource !== 'missing') return null
+      const unitPrice = draftUnitPrice(prices, line)
+      return unitPrice ? { skuId: line.sku.id, unitPrice } : null
+    })
+    .filter(Boolean) as { skuId: string; unitPrice: string }[]
+}
+
 export function canFinalizeInvoice(invoice: ApiInvoice): boolean {
   return invoice.status === 'draft' && linesMissingPrice(invoice).length === 0
 }

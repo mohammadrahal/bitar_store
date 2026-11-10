@@ -291,7 +291,7 @@ export function TransferReceivingReportView({ transferId }: { transferId: string
                 {supplyInvoice ? (
                   <>
                     Supply invoice{' '}
-                    <Link href={`/sales/invoices/${supplyInvoice.id}`} className="text-link">
+                    <Link href={`/transfers/${transfer.id}/invoice`} className="text-link">
                       {invoiceLabel(supplyInvoice)}
                     </Link>{' '}
                     {invoiceFinal
@@ -320,7 +320,7 @@ export function TransferReceivingReportView({ transferId }: { transferId: string
                     : `Confirm for sale (${formatNumber(pendingSellable)} good)`}
                 </button>
                 {supplyInvoice ? (
-                  <Link href={`/sales/invoices/${supplyInvoice.id}`} className="btn btn-secondary">
+                  <Link href={`/transfers/${transfer.id}/invoice`} className="btn btn-secondary">
                     View supply invoice
                   </Link>
                 ) : null}

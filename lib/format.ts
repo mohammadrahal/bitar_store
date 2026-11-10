@@ -66,11 +66,13 @@ export const EMPTY_DISPLAY = ''
 const priceFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: CURRENCY,
-  minimumFractionDigits: 2,
+  minimumFractionDigits: 0,
   maximumFractionDigits: 2,
 })
 
+/** USD for screens and receipts: whole dollars without `.00`, cents when needed. */
 export function formatPrice(value: number) {
+  if (!Number.isFinite(value)) return priceFormatter.format(0)
   return priceFormatter.format(value)
 }
 

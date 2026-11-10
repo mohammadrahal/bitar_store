@@ -93,4 +93,10 @@ export function usdToLbp(usd: number, rate: number | null): number | null {
   return Math.round(usd * rate)
 }
 
+/** Whole pounds to USD, two decimals (till guide). */
+export function lbpToUsd(lbp: number, rate: number | null): number | null {
+  if (rate === null || rate <= 0 || lbp <= 0) return null
+  return Math.round((lbp / rate) * 100) / 100
+}
+
 export type { ApiSettings, UpdateSettingsInput }

@@ -307,7 +307,12 @@ export function InvoicesLedgerPanel({
                           {inv.sale ? <small className="muted">POS</small> : null}
                         </td>
                         <td className="num">
-                          <PriceWithLbp usd={totalUsd} strong />
+                          <PriceWithLbp
+                            usd={totalUsd}
+                            exchangeRateUsdLbp={inv.exchangeRate}
+                            lbpAmount={inv.totalLbp}
+                            strong
+                          />
                         </td>
                         <td>
                           <InvoiceLedgerStatusPill status={status} label={ledgerStatusLabel(status)} />

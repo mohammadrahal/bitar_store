@@ -52,13 +52,20 @@ export function SaleItemCard({
     setSize(null)
   }, [models, productId])
 
-  const colors = useMemo(() => [...new Set(options.map((option) => option.color))], [options])
+  const sellable = useMemo(
+    () => (enforceStock ? options.filter((option) => (option.available ?? 0) > 0) : options),
+    [options, enforceStock],
+  )
+  const colors = useMemo(() => [...new Set(sellable.map((option) => option.color))], [sellable])
   const sizes = useMemo(
-    () => [...new Set(options.filter((option) => option.color === color).map((option) => option.size))].sort(compareSizes),
-    [options, color],
+    () =>
+      [...new Set(sellable.filter((option) => option.color === color).map((option) => option.size))].sort(
+        compareSizes,
+      ),
+    [sellable, color],
   )
   const leftOf = (option: VariantOption) => Math.max(0, (option.available ?? 0) - (inCart[option.variantId] ?? 0))
-  const chosen = options.find((option) => option.color === color && option.size === size)
+  const chosen = sellable.find((option) => option.color === color && option.size === size)
   const left = chosen ? leftOf(chosen) : 0
   const maxQty = enforceStock ? left : 9999
   const qty = chosen ? (enforceStock ? Math.min(quantity, maxQty) : Math.max(1, quantity)) : 0
@@ -121,11 +128,15 @@ export function SaleItemCard({
         <p className="field-error">Could not load variants for this model.</p>
       )}
 
-      {productId && !loadingVariants && !variantsQuery.isError && options.length === 0 && (
-        <p className="muted">This model has no active sizes yet.</p>
+      {productId && !loadingVariants && !variantsQuery.isError && sellable.length === 0 && (
+        <p className="muted">
+          {enforceStock && options.length > 0
+            ? 'Nothing in stock for this model at this branch.'
+            : 'This model has no active sizes yet.'}
+        </p>
       )}
 
-      {productId && options.length > 0 && (
+      {productId && sellable.length > 0 && (
         <div className="chip-row" role="group" aria-label="Color">
           {colors.map((entry) => (
             <button
@@ -148,29 +159,22 @@ export function SaleItemCard({
         <>
           <div className="chip-row" role="group" aria-label="Size">
             {sizes.map((entry) => {
-              const option = options.find((candidate) => candidate.color === color && candidate.size === entry)
+              const option = sellable.find((candidate) => candidate.color === color && candidate.size === entry)
               const available = option ? leftOf(option) : 0
-              const none = !option || (enforceStock && available === 0)
               return (
                 <button
                   key={entry}
                   type="button"
                   className="chip chip-lg tabular"
                   aria-pressed={entry === size}
-                  disabled={none}
+                  disabled={!option}
                   onClick={() => {
                     setSize(entry)
                     setQuantity(1)
                   }}
                 >
                   {entry}
-                  {!option ? (
-                    <span className="chip-count" />
-                  ) : enforceStock && available === 0 ? (
-                    <span className="chip-count">Out of stock</span>
-                  ) : (
-                    <span className="chip-count">{available} here</span>
-                  )}
+                  {option ? <span className="chip-count">{available} here</span> : <span className="chip-count" />}
                 </button>
               )
             })}

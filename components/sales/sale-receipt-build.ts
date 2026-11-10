@@ -20,12 +20,16 @@ export function receiptPaymentsFromApi(payments: readonly ApiSalePayment[]): Rec
   }))
 }
 
-export function receiptPaymentsFromDraft(draft: PaymentDraft, total: number): ReceiptPaymentLine[] {
-  return paymentsFor(draft, total).map((payment) => ({
+export function receiptPaymentsFromDraft(
+  draft: PaymentDraft,
+  total: number,
+  rate: number | null = null,
+): ReceiptPaymentLine[] {
+  return paymentsFor(draft, total, rate).map((payment) => ({
     method: payment.method,
     amount: payment.amount,
     tendered: payment.method === 'cash' ? (payment.tendered ?? payment.amount) : null,
-    change: payment.method === 'cash' ? changeDue(draft, total) : null,
+    change: payment.method === 'cash' ? changeDue(draft, total, rate) : null,
     reference: payment.reference ?? null,
   }))
 }

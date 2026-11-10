@@ -85,7 +85,7 @@ export function TransferDocumentsPanel({
           {invoiceQuery.isPending ? (
             <Skeleton rows={1} stats={0} />
           ) : invoice ? (
-            <Link href={`/sales/invoices/${invoice.id}`} className="doc-action-link transfer-doc-row">
+            <Link href={`/transfers/${transfer.id}/invoice`} className="doc-action-link transfer-doc-row">
               <span className="transfer-doc-icon" aria-hidden="true">
                 <FileText size={18} />
               </span>

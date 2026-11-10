@@ -6,6 +6,27 @@ import { fetchSalesSummary, fetchTopSkus } from '@/services/reports-api.service'
 import { fetchTodayBranchSales } from '@/services/today-branch-sales.service'
 import { ALL_BRANCHES, type BranchScope, type SalesAnalytics, type SalesSeries, type TopSellerRow } from '@/types'
 
+/**
+ * What the returns approved in the period gave back, and revenue net of it.
+ *
+ * Both fields arrived with the returns API and an older server omits them, so
+ * these are the only safe way to read them: a missing `refunds` means "no
+ * returns data from this server", which is **not** the same as "no returns" but
+ * is the only figure it can honestly show. `netRevenueOf` therefore falls back
+ * to gross revenue rather than to zero.
+ *
+ * `netRevenue` can be negative for a branch that handed money back on goods
+ * another branch sold. That is the truth about that branch's day, so it is
+ * passed through unclamped.
+ */
+export function refundsOf(row: { refunds?: string }): number | null {
+  return row.refunds === undefined ? null : priceOf(row.refunds)
+}
+
+export function netRevenueOf(row: { revenue: string; netRevenue?: string }): number {
+  return row.netRevenue === undefined ? priceOf(row.revenue) : priceOf(row.netRevenue)
+}
+
 /** Beyond this many branches the chart folds the tail into one "Other" series. */
 const MAX_BRANCH_SERIES = 5
 const TOP_PRODUCTS = 8

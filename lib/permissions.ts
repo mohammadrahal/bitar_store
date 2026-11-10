@@ -1,6 +1,7 @@
 import {
   canDispatchTransfers,
   canManageMinimums,
+  canReceiveTransfers,
   canRequestTransfer,
   canSeeTransfers,
   canViewAdminWarehouseTools,
@@ -116,7 +117,8 @@ export function canAccessAdminHub(user: User): boolean {
     can(user, 'opening_stock.post') ||
     canViewFinancialReports(user) ||
     canViewAdminWarehouseTools(user) ||
-    can(user, 'settings.manage')
+    can(user, 'settings.manage') ||
+    can(user, 'stock.adjust')
   )
 }
 
@@ -137,6 +139,15 @@ export function canViewBranchSalesTelemetry(user: User, locationId?: string): bo
   if (can(user, 'locations.view_all')) return true
   if (locationId) return can(user, 'sales.view_branch', locationId)
   return can(user, 'sales.view_branch')
+}
+
+/**
+ * Branch overview KPI for today's revenue and sale count. Any till role at that
+ * location qualifies; `sales.view_branch` is not required.
+ */
+export function canViewTodayShopKpi(user: User, locationId: string): boolean {
+  if (canViewBranchSalesTelemetry(user, locationId)) return true
+  return canAny(user, ['sales.view_own', 'sales.view_branch', 'sales.create'], locationId)
 }
 
 /** Network overview sales bands (`scope` is all branches). */
@@ -166,9 +177,14 @@ const ROUTE_PERMISSIONS: [prefix: string, rule: PermissionRule][] = [
   /* Any one of the four drawer keys gets in: a cashier who may only open it
      still needs the screen, and the panels inside check their own key. */
   ['/cash', ['cash.open', 'cash.accept', 'cash.close', 'cash.move']],
+  /* Either returns key gets in, and a manager holds both by role. The decision
+     panels inside check the role separately, since approving and releasing are
+     a manager's and have no key to grant. */
+  ['/returns', ['returns.create', 'returns.refund']],
   ['/inventory', 'stock.view'],
   ['/opening-stock', 'opening_stock.post'],
   ['/stock-receipts', 'stock.adjust'],
+  ['/suppliers', 'stock.adjust'],
   ['/users', 'users.manage'],
   ['/settings', 'settings.manage'],
 ]
@@ -202,8 +218,18 @@ export function redirectPathFor(user: User, pathname: string): string | null {
     const creating = pathname === '/sales/invoices/new' || pathname.startsWith('/sales/invoices/new/')
     if (creating) {
       if (!can(user, 'sales.create')) return home
-    } else if (!canViewInvoicesLedger(user)) {
-      return home
+    } else {
+      const invoiceDetail = /^\/sales\/invoices\/[^/]+$/.test(pathname)
+      /* `transfers.receive` and `transfers.dispatch` are *server* keys, so they
+         go through api-access and not `can()`, whose list is the local grantable
+         one. */
+      const mayOpenDetail =
+        canViewInvoicesLedger(user) || canReceiveTransfers(user) || canDispatchTransfers(user)
+      if (invoiceDetail) {
+        if (!mayOpenDetail) return home
+      } else if (!canViewInvoicesLedger(user)) {
+        return home
+      }
     }
   }
 

@@ -49,8 +49,7 @@ export function CashSessionGate({ branchId }: { branchId: string }) {
   if (current) {
     return (
       <p className="section-note muted">
-        <Banknote size={14} aria-hidden="true" /> Drawer open since{' '}
-        {current.openedBy.name ?? 'earlier'} started the shift ·{' '}
+        <Banknote size={14} aria-hidden="true" /> Drawer open ·{' '}
         {formatPrice(priceOf(cashSessionTotals(current).expectedCash))} expected ·{' '}
         <Link href={cashHubHref('drawer')} className="text-link">
           Cash drawer

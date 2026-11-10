@@ -159,6 +159,24 @@ export const queryKeys = {
     list: (branchId: string, status: string, review: string, offset: number) =>
       ['cash-sessions', 'list', branchId, status, review, offset] as const,
   },
+  /** `GET /returns`: customer returns. */
+  returns: {
+    all: ['returns'] as const,
+    list: (branchId: string, saleId: string, status: string, offset: number) =>
+      ['returns', 'list', branchId, saleId, status, offset] as const,
+    detail: (id: string) => ['returns', 'detail', id] as const,
+    /* `GET /returns/eligible?sale=`. Keyed by what was typed, because the
+       lookup accepts the sale id *or* its printed number and the counter may
+       try both. It is a lookup, not a cache of the sale. */
+    eligible: (sale: string) => ['returns', 'eligible', sale] as const,
+  },
+  /** `GET /costs`: cost and profit. Admin or manager only. */
+  costs: {
+    all: ['costs'] as const,
+    sku: (skuId: string) => ['costs', 'sku', skuId] as const,
+    profit: (branchId: string, from: string, to: string) =>
+      ['costs', 'profit', branchId, from, to] as const,
+  },
   dashboard: {
     all: ['dashboard'] as const,
     overview: (scope: BranchScope) => ['dashboard', 'overview', scope] as const,

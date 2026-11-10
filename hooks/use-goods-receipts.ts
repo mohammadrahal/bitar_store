@@ -24,6 +24,8 @@ export const GOODS_RECEIPTS_PAGE = 20
 export interface GoodsReceiptFilters {
   /** Matches the supplier's name or their invoice number. */
   search: string
+  /** Every receipt filed against one supplier record. */
+  supplierId?: string
   /** `yyyy-mm-dd`, inclusive. */
   from?: string
   to?: string
@@ -36,12 +38,13 @@ export function useGoodsReceipts(filters: GoodsReceiptFilters, offset: number) {
   const search = filters.search.trim()
   return useQuery({
     queryKey: queryKeys.stock.goodsReceipts(
-      `${search}|${filters.from ?? ''}|${filters.to ?? ''}|${filters.skuId ?? ''}`,
+      `${search}|${filters.supplierId ?? ''}|${filters.from ?? ''}|${filters.to ?? ''}|${filters.skuId ?? ''}`,
       offset,
     ),
     queryFn: () =>
       listGoodsReceipts({
         supplier: search || undefined,
+        supplierId: filters.supplierId || undefined,
         from: filters.from || undefined,
         to: filters.to || undefined,
         skuId: filters.skuId || undefined,

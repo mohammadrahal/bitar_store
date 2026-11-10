@@ -279,7 +279,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
                 View report
               </Link>
               {supplyInvoice ? (
-                <Link href={`/sales/invoices/${supplyInvoice.id}`} className="btn btn-secondary">
+                <Link href={`/transfers/${transfer.id}/invoice`} className="btn btn-secondary">
                   View invoice
                 </Link>
               ) : null}
@@ -306,7 +306,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
             {supplyInvoice && !invoiceFinal && (
               <p className="muted text-sm" style={{ margin: 0 }}>
                 The{' '}
-                <Link href={`/sales/invoices/${supplyInvoice.id}`} className="text-link">
+                <Link href={`/transfers/${transfer.id}/invoice`} className="text-link">
                   supply invoice
                 </Link>{' '}
                 is still a draft. The warehouse finalizes it once this movement is reconciled; it does not hold up the

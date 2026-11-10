@@ -1,6 +1,8 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMemo } from 'react'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { cashSessionListItems } from '@/lib/cash-display'
 import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query-keys'
 import { useSettings } from '@/hooks/use-settings'
@@ -101,6 +103,39 @@ export function useCashSessions(params: {
       }),
     staleTime: 30_000,
   })
+}
+
+/**
+ * `GET /cash-sessions` list rows omit rolled-up totals; each visible row is
+ * hydrated with `GET /cash-sessions/:id` so net sales and expected cash match the shift.
+ */
+export function useCashSessionsWithTotals(params: Parameters<typeof useCashSessions>[0]) {
+  const list = useCashSessions(params)
+  const ids = useMemo(
+    () => cashSessionListItems(list.data?.items).map((row) => row.id),
+    [list.data?.items],
+  )
+  const details = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: queryKeys.cashSessions.detail(id),
+      queryFn: () => getCashSession(id),
+      enabled: list.isSuccess && Boolean(id),
+      staleTime: 30_000,
+    })),
+  })
+  const data = useMemo(() => {
+    if (!list.data) return undefined
+    const byId = new Map(
+      details.flatMap((q) => (q.data ? [[q.data.id, q.data] as const] : [])),
+    )
+    const items = cashSessionListItems(list.data.items).map((row) => {
+      const full = byId.get(row.id)
+      return full ? { ...row, totals: full.totals } : row
+    })
+    return { ...list.data, items }
+  }, [list.data, details])
+  const isEnrichingTotals = details.some((q) => q.isPending)
+  return { ...list, data, isEnrichingTotals }
 }
 
 export function useOpenCashSession() {

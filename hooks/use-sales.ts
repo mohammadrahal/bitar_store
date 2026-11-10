@@ -33,6 +33,7 @@ export function useCreateSale() {
     onSuccess: (sale) => {
       invalidateStockQueries(queryClient)
       void queryClient.invalidateQueries({ queryKey: salesQueryKeys.all })
+      void queryClient.invalidateQueries({ queryKey: ['stock', 'operations'] })
       void queryClient.invalidateQueries({ queryKey: queryKeys.analytics.all })
       void queryClient.invalidateQueries({ queryKey: queryKeys.apiInvoices.all })
       /* The server attaches the sale to the branch's open drawer, so its

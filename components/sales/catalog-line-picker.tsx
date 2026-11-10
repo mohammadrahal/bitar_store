@@ -86,8 +86,13 @@ function VariantRows({
   const enforceStock = availability === 'enforce'
   const showsStock = availability !== 'ignore'
   const till = pickerUi === 'till'
-  if (rows.length === 0) {
-    return <p className="invoice-picker-hint">No variants to add for this model.</p>
+  const listed = enforceStock ? rows.filter((option) => (option.available ?? 0) > 0) : rows
+  if (listed.length === 0) {
+    return (
+      <p className="invoice-picker-hint">
+        {enforceStock ? 'Nothing in stock for this model at this branch.' : 'No variants to add for this model.'}
+      </p>
+    )
   }
   return (
     <div className={nested ? 'catalog-picker-variants-wrap' : 'invoice-picker-table-wrap'}>
@@ -110,7 +115,7 @@ function VariantRows({
           </tr>
         </thead>
         <tbody>
-          {rows.map((option) => {
+          {listed.map((option) => {
             const inBasket = inCart[option.variantId] ?? 0
             const left = leftToSell(option, inCart)
             const canAdd = !enforceStock || left > 0
@@ -306,10 +311,12 @@ export function CatalogLinePicker({
   })
 
   const skuSearchQuery = useQuery({
-    queryKey: ['catalog', 'variant-search', branchId, search.trim().toLowerCase(), modelScope],
+    queryKey: ['catalog', 'variant-search', branchId, search.trim().toLowerCase(), modelScope, enforceStock],
     queryFn: async () => {
       const matches = await searchVariants(search, SKU_SEARCH_LIMIT, branchId)
-      return branchStock ? matches.filter((option) => (option.available ?? 0) > 0) : matches
+      return enforceStock || branchStock
+        ? matches.filter((option) => (option.available ?? 0) > 0)
+        : matches
     },
     enabled: mirrored !== null && Boolean(branchId) && skuSearchReady(search),
     staleTime: 15_000,

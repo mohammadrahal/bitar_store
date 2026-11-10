@@ -10,6 +10,7 @@ import { OpeningStockView } from '@/components/opening-stock/opening-stock-view'
 import { PageHeader } from '@/components/shared/page-header'
 import { ReportsView } from '@/components/reports/reports-view'
 import { StoreSettingsView } from '@/components/settings/store-settings-view'
+import { SuppliersView } from '@/components/suppliers/suppliers-view'
 import { UsersView } from '@/components/users/users-view'
 import { usePermission } from '@/hooks/use-permission'
 
@@ -51,6 +52,10 @@ const SECTION_COPY: Record<
     title: 'Store settings',
     description: 'Rates and rules that every branch uses on the till.',
   },
+  suppliers: {
+    title: 'Suppliers',
+    description: 'Who the warehouse buys from. Goods receipts pick from here instead of free-text names.',
+  },
 }
 
 export function AdminHubView() {
@@ -64,9 +69,16 @@ export function AdminHubView() {
   const showReports = canViewFinancialReports()
   const showAudit = canViewAdminWarehouseTools()
   const showSettings = can('settings.manage')
+  const showSuppliers = can('stock.adjust')
 
   const hasAnyAdmin =
-    showUsers || showLocations || showOpeningStock || showReports || showAudit || showSettings
+    showUsers ||
+    showLocations ||
+    showOpeningStock ||
+    showReports ||
+    showAudit ||
+    showSettings ||
+    showSuppliers
 
   /** Top tabs: employees, locations, settings only. opening stock, reports and audit live in the sidebar. */
   const tabs: TabDef[] = useMemo(
@@ -90,6 +102,7 @@ export function AdminHubView() {
     if (id === 'reports') return showReports
     if (id === 'audit') return showAudit
     if (id === 'settings') return showSettings
+    if (id === 'suppliers') return showSuppliers
     return false
   }
 
@@ -100,8 +113,9 @@ export function AdminHubView() {
     if (showOpeningStock) return 'opening-stock'
     if (showReports) return 'reports'
     if (showAudit) return 'audit'
+    if (showSuppliers) return 'suppliers'
     return 'users'
-  }, [showUsers, showLocations, showSettings, showOpeningStock, showReports, showAudit])
+  }, [showUsers, showLocations, showSettings, showOpeningStock, showReports, showAudit, showSuppliers])
 
   const section: AdminHubSection = useMemo(() => {
     if (requested && sectionAllowed(requested)) return requested
@@ -161,6 +175,7 @@ export function AdminHubView() {
         {section === 'reports' && showReports && <ReportsView embedded />}
         {section === 'audit' && showAudit && <AuditView embedded />}
         {section === 'settings' && showSettings && <StoreSettingsView embedded />}
+        {section === 'suppliers' && showSuppliers && <SuppliersView embedded />}
       </div>
     </>
   )

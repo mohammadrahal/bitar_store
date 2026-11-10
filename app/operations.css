@@ -144,6 +144,15 @@ ul.chip-row { list-style: none; margin: 0; padding: 0; }
   .inventory-split { grid-template-columns: 1fr; }
 }
 .stack { display: flex; flex-direction: column; gap: var(--layout-gap); }
+/* Two tighter gaps for a `.stack` inside a panel, where `--layout-gap` is the
+   spacing BETWEEN panels and too airy for the fields within one. Every cash and
+   returns panel already asked for these by name; they were missing, so the
+   stack gap silently applied instead. */
+.stack.gap-sm { gap: var(--space-2); }
+.stack.gap-md { gap: var(--space-3); }
+/* A rule between two acts in one panel — approve above, reject below. Not a
+   section break: it separates choices that are deliberately side by side. */
+.panel-divider { border: 0; border-top: 1px solid hsl(var(--border)); margin: var(--space-2) 0; }
 .notice { display: flex; align-items: flex-start; gap: 8px; padding: 12px 14px; border-radius: var(--r-sm); background: hsl(var(--muted) / .6); border: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: var(--fs-sm); line-height: 1.5; }
 .notice svg { flex: none; margin-top: 2px; color: hsl(var(--accent)); }
 .notice strong { color: hsl(var(--foreground)); font-weight: 500; }
@@ -319,30 +328,77 @@ details.optional[open] summary { margin-bottom: 16px; }
 .action-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 24px; border-top: 1px solid hsl(var(--border)); }
 
 /* ---------- New sale ---------- */
+.sale-complete-line {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+}
+.sale-held-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 10px 14px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-sm);
+  background: hsl(var(--card));
+  font-size: var(--fs-sm);
+}
+.sale-held-banner p { margin: 0; color: hsl(var(--foreground)); }
 .sale-layout { width: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-bottom: 160px; }
 .sale-layout--till {
   max-width: none;
   margin: 0;
-  gap: var(--layout-gap, 20px);
-  padding-bottom: 200px;
+  gap: 16px;
+  padding-bottom: 108px;
 }
-.sale-till-stack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--layout-gap, 20px);
+.sale-till-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 22.5rem);
+  gap: 16px;
+  align-items: start;
 }
 .sale-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 22px;
+  gap: 12px;
+  padding: 16px;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
   border-radius: var(--r-md);
-  border-top: 2px solid hsl(var(--gold-500) / 0.32);
 }
-.dark .sale-panel {
-  border-top-color: hsl(var(--gold-400) / 0.28);
+.sale-ticket {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-md);
+}
+.sale-ticket-details {
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 8px;
+}
+.sale-ticket-details summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+  list-style: none;
+}
+.sale-ticket-details summary::-webkit-details-marker { display: none; }
+.sale-ticket-details[open] summary { margin-bottom: 12px; color: hsl(var(--foreground)); }
+.sale-ticket-pay {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--border));
+}
+@media (max-width: 960px) {
+  .sale-till-grid { grid-template-columns: 1fr; }
 }
 .sale-staged-head {
   display: flex;
@@ -401,6 +457,31 @@ details.optional[open] summary { margin-bottom: 16px; }
 .sale-staged-line-price {
   font-weight: 600;
   font-size: var(--fs-md);
+}
+.sale-channel-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.invoice-line-barcode-cell {
+  vertical-align: middle;
+  min-width: 8.5rem;
+}
+.invoice-line-barcode {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.invoice-line-barcode-svg svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+.invoice-line-barcode-text {
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+  letter-spacing: 0.06em;
 }
 .sale-customer-grid {
   margin-top: 4px;
@@ -491,32 +572,19 @@ details.optional[open] summary { margin-bottom: 16px; }
   padding: 10px 20px calc(12px + env(safe-area-inset-bottom));
   background: hsl(var(--card));
   border-top: 1px solid hsl(var(--border));
-  box-shadow: 0 -12px 40px hsl(0 0% 0% / 0.22);
-}
-.dark .sale-footer--till {
-  box-shadow: 0 -8px 32px hsl(0 0% 0% / 0.45);
 }
 .sale-footer-inner { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .sale-footer--till .sale-footer-inner {
   max-width: none;
   margin: 0;
-  gap: 10px;
-}
-.sale-footer-rate {
-  margin: 0;
-  text-align: center;
-  font-size: 11px;
-  color: hsl(var(--muted-foreground));
-  padding: 6px 12px;
-  border-radius: var(--r-sm);
-  background: hsl(var(--muted) / 0.45);
-  border: 1px solid hsl(var(--border));
+  gap: 6px;
 }
 .sale-footer-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px 20px;
+  justify-content: space-between;
+  gap: 12px 16px;
 }
 .sale-footer-scanner {
   display: inline-flex;
@@ -547,11 +615,8 @@ details.optional[open] summary { margin-bottom: 16px; }
 }
 .sale-footer-totals {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  justify-self: center;
-  text-align: center;
+  align-items: baseline;
+  gap: 10px;
 }
 .sale-footer-items-badge {
   display: inline-flex;
@@ -566,28 +631,20 @@ details.optional[open] summary { margin-bottom: 16px; }
   background: hsl(var(--muted) / 0.35);
 }
 .sale-footer-price {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
 }
 .sale-footer-price strong {
-  font-family: var(--font-cormorant), ui-serif, Georgia, serif;
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-size: var(--fs-xl);
   font-weight: 600;
   line-height: 1.1;
-}
-.dark .sale-footer-price strong {
-  color: hsl(240 5% 96%);
-}
-.sale-footer-price .price-lbp::before {
-  content: '= ';
 }
 .sale-footer-price .price-lbp {
   font-size: var(--fs-xs);
   color: hsl(var(--muted-foreground));
 }
-.sale-footer-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-self: end; justify-content: flex-end; }
+.sale-footer-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .sale-footer-actions .btn { flex: 0 1 auto; }
 .sale-footer-btn-outline {
   border: 1px solid hsl(var(--border)) !important;
@@ -610,13 +667,7 @@ details.optional[open] summary { margin-bottom: 16px; }
   max-width: none;
 }
 @media (max-width: 900px) {
-  .sale-footer-bar {
-    grid-template-columns: 1fr;
-    justify-items: stretch;
-  }
-  .sale-footer-scanner { justify-self: start; }
-  .sale-footer-totals { justify-self: center; }
-  .sale-footer-actions { justify-self: stretch; }
+  .sale-footer-actions { width: 100%; }
   .sale-footer-actions .btn.btn-till { flex: 1 1 calc(50% - 4px); }
 }
 
@@ -1936,13 +1987,19 @@ details.optional[open] summary { margin-bottom: 16px; }
   line-height: 1.5;
 }
 .cash-z-receipt-lines {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin: 8px 0 0;
   padding: 12px 0 0;
   border-top: 1px dashed hsl(var(--border));
   font-size: var(--fs-sm);
+}
+.cash-z-receipt-lines > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 16px;
+  align-items: baseline;
 }
 .cash-z-receipt-lines dt {
   margin: 0;
@@ -1952,13 +2009,17 @@ details.optional[open] summary { margin-bottom: 16px; }
   margin: 0;
   text-align: right;
   font-weight: 500;
+  white-space: nowrap;
 }
-.cash-z-receipt-total dt,
-.cash-z-receipt-total dd {
+.cash-z-receipt-lines > div.cash-z-receipt-total {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid hsl(var(--border));
+}
+.cash-z-receipt-lines > div.cash-z-receipt-total dt,
+.cash-z-receipt-lines > div.cash-z-receipt-total dd {
   font-weight: 600;
   color: hsl(var(--foreground));
-  padding-top: 6px;
-  border-top: 1px solid hsl(var(--border));
 }
 .cash-z-receipt-foot {
   margin: 0;
@@ -2101,6 +2162,17 @@ details.optional[open] summary { margin-bottom: 16px; }
   border: 1px solid hsl(var(--border));
   overflow: hidden;
   font-size: var(--fs-md);
+}
+.financial-reports-view-toggle button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+.financial-reports-view-toggle button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 .financial-reports-view-toggle-active {
   padding: 8px 14px;
@@ -2511,4 +2583,71 @@ details.optional[open] summary { margin-bottom: 16px; }
 .table-primary-link:hover {
   color: hsl(var(--gold-500));
   text-decoration: underline;
+}
+
+/* ---------- Returns: the four acts, shown as four ---------- */
+/* A read-only progress rail, not a wizard: the steps are never clickable,
+   because each one is performed by whoever has the right at the time and the
+   screen's job is only to say where the return has got to. It wraps to one
+   column on a phone rather than shrinking, so a step's label never truncates
+   into something ambiguous like "Refund of…". */
+.return-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 6px;
+  margin: 0;
+  padding: 14px 16px;
+  list-style: none;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-sm);
+  background: hsl(var(--card));
+}
+.return-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 12.5rem;
+}
+.return-step-arrow {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  align-self: center;
+  padding: 0 2px;
+  margin-top: 2px;
+  color: hsl(var(--muted-foreground) / .75);
+}
+.return-step-arrow svg {
+  display: block;
+}
+.return-step-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / .5);
+  color: hsl(var(--muted-foreground));
+}
+.return-step--done .return-step-mark {
+  border-color: hsl(var(--success) / .5);
+  background: hsl(var(--success) / .15);
+  color: hsl(var(--success));
+}
+.return-step-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.return-step-copy strong {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+}
+.return-step--done .return-step-copy strong { color: hsl(var(--foreground)); }
+.return-step-copy small {
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
 }

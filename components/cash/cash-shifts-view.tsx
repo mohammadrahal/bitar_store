@@ -11,11 +11,11 @@ import { LocationSelect } from '@/components/shared/location-select'
 import { Pagination } from '@/components/shared/pagination'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
-import { useCashSessions } from '@/hooks/use-cash-sessions'
+import { useCashSessionsWithTotals } from '@/hooks/use-cash-sessions'
 import { useAllowPageBranchFilter } from '@/hooks/use-branch-scope'
 import { usePermission } from '@/hooks/use-permission'
 import { priceOf } from '@/lib/api/map-catalog'
-import { cashSessionListItems, cashSessionTotals } from '@/lib/cash-display'
+import { cashSessionListItems, cashSessionListTotalsMissing, cashSessionTotals } from '@/lib/cash-display'
 import { EMPTY_DISPLAY, formatDocumentDate, formatNumber, formatPrice } from '@/lib/format'
 import type { ApiCashSessionSummary, CashSessionStatus } from '@/lib/api/types'
 
@@ -82,7 +82,7 @@ export function CashShiftsView({
   const [filter, setFilter] = useState<ShiftFilter>('all')
   const [page, setPage] = useState(1)
 
-  const query = useCashSessions({
+  const query = useCashSessionsWithTotals({
     branchId: branchId || undefined,
     ...paramsFor(filter),
     offset: (page - 1) * PAGE_SIZE,
@@ -156,6 +156,7 @@ export function CashShiftsView({
               </thead>
               <tbody>
                 {rows.map((session) => {
+                  const totalsKnown = !cashSessionListTotalsMissing(session)
                   const totals = cashSessionTotals(session)
                   return (
                     <tr key={session.id}>
@@ -170,10 +171,10 @@ export function CashShiftsView({
                         <StatusCell session={session} />
                       </td>
                       <td className="num tabular" data-label="Sales">
-                        {formatNumber(totals.salesCount)}
+                        {totalsKnown ? formatNumber(totals.salesCount) : '…'}
                       </td>
                       <td className="num tabular" data-label="Expected cash">
-                        {formatPrice(priceOf(totals.expectedCash))}
+                        {totalsKnown ? formatPrice(priceOf(totals.expectedCash)) : '…'}
                       </td>
                     </tr>
                   )

@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Download, ExternalLink, MessageCircle, Printer, X } from 'lucide-react'
 import { InvoiceLedgerStatusPill } from '@/components/shared/status-pill'
+import { InvoicePaymentAmount, invoicePaymentMethodLabel } from '@/components/sales/invoice-lbp'
 import { PriceWithLbp } from '@/components/shared/price-with-lbp'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useApiInvoice, useVoidInvoice } from '@/hooks/use-api-invoices'
@@ -10,6 +11,7 @@ import { useBranches } from '@/hooks/use-branches'
 import { getApiClient } from '@/lib/api'
 import { ledgerDisplayStatus, ledgerStatusLabel } from '@/lib/invoices-ledger'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
+import type { ApiInvoicePayment } from '@/lib/api/types'
 import { invoiceLabel, invoiceTotal } from '@/services/invoices-api.service'
 
 function InspectorReceipt({
@@ -23,6 +25,8 @@ function InspectorReceipt({
   discount,
   total,
   payments,
+  exchangeRate,
+  totalLbp,
 }: {
   reference: string
   status: string
@@ -33,7 +37,9 @@ function InspectorReceipt({
   subtotal: number
   discount: number
   total: number
-  payments?: { label: string; amount: number; detail?: string }[]
+  exchangeRate?: number | null
+  totalLbp?: number | null
+  payments?: { payment: ApiInvoicePayment }[]
 }) {
   return (
     <div className="invoice-inspector-receipt">
@@ -69,7 +75,7 @@ function InspectorReceipt({
                 {line.quantity > 1 ? <small className="muted"> × {line.quantity}</small> : null}
               </td>
               <td className="num tabular">
-                <PriceWithLbp usd={line.lineTotal} />
+                <PriceWithLbp usd={line.lineTotal} exchangeRateUsdLbp={exchangeRate} />
               </td>
             </tr>
           ))}
@@ -77,27 +83,32 @@ function InspectorReceipt({
       </table>
       <dl className="invoice-inspector-totals totals">
         <dt>Subtotal</dt>
-        <dd className="tabular">{formatPrice(subtotal)}</dd>
+        <dd className="tabular">
+          <PriceWithLbp usd={subtotal} exchangeRateUsdLbp={exchangeRate} />
+        </dd>
         {discount > 0 ? (
           <>
             <dt>Discounts</dt>
-            <dd className="tabular tone-good">−{formatPrice(discount)}</dd>
+            <dd className="tabular tone-good">
+              −<PriceWithLbp usd={discount} exchangeRateUsdLbp={exchangeRate} />
+            </dd>
           </>
         ) : null}
         <dt>Net total</dt>
         <dd className="tabular invoice-inspector-grand">
-          <PriceWithLbp usd={total} strong />
+          <PriceWithLbp usd={total} exchangeRateUsdLbp={exchangeRate} lbpAmount={totalLbp} strong />
         </dd>
       </dl>
       {payments && payments.length > 0 ? (
         <section className="invoice-inspector-payments">
           <h3 className="invoice-inspector-section-title">Payment</h3>
           <ul className="invoice-inspector-payment-list">
-            {payments.map((payment) => (
-              <li key={payment.label}>
-                <span>{payment.label}</span>
-                <span className="tabular">{formatPrice(payment.amount)}</span>
-                {payment.detail ? <small className="muted">{payment.detail}</small> : null}
+            {payments.map((row, index) => (
+              <li key={`${row.payment.method}-${index}`}>
+                <span>{invoicePaymentMethodLabel(row.payment)}</span>
+                <span className="tabular">
+                  <InvoicePaymentAmount payment={row.payment} exchangeRateUsdLbp={exchangeRate} />
+                </span>
               </li>
             ))}
           </ul>
@@ -153,11 +164,7 @@ export function InvoiceInspector({ invoiceId, onClose }: { invoiceId: string; on
   const subtotal = Number(invoice.subtotal)
   const discount = Number(invoice.discountTotal)
   const total = invoiceTotal(invoice)
-  const payments = invoice.payments?.map((payment) => ({
-    label: payment.method,
-    amount: Number(payment.amount),
-    detail: payment.reference ?? undefined,
-  }))
+  const payments = invoice.payments?.map((payment) => ({ payment }))
 
   return (
     <aside className="invoice-inspector" aria-label="Invoice inspector">
@@ -204,6 +211,8 @@ export function InvoiceInspector({ invoiceId, onClose }: { invoiceId: string; on
         subtotal={subtotal}
         discount={discount}
         total={total}
+        exchangeRate={invoice.exchangeRate}
+        totalLbp={invoice.totalLbp}
         payments={payments}
       />
 

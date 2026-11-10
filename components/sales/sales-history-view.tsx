@@ -17,6 +17,7 @@ import { usePermission } from '@/hooks/use-permission'
 import { useSalesHistoryPages } from '@/hooks/use-sales-history'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
 import { apiFeatureHint, isApiFeatureMissing } from '@/lib/api/capabilities'
+import { saleChannelLabel } from '@/lib/sale-channel'
 import { presetRange, shopSpanDays, shopToday, type SalesHistoryPreset } from '@/lib/shop-date'
 
 const PRESETS: ChipOption<SalesHistoryPreset>[] = [
@@ -31,12 +32,6 @@ const PRESETS: ChipOption<SalesHistoryPreset>[] = [
 function money(value: string) {
   const amount = Number(value)
   return Number.isFinite(amount) ? formatPrice(amount) : value
-}
-
-function channelLabel(channel: string) {
-  if (channel === 'in_store') return 'In store'
-  if (channel === 'social_media') return 'Social'
-  return channel
 }
 
 export function SalesHistoryView() {
@@ -185,7 +180,7 @@ export function SalesHistoryView() {
                       </td>
                       <td>{sale.branch.name}</td>
                       <td>{sale.soldBy.name ?? 'Unknown'}</td>
-                      <td>{channelLabel(sale.channel)}</td>
+                      <td>{saleChannelLabel(sale.channel)}</td>
                       <td className="num">{sale.items}</td>
                       <td className="num">{money(sale.total)}</td>
                       <td className="num">{money(sale.cash)}</td>

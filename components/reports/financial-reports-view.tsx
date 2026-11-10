@@ -13,10 +13,41 @@ import { Skeleton } from '@/components/shared/skeleton'
 import { SkuTableCell } from '@/components/shared/table-empty'
 import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { useSalesSummaryReport, useTopSkusReport } from '@/hooks/use-reports-api'
+import { useExchangeRate } from '@/hooks/use-settings'
 import { useBranches } from '@/hooks/use-branches'
 import type { ApiSalesSummaryRow } from '@/lib/api/types'
-import { formatNumber, formatPrice } from '@/lib/format'
+import { formatLbp, formatNumber, formatPrice, formatUsdLbpRate } from '@/lib/format'
 import type { TrendPoint } from '@/services/dashboard-trend.service'
+import { usdToLbp } from '@/services/settings.service'
+import Link from 'next/link'
+
+type ReportCurrencyView = 'usd' | 'lbp'
+
+function ReportAmount({
+  usd,
+  strong,
+  currencyView,
+  rate,
+}: {
+  usd: number
+  strong?: boolean
+  currencyView: ReportCurrencyView
+  rate: number | null
+}) {
+  if (currencyView === 'lbp' && rate != null) {
+    const lbp = usdToLbp(usd, rate)
+    if (lbp !== null) {
+      const Tag = strong ? 'strong' : 'span'
+      return (
+        <span className="price-with-lbp">
+          <Tag className="tabular">{formatLbp(lbp)}</Tag>
+          <small className="price-lbp tabular">≈ {formatPrice(usd)}</small>
+        </span>
+      )
+    }
+  }
+  return <PriceWithLbp usd={usd} exchangeRateUsdLbp={rate} strong={strong} />
+}
 
 type Quarter = 'q1' | 'q2' | 'q3' | 'q4' | 'custom'
 
@@ -99,6 +130,14 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
 
   const summary = useSalesSummaryReport(branchId, from, to)
   const topSkus = useTopSkusReport(branchId, from, to)
+  const rateQuery = useExchangeRate()
+  const rate = rateQuery.rate
+  const [currencyView, setCurrencyView] = useState<ReportCurrencyView>('usd')
+  const revenueHeader = currencyView === 'lbp' ? 'Revenue (LBP guide)' : 'Revenue (USD)'
+  const currencyFootnote =
+    currencyView === 'lbp' && rate != null
+      ? `LBP guide at 1 USD = ${formatUsdLbpRate(rate)} (store settings; not per-sale MoF peg)`
+      : 'consolidated USD'
 
   const totals = summary.data?.totals
   const revenue = totals ? Number(totals.revenue) : 0
@@ -206,7 +245,7 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
         <div className="financial-reports-hero-main">
           <h2 className="financial-reports-hero-title">Financial reports &amp; fiscal audit</h2>
           <p className="muted financial-reports-hero-sub">
-            {branchLabel} · consolidated USD · {from} → {to}
+            {branchLabel} · {currencyFootnote} · {from} → {to}
           </p>
           <p className="financial-reports-source-badge" title="Figures from GET /reports/sales-summary">
             Ledger source · sales-summary API
@@ -228,11 +267,46 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
         <div className="panel-body financial-reports-filters">
           <Field label="View">
             <div className="financial-reports-view-toggle" role="group" aria-label="Currency view">
-              <span className="financial-reports-view-toggle-active">Consolidated USD</span>
-              <span className="financial-reports-view-toggle-muted" title="LBP tax base not on API">
-                LBP peg (pending API)
-              </span>
+              <button
+                type="button"
+                className={
+                  currencyView === 'usd'
+                    ? 'financial-reports-view-toggle-active'
+                    : 'financial-reports-view-toggle-muted'
+                }
+                aria-pressed={currencyView === 'usd'}
+                onClick={() => setCurrencyView('usd')}
+              >
+                Consolidated USD
+              </button>
+              <button
+                type="button"
+                className={
+                  currencyView === 'lbp'
+                    ? 'financial-reports-view-toggle-active'
+                    : 'financial-reports-view-toggle-muted'
+                }
+                aria-pressed={currencyView === 'lbp'}
+                disabled={rate == null}
+                title={
+                  rate == null
+                    ? 'Set 1 USD = LBP in Settings to switch to LBP guide'
+                    : `Convert amounts using 1 USD = ${formatUsdLbpRate(rate)} from GET /settings`
+                }
+                onClick={() => setCurrencyView('lbp')}
+              >
+                {rate != null ? `LBP guide · ${formatUsdLbpRate(rate)}` : 'LBP guide · set rate'}
+              </button>
             </div>
+            {rate == null ? (
+              <p className="muted text-sm" style={{ margin: '8px 0 0' }}>
+                No exchange rate on the server.{' '}
+                <Link href="/settings" className="text-link">
+                  Set USD / LBP in Settings
+                </Link>
+                .
+              </p>
+            ) : null}
           </Field>
           <Field label="Fiscal period">
             <select
@@ -275,7 +349,7 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
             <article className="financial-reports-kpi">
               <p className="financial-reports-kpi-label">Gross revenue</p>
               <p className="financial-reports-kpi-value tabular">
-                <PriceWithLbp usd={revenue} strong />
+                <ReportAmount usd={revenue} strong currencyView={currencyView} rate={rate} />
               </p>
               <p className="muted financial-reports-kpi-foot">
                 {formatNumber(totals.salesCount)} {totals.salesCount === 1 ? 'sale' : 'sales'} in range
@@ -283,19 +357,26 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
             </article>
             <article className="financial-reports-kpi financial-reports-kpi--gold">
               <p className="financial-reports-kpi-label">Cash (USD)</p>
-              <p className="financial-reports-kpi-value tabular">{formatPrice(cash)}</p>
+              <p className="financial-reports-kpi-value tabular">
+                <ReportAmount usd={cash} currencyView={currencyView} rate={rate} />
+              </p>
               <p className="muted financial-reports-kpi-foot">{cashPct}% of revenue</p>
             </article>
             <article className="financial-reports-kpi">
               <p className="financial-reports-kpi-label">Whish / digital</p>
-              <p className="financial-reports-kpi-value tabular">{formatPrice(whish)}</p>
+              <p className="financial-reports-kpi-value tabular">
+                <ReportAmount usd={whish} currencyView={currencyView} rate={rate} />
+              </p>
               <p className="muted financial-reports-kpi-foot">{whishPct}% of revenue</p>
             </article>
             <article className="financial-reports-kpi">
               <p className="financial-reports-kpi-label">Line discounts</p>
-              <p className="financial-reports-kpi-value tabular">{formatPrice(Number(totals.discounts))}</p>
+              <p className="financial-reports-kpi-value tabular">
+                <ReportAmount usd={Number(totals.discounts)} currencyView={currencyView} rate={rate} />
+              </p>
               <p className="muted financial-reports-kpi-foot">
-                In-store {formatPrice(Number(totals.inStore))} · Social {formatPrice(Number(totals.socialMedia))}
+                In-store <ReportAmount usd={Number(totals.inStore)} currencyView={currencyView} rate={rate} /> · Social{' '}
+                <ReportAmount usd={Number(totals.socialMedia)} currencyView={currencyView} rate={rate} />
               </p>
             </article>
           </div>
@@ -324,7 +405,9 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
                       <div key={row.name} className="financial-reports-category-row">
                         <div className="financial-reports-category-head">
                           <span>{row.name}</span>
-                          <span className="tabular">{formatPrice(row.revenue)}</span>
+                          <span className="tabular">
+                            <ReportAmount usd={row.revenue} currencyView={currencyView} rate={rate} />
+                          </span>
                         </div>
                         <div className="financial-reports-category-bar" aria-hidden="true">
                           <span style={{ width: `${pct}%` }} />
@@ -348,7 +431,7 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
                   <tr>
                     <th scope="col">Period</th>
                     <th scope="col" className="num">
-                      Revenue (USD)
+                      {revenueHeader}
                     </th>
                     <th scope="col" className="num">
                       Sales
@@ -370,11 +453,19 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
                     return (
                       <tr key={month}>
                         <th scope="row">{monthLabel(month)}</th>
-                        <td className="num tabular financial-reports-amount">{formatPrice(Number(rolled.revenue))}</td>
+                        <td className="num tabular financial-reports-amount">
+                          <ReportAmount usd={Number(rolled.revenue)} currencyView={currencyView} rate={rate} />
+                        </td>
                         <td className="num tabular">{rolled.salesCount}</td>
-                        <td className="num tabular">{formatPrice(Number(rolled.cash))}</td>
-                        <td className="num tabular">{formatPrice(Number(rolled.whish))}</td>
-                        <td className="num tabular">{formatPrice(Number(rolled.discounts))}</td>
+                        <td className="num tabular">
+                          <ReportAmount usd={Number(rolled.cash)} currencyView={currencyView} rate={rate} />
+                        </td>
+                        <td className="num tabular">
+                          <ReportAmount usd={Number(rolled.whish)} currencyView={currencyView} rate={rate} />
+                        </td>
+                        <td className="num tabular">
+                          <ReportAmount usd={Number(rolled.discounts)} currencyView={currencyView} rate={rate} />
+                        </td>
                       </tr>
                     )
                   })}
@@ -408,9 +499,15 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
                       return (
                         <tr key={row.branch.id}>
                           <td>{name}</td>
-                          <td className="num tabular">{formatPrice(Number(row.revenue))}</td>
-                          <td className="num tabular">{formatPrice(Number(row.cash))}</td>
-                          <td className="num tabular">{formatPrice(Number(row.whish))}</td>
+                          <td className="num tabular">
+                            <ReportAmount usd={Number(row.revenue)} currencyView={currencyView} rate={rate} />
+                          </td>
+                          <td className="num tabular">
+                            <ReportAmount usd={Number(row.cash)} currencyView={currencyView} rate={rate} />
+                          </td>
+                          <td className="num tabular">
+                            <ReportAmount usd={Number(row.whish)} currencyView={currencyView} rate={rate} />
+                          </td>
                         </tr>
                       )
                     })}
@@ -449,7 +546,9 @@ export function FinancialReportsView({ embedded = false }: { embedded?: boolean 
                           size={row.sku.size}
                         />
                         <td className="num">{row.quantity}</td>
-                        <td className="num tabular">{formatPrice(Number(row.revenue))}</td>
+                        <td className="num tabular">
+                          <ReportAmount usd={Number(row.revenue)} currencyView={currencyView} rate={rate} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

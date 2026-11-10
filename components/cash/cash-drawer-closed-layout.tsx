@@ -4,12 +4,12 @@ import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import { OpenDrawerPanel } from '@/components/cash/open-drawer-panel'
 import { CashShiftTimeline } from '@/components/cash/cash-shift-timeline'
-import { useCashSessions } from '@/hooks/use-cash-sessions'
+import { useCashSessionsWithTotals } from '@/hooks/use-cash-sessions'
 import { PriceWithLbp } from '@/components/shared/price-with-lbp'
 import { priceOf } from '@/lib/api/map-catalog'
 import { formatPrice } from '@/lib/format'
 import { cashHubHref } from '@/lib/cash-hub'
-import { cashSessionListItems, cashSessionTotals } from '@/lib/cash-display'
+import { cashSessionListItems, cashSessionListTotalsMissing, cashSessionTotals } from '@/lib/cash-display'
 
 export function CashDrawerClosedLayout({
   branchId,
@@ -23,10 +23,14 @@ export function CashDrawerClosedLayout({
   /** `requireOpenCashSession` and no drawer open */
   salesBlocked: boolean
 }) {
-  const recent = useCashSessions({ branchId, status: 'closed', offset: 0 })
+  const recent = useCashSessionsWithTotals({ branchId, status: 'closed', offset: 0 })
   const recentRows = cashSessionListItems(recent.data?.items).slice(0, 6)
   const lastClosed = recentRows[0]
-  const lastNet = lastClosed ? priceOf(cashSessionTotals(lastClosed).salesTotal) : null
+  const lastNetKnown =
+    lastClosed && !cashSessionListTotalsMissing(lastClosed)
+      ? priceOf(cashSessionTotals(lastClosed).salesTotal)
+      : null
+  const lastNetPending = Boolean(lastClosed) && recent.isEnrichingTotals && lastNetKnown === null
 
   return (
     <div className="cash-z-page">
@@ -72,10 +76,22 @@ export function CashDrawerClosedLayout({
         <article className="cash-z-kpi cash-z-kpi--idle">
           <p className="cash-z-kpi-label">Last closed shift</p>
           <p className="cash-z-kpi-value tabular">
-            {lastNet !== null ? <PriceWithLbp usd={lastNet} strong /> : '—'}
+            {lastNetKnown !== null ? (
+              <PriceWithLbp usd={lastNetKnown} strong />
+            ) : lastNetPending ? (
+              '…'
+            ) : (
+              '—'
+            )}
           </p>
           <p className="cash-z-kpi-detail muted">
-            {lastClosed ? `Net sales · ${formatPrice(lastNet ?? 0)}` : 'No prior session on record'}
+            {lastClosed
+              ? lastNetKnown !== null
+                ? `Net sales · ${formatPrice(lastNetKnown)}`
+                : lastNetPending
+                  ? 'Loading last shift totals…'
+                  : 'Net sales · —'
+              : 'No prior session on record'}
           </p>
         </article>
         <article className="cash-z-kpi cash-z-kpi--idle">
@@ -116,7 +132,11 @@ export function CashDrawerClosedLayout({
           Could not load past shifts: {recent.error instanceof Error ? recent.error.message : 'Request failed'}
         </p>
       ) : (
-        <CashShiftTimeline sessions={recentRows} activeId="" loading={recent.isPending} />
+        <CashShiftTimeline
+          sessions={recentRows}
+          activeId=""
+          loading={recent.isPending || recent.isEnrichingTotals}
+        />
       )}
     </div>
   )

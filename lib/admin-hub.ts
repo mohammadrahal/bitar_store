@@ -1,5 +1,12 @@
 /** Query `section` on `/admin`. admin tools in one screen. */
-export type AdminHubSection = 'users' | 'locations' | 'opening-stock' | 'reports' | 'audit' | 'settings'
+export type AdminHubSection =
+  | 'users'
+  | 'locations'
+  | 'opening-stock'
+  | 'reports'
+  | 'audit'
+  | 'settings'
+  | 'suppliers'
 
 const SECTION_VALUES: readonly AdminHubSection[] = [
   'users',
@@ -8,6 +15,7 @@ const SECTION_VALUES: readonly AdminHubSection[] = [
   'reports',
   'audit',
   'settings',
+  'suppliers',
 ]
 
 export function parseAdminHubSection(value: string | null): AdminHubSection | null {

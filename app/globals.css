@@ -1409,6 +1409,53 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: l
   font-weight: 600;
   color: hsl(var(--foreground));
 }
+/* B2C invoice detail: USD + LBP stack under right-aligned headers. */
+.card-table.card-table--invoice-detail {
+  table-layout: fixed;
+}
+.card-table.card-table--invoice-detail th.num,
+.card-table.card-table--invoice-detail td.num {
+  text-align: right;
+  vertical-align: top;
+  width: 9.5rem;
+}
+.card-table.card-table--invoice-detail th.num:last-child,
+.card-table.card-table--invoice-detail td.num:last-child {
+  width: 10.5rem;
+}
+.card-table.card-table--invoice-detail td.num .price-with-lbp,
+.card-table.card-table--invoice-detail td.num .invoice-amount-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+  min-width: 6.5rem;
+}
+.card-table.card-table--invoice-payment th:nth-child(1),
+.card-table.card-table--invoice-payment td:nth-child(1) {
+  width: 40%;
+}
+.card-table.card-table--invoice-payment th.num,
+.card-table.card-table--invoice-payment td.num {
+  width: 32%;
+}
+.invoice-amount-stack--lbp-primary .invoice-amount-primary {
+  font-weight: 600;
+  font-size: var(--fs-md);
+}
+.invoice-amount-stack .invoice-amount-change {
+  display: block;
+  margin-top: 2px;
+}
+.invoice-lbp-footnote-wrap {
+  padding-top: 0;
+  border-top: 1px solid hsl(var(--border) / 0.5);
+  margin-top: 4px;
+}
+.invoice-lbp-footnote {
+  margin: 0;
+}
 .table-wrap td.cell-alert { color: hsl(var(--destructive)); font-weight: 500; }
 /* Financial / audit tables: balanced columns so text columns do not read as one huge gap. */
 .card-table.card-table--report-summary {

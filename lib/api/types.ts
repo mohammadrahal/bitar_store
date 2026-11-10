@@ -360,6 +360,19 @@ export interface ApiSalesSummaryRow {
   whish: string
   inStore: string
   socialMedia: string
+  /**
+   * What the returns approved in this period give back, and `revenue` less that.
+   *
+   * These two arrived with the returns API; an older server omits them, so read
+   * them through `refundsOf` / `netRevenueOf` rather than directly.
+   *
+   * `netRevenue` can be **negative** for a branch: a refund is counted at the
+   * branch that handed the money back, which may not be the branch that sold
+   * the goods. Do not clamp it to zero — a negative figure is the true picture
+   * of a branch that only took returns that day.
+   */
+  refunds?: string
+  netRevenue?: string
 }
 
 /**
@@ -451,7 +464,7 @@ export interface AuditEventParams {
 }
 
 export type ApiSaleChannel = 'in_store' | 'social_media'
-export type ApiSocialPlatform = 'facebook' | 'instagram' | 'whatsapp' | 'other'
+export type ApiSocialPlatform = 'facebook' | 'instagram' | 'whatsapp' | 'tiktok' | 'other'
 export type ApiPaymentMethod = 'cash' | 'whish'
 
 export interface ApiSaleLineDiscountPercent {
@@ -615,6 +628,9 @@ export interface CreateSalePaymentInput {
   amount: string | number
   tendered?: string | number
   reference?: string
+  currency?: 'USD' | 'LBP'
+  /** USD value of the change given back in pounds. */
+  changeLbp?: string | number
 }
 
 export interface CreateSaleInput {
@@ -847,6 +863,9 @@ export interface ApiInvoiceSummary {
   subtotal: string
   discountTotal: string
   total: string
+  /** B2C from sale: rate frozen at checkout. B2B usually null. */
+  exchangeRate?: number | null
+  totalLbp?: number | null
   note: string | null
   issuedBy: { id: string; name: string | null }
   createdAt: string
@@ -871,7 +890,9 @@ export type ApiInvoicePriceSource = 'cost' | 'manual' | 'missing' | 'sale' | nul
 
 export interface ApiInvoiceLine {
   lineNo: number
-  sku: { id: string; code: string }
+  sku: { id: string; code: string; barcode?: string | null }
+  /** Primary variant barcode when the API includes it on the invoice line. */
+  barcode?: string | null
   description: string
   quantity: number
   unitPrice: string
@@ -881,9 +902,20 @@ export interface ApiInvoiceLine {
   priceSource?: ApiInvoicePriceSource
 }
 
+export type ApiInvoicePaymentCurrency = 'USD' | 'LBP'
+
+export interface ApiInvoicePayment {
+  method: string
+  amount: string
+  reference: string | null
+  currency?: ApiInvoicePaymentCurrency
+  lbpAmount?: number | null
+  changeLbp?: number | null
+}
+
 export interface ApiInvoice extends ApiInvoiceSummary {
   lines: ApiInvoiceLine[]
-  payments: { method: string; amount: string; reference: string | null }[]
+  payments: ApiInvoicePayment[]
 }
 
 export interface ListInvoicesParams {
@@ -947,7 +979,7 @@ export interface ApiCashMovement {
   amount: string
   reason: string
   at: string
-  by: { id: string; name: string | null }
+  by?: { id: string; name: string | null }
 }
 
 /** One person taking the drawer from another. Counted by the person TAKING it. */
@@ -971,12 +1003,13 @@ export interface ApiCashCorrection {
   value: string
   reason: string
   at: string
-  by: { id: string; name: string | null }
+  by?: { id: string; name: string | null }
 }
 
 export interface ApiCashClosing {
   at: string
-  by: { id: string; name: string | null }
+  /** Omitted on some older cash-session payloads. */
+  by?: { id: string; name: string | null }
   countedCash: string
   cashRemoved: string
   /** counted - removed: what stays in the drawer for tomorrow. */
@@ -1029,7 +1062,8 @@ export interface ApiCashSessionSummary {
   openedAt: string
   openedBy: { id: string; name: string | null }
   closedAt: string | null
-  totals: ApiCashSessionTotals
+  /** Present on detail and current session; list may omit until enriched. */
+  totals?: ApiCashSessionTotals
   review: ApiCashSessionReview
 }
 
@@ -1087,4 +1121,310 @@ export interface ListCashSessionsParams {
   to?: string
   limit?: number
   offset?: number
+}
+
+/* ------------------------------------------------------------------ *
+ * Customer returns: `/returns` (BL-04 rules 31 to 37)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Where a return has got to.
+ *
+ * `in_custody` means the shop is holding goods that are still the **customer's**
+ * — no stock has moved. Approval is the single moment the units enter the
+ * business's own on-hold bucket; `release` is what later puts them on the shelf.
+ * A rejected return waits at `rejected` until the customer collects it, which
+ * is `handed_back`.
+ */
+export type ApiReturnStatus = 'in_custody' | 'approved' | 'rejected' | 'handed_back'
+
+/**
+ * Whether the shop physically has the goods.
+ *
+ * A customer who starts a return but keeps the item is `customer_keeps`, and
+ * the server **refuses to approve** that return until `POST /returns/:id/custody`
+ * records that the goods came in. Nothing is refunded for an item nobody has
+ * seen.
+ */
+export type ApiReturnCustody = 'with_branch' | 'customer_keeps'
+
+/**
+ * The condition recorded on each returned unit.
+ *
+ * These four are the server's list. They do **not** change the refund: rule 35
+ * is the amount actually paid, and the condition only tells the manager what to
+ * do with the unit when deciding whether to release it. There is no retention
+ * percentage and no grade haircut.
+ */
+export type ApiReturnCondition = 'as_new' | 'minor_flaws' | 'needs_repair' | 'damaged'
+
+export interface ApiReturnLine {
+  id: string
+  saleLineId: string
+  sku: { id: string; code: string }
+  description: string
+  quantity: number
+  condition: ApiReturnCondition
+  /** Fixed at approval: what was paid for these units. `null` until then. */
+  refundValue: string | null
+  /** Moved from hold to sellable by `POST /returns/:id/release`. */
+  releasedQty: number
+  /** Approved and not yet released. A release can never exceed this. */
+  onHold: number
+}
+
+export interface ApiReturnRefundPayment {
+  id: string
+  method: 'cash' | 'whish'
+  amount: string
+  recipient: string
+  /** Whish only — the server rejects a reference on a cash refund. */
+  reference: string | null
+  by: { id: string; name: string | null }
+  at: string
+}
+
+/**
+ * The money owed, fixed when the manager approves and paid separately.
+ *
+ * `null` while the return is in custody, and on a rejected one: there is no
+ * refund to speak of. `outstanding` is what may still be paid, and the server
+ * refuses a payment above it, so read it rather than subtracting by hand.
+ */
+export interface ApiReturnRefund {
+  total: string
+  paid: string
+  outstanding: string
+  status: 'pending' | 'paid'
+  payments: ApiReturnRefundPayment[]
+}
+
+/**
+ * An exchange: this return linked to the replacement sale (rule 36).
+ *
+ * `net` is the new sale's total less the refund. Positive means the customer
+ * pays the difference (`customer_pays`), negative means the shop owes it
+ * (`business_pays`). Linking an exchange neither pays the refund nor releases
+ * the goods — those stay separate acts.
+ */
+export interface ApiReturnExchange {
+  saleId: string
+  saleReference: string
+  saleTotal: string
+  refundTotal: string
+  net: string
+  direction: 'customer_pays' | 'business_pays' | 'even'
+  linkedBy: { id: string; name: string | null }
+  linkedAt: string
+}
+
+export interface ApiReturn {
+  id: string
+  /** `RET-00000001`, issued by the server. */
+  reference: string
+  status: ApiReturnStatus
+  custody: ApiReturnCustody
+  sale: { id: string; reference: string; branch: { id: string; name: string }; soldAt: string }
+  /** Where the goods were handed in — not necessarily where they were sold. */
+  receivingBranch: { id: string; code: string; name: string }
+  reason: string
+  note: string | null
+  /** A manager's written exception for a return past the return window. */
+  lateExceptionReason: string | null
+  receivedBy: { id: string; name: string | null }
+  receivedAt: string
+  /** Who approved or rejected it, and why. `null` while in custody. */
+  decision: { by: { id: string; name: string | null }; at: string; reason: string | null } | null
+  /** Who collected a rejected return, and who handed it over. */
+  handback: { to: string; by: { id: string; name: string | null }; at: string } | null
+  lines: ApiReturnLine[]
+  exchange: ApiReturnExchange | null
+  refund: ApiReturnRefund | null
+}
+
+/** A row of `GET /returns`. `refundTotal` is `null` until the return is approved. */
+export interface ApiReturnSummary {
+  id: string
+  reference: string
+  status: ApiReturnStatus
+  saleReference: string
+  receivingBranch: { id: string; name: string }
+  receivedAt: string
+  units: number
+  refundTotal: string | null
+  refundOutstanding: string | null
+}
+
+export interface ApiReturnableSaleLine {
+  saleLineId: string
+  skuId: string
+  skuCode: string
+  description: string
+  sold: number
+  /** Units already approved back. */
+  returned: number
+  /** Units sitting in custody on an open return — they count against the limit. */
+  inCustody: number
+  /** `sold - returned - inCustody`: what this return may take. */
+  returnable: number
+  lineTotal: string
+}
+
+/**
+ * `GET /returns/eligible?sale=` — the sale a return starts from.
+ *
+ * The lookup takes either the sale's id or its printed number (`S-00000012`,
+ * case-insensitively), because the customer arrives holding a receipt and a
+ * return may be taken at **any** branch.
+ *
+ * `withinPeriod: false` does not end the matter: a manager may still receive
+ * the goods by sending `lateException.reason`. An employee cannot.
+ */
+export interface ApiReturnableSale {
+  sale: {
+    id: string
+    reference: string
+    status: string
+    branch: { id: string; name: string }
+    soldAt: string
+    businessDate: string
+    total: string
+  }
+  /** From `GET /settings`, so the window is the shop's, not a constant. */
+  returnPeriodDays: number
+  daysSinceSale: number
+  withinPeriod: boolean
+  lines: ApiReturnableSaleLine[]
+}
+
+export interface CreateReturnInput {
+  saleId: string
+  /** The branch taking the goods in. The warehouse is refused. */
+  receivingBranchId: string
+  /** The server defaults this to `with_branch`. */
+  custody?: ApiReturnCustody
+  /** 3 to 200 characters. */
+  reason: string
+  /** At most 200 characters. */
+  note?: string
+  lines: { skuId: string; quantity: number; condition: ApiReturnCondition }[]
+  /** Manager-only, and only needed past the return window. 3 to 200 characters. */
+  lateException?: { reason: string }
+}
+
+/** An optional note on the approval; the decision itself needs no body. */
+export interface ApproveReturnInput {
+  reason?: string
+}
+
+/** Rejecting **requires** a reason (3 to 200 characters). */
+export interface RejectReturnInput {
+  reason: string
+}
+
+/** Who collected the goods (2 to 100 characters). */
+export interface HandbackReturnInput {
+  recipient: string
+}
+
+/** Omit `lines` to release everything still on hold. */
+export interface ReleaseReturnInput {
+  lines?: { returnLineId: string; quantity: number }[]
+}
+
+export interface RefundPaymentInput {
+  method: 'cash' | 'whish'
+  /** Decimal string. Above zero, and never more than `refund.outstanding`. */
+  amount: string
+  /** Who received the money (2 to 100 characters). */
+  recipient: string
+  /** Whish only — sending one with `cash` is a 400. */
+  reference?: string
+}
+
+/** The replacement sale. Made at the receiving branch, after the goods came in. */
+export interface LinkExchangeInput {
+  saleId: string
+}
+
+export interface ListReturnsParams {
+  /** The receiving branch. */
+  branchId?: string
+  saleId?: string
+  status?: ApiReturnStatus
+  from?: string
+  to?: string
+  limit?: number
+  offset?: number
+}
+
+/* ------------------------------------------------------------------ *
+ * Cost and profit: `/costs`
+ * ------------------------------------------------------------------ */
+
+/**
+ * `GET /costs/skus/:id` — what a piece costs. Admin or manager only.
+ *
+ * Two independent figures, both **four-decimal** strings (`"9.5000"`):
+ * `catalogCost` is what a manager typed, and `warehouseAverageCost` is what the
+ * warehouse actually paid on average across its receipts. A supply invoice
+ * prices from the warehouse average and falls back to the catalog cost when the
+ * warehouse has none yet (opening stock), which is what stops a line reading
+ * `priceSource: 'missing'`.
+ *
+ * This is the server-side replacement for the device-local
+ * `bitar:catalog-costs:v1` store, where a cost typed on one laptop was
+ * invisible everywhere else.
+ */
+export interface ApiSkuCost {
+  skuId: string
+  skuCode: string
+  catalogCost: string | null
+  warehouseAverageCost: string | null
+}
+
+/** `PUT /costs/skus/:id`. `null` clears the catalog cost. Max 100,000.00. */
+export interface SetSkuCostInput {
+  unitCost: string | number | null
+}
+
+/**
+ * One branch's trading result over the period.
+ *
+ * `revenue`, `cost` and `profit` are what was **sold**. A line whose cost was
+ * never known is not guessed: its revenue is set aside in `unknownCostRevenue`,
+ * so `profit` is only ever the margin on goods whose cost is known. Reading
+ * `revenue - cost` as the margin would overstate it by exactly that amount.
+ *
+ * `refunds` and `returnedCost` are the returns approved in the period, counted
+ * at the branch that handed the money back. `netProfit` is therefore the profit
+ * on what the customers actually kept.
+ */
+export interface ApiProfitRow {
+  branchId: string
+  revenue: string
+  cost: string
+  profit: string
+  unknownCostRevenue: string
+  salesCount: number
+  refunds: string
+  returnedCost: string
+  netRevenue: string
+  netProfit: string
+}
+
+export type ApiProfitTotals = Omit<ApiProfitRow, 'branchId'>
+
+/** `GET /costs/profit`. Needs `reports.financial` **and** an admin or manager role. */
+export interface ApiProfitReport {
+  from: string
+  to: string
+  totals: ApiProfitTotals
+  byBranch: ApiProfitRow[]
+}
+
+export interface ProfitReportParams {
+  branchId?: string
+  from?: string
+  to?: string
 }

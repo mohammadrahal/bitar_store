@@ -5,7 +5,7 @@ import { Field } from '@/components/shared/field'
 import { Panel } from '@/components/shared/panel'
 import { useIdempotencyKey } from '@/hooks/use-idempotency-key'
 import { useRecordCashMovement } from '@/hooks/use-cash-sessions'
-import { cashSessionTotals } from '@/lib/cash-display'
+import { actorName, cashSessionTotals } from '@/lib/cash-display'
 import { priceOf } from '@/lib/api/map-catalog'
 import { formatPrice, formatRelativeDateTime } from '@/lib/format'
 import { MAX_CASH_TENDERED, parseMoneyInput } from '@/lib/input-limits'
@@ -93,7 +93,7 @@ export function CashMovementPanel({ session, canMove }: { session: ApiCashSessio
                 inputMode="decimal"
                 className="tabular"
                 value={amount}
-                placeholder="0.00"
+                placeholder="0"
                 onChange={(event) => setAmount(event.target.value.replace(/[^\d.]/g, ''))}
               />
             </Field>
@@ -142,7 +142,7 @@ export function CashMovementPanel({ session, canMove }: { session: ApiCashSessio
                     {movement.reason}
                     <small>{formatRelativeDateTime(movement.at)}</small>
                   </td>
-                  <td>{movement.by.name ?? 'Unknown'}</td>
+                  <td>{actorName(movement.by)}</td>
                   <td className={`num tabular ${movement.direction === 'out' ? 'detail-alert' : ''}`}>
                     {movement.direction === 'out' ? '−' : '+'}
                     {formatPrice(priceOf(movement.amount))}

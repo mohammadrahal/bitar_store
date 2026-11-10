@@ -1,10 +1,16 @@
 'use client'
 
-import { formatPrice } from '@/lib/format'
+import { PriceWithLbp } from '@/components/shared/price-with-lbp'
+import { formatLbp } from '@/lib/format'
+import { useExchangeRate } from '@/hooks/use-settings'
+import { usdToLbp } from '@/services/settings.service'
 import { amountsOf, changeDue, type PaymentDraft } from '@/lib/sale-payments'
 import { toCents } from '@/lib/money'
 
 export function InvoicePaymentReadout({ payment, total }: { payment?: PaymentDraft; total: number }) {
+  const rate = useExchangeRate().rate
+  const changeLbp = payment ? usdToLbp(changeDue(payment, total, rate), rate) : null
+
   if (!payment || toCents(total) <= 0) {
     return (
       <section className="invoice-payment-section" aria-label="Payment">
@@ -15,7 +21,7 @@ export function InvoicePaymentReadout({ payment, total }: { payment?: PaymentDra
   }
 
   const { cash, whish } = amountsOf(payment, total)
-  const change = changeDue(payment, total)
+  const change = changeDue(payment, total, rate)
 
   return (
     <section className="invoice-payment-section" aria-label="Payment">
@@ -25,16 +31,23 @@ export function InvoicePaymentReadout({ payment, total }: { payment?: PaymentDra
           <>
             <div>
               <dt>Cash</dt>
-              <dd className="tabular">{formatPrice(cash)}</dd>
+              <dd className="tabular">
+                <PriceWithLbp usd={cash} exchangeRateUsdLbp={rate} />
+              </dd>
             </div>
             <div>
               <dt>Cash received</dt>
-              <dd className="tabular">{formatPrice(payment.tendered)}</dd>
+              <dd className="tabular">
+                <PriceWithLbp usd={payment.tendered} exchangeRateUsdLbp={rate} />
+              </dd>
             </div>
             {change > 0 && (
               <div>
                 <dt>Change</dt>
-                <dd className="tabular">{formatPrice(change)}</dd>
+                <dd className="tabular">
+                  <PriceWithLbp usd={change} exchangeRateUsdLbp={rate} />
+                  {changeLbp != null ? <small className="muted block">≈ {formatLbp(changeLbp)} LBP</small> : null}
+                </dd>
               </div>
             )}
           </>
@@ -43,7 +56,9 @@ export function InvoicePaymentReadout({ payment, total }: { payment?: PaymentDra
           <>
             <div>
               <dt>Whish</dt>
-              <dd className="tabular">{formatPrice(whish)}</dd>
+              <dd className="tabular">
+                <PriceWithLbp usd={whish} exchangeRateUsdLbp={rate} />
+              </dd>
             </div>
             <div>
               <dt>Whish reference</dt>

@@ -1,5 +1,6 @@
 'use client'
 
+import { actorName } from '@/lib/cash-display'
 import { Panel } from '@/components/shared/panel'
 import { priceOf } from '@/lib/api/map-catalog'
 import { formatPrice, formatRelativeDateTime } from '@/lib/format'
@@ -54,7 +55,7 @@ export function CashClosingComparison({
       description={
         corrected
           ? 'What was counted, and what it stands at after a manager’s correction. The original count is never overwritten.'
-          : `Counted by ${closing.by.name ?? 'Unknown'} ${formatRelativeDateTime(closing.at)}.`
+          : `Counted by ${actorName(closing.by)}${closing.at ? ` ${formatRelativeDateTime(closing.at)}` : ''}.`
       }
     >
       <div className="table-wrap">
@@ -119,7 +120,7 @@ export function CashClosingComparison({
                       {correction.reason} · {formatRelativeDateTime(correction.at)}
                     </small>
                   </td>
-                  <td>{correction.by.name ?? 'Unknown'}</td>
+                  <td>{actorName(correction.by)}</td>
                   <td className="num tabular">{formatPrice(priceOf(correction.value))}</td>
                 </tr>
               ))}

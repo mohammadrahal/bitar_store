@@ -26,6 +26,9 @@ import { getApiClient } from '@/lib/api'
 import type { ApiSale, ApiSaleLine } from '@/lib/api/types'
 import { formatPrice, formatNumber } from '@/lib/format'
 import { queryKeys } from '@/lib/query-keys'
+import { InvoiceLineBarcode } from '@/components/sales/invoice-line-barcode'
+import { primaryBarcodeFor, useSkuBarcodes } from '@/hooks/use-sku-barcodes'
+import { saleChannelLabel } from '@/lib/sale-channel'
 import { salePaymentKind } from '@/lib/sale-payments'
 import { findB2cInvoiceForSale, invoiceLabel } from '@/services/invoices-api.service'
 import { usdToLbp } from '@/services/settings.service'
@@ -43,13 +46,6 @@ function formatSaleWhen(iso: string) {
   return `${day} · ${time}`
 }
 
-function channelLabel(sale: ApiSale) {
-  if (sale.channel === 'social_media') {
-    return sale.socialPlatform ? `Social · ${sale.socialPlatform}` : 'Social'
-  }
-  return 'In store'
-}
-
 function paymentStatusLabel(sale: ApiSale) {
   const kind = salePaymentKind(sale.payments)
   const method =
@@ -58,7 +54,7 @@ function paymentStatusLabel(sale: ApiSale) {
 }
 
 function lineDiscountText(line: ApiSaleLine) {
-  if (!line.discount) return '0% / $0.00'
+  if (!line.discount) return `0% / ${formatPrice(0)}`
   if (line.discount.type === 'percent') return `${line.discount.percent}% / —`
   return 'Override / —'
 }
@@ -74,6 +70,7 @@ function SaleLinesTable({ lines, subtotal, discount, total }: {
   discount: number
   total: number
 }) {
+  const barcodeMap = useSkuBarcodes(lines.map((line) => line.skuId))
   const rateQuery = useExchangeRate()
   const lbpTotal = usdToLbp(total, rateQuery.rate)
   const { visible, page, pageCount, total: rowTotal, pageSize, setPage } = usePagination(lines, 15)
@@ -86,6 +83,7 @@ function SaleLinesTable({ lines, subtotal, discount, total }: {
             <tr>
               <th scope="col">Item &amp; details</th>
               <th scope="col">SKU</th>
+              <th scope="col">Barcode</th>
               <th scope="col" className="num">
                 Qty
               </th>
@@ -107,6 +105,9 @@ function SaleLinesTable({ lines, subtotal, discount, total }: {
                   {line.styleName} {line.color} / {line.size}
                 </td>
                 <td className="td-code tabular">{line.skuCode}</td>
+                <td className="invoice-line-barcode-cell">
+                  <InvoiceLineBarcode code={primaryBarcodeFor(line.skuId, barcodeMap.data)} />
+                </td>
                 <td className="num tabular">{formatNumber(line.quantity)}</td>
                 <td className="num tabular">
                   <PriceWithLbp usd={Number(line.unitPrice)} />
@@ -206,7 +207,7 @@ export function SaleDetailView({ saleId }: { saleId: string }) {
             <p className="sale-invoice-total tabular">
               <PriceWithLbp usd={total} strong />
             </p>
-            <span className="sale-invoice-channel">{channelLabel(sale)}</span>
+            <span className="sale-invoice-channel">{saleChannelLabel(sale.channel, sale.socialPlatform)}</span>
           </div>
           <span className="sale-invoice-status-pill">{paymentStatusLabel(sale)}</span>
           <p className="sale-invoice-meta muted">

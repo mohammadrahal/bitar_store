@@ -22,9 +22,11 @@ export { createBranchesApi, type BranchesApi } from '@/lib/api/branches.api'
 export { createCashSessionsApi, type CashSessionsApi } from '@/lib/api/cash-sessions.api'
 export { createCatalogApi, type CatalogApi } from '@/lib/api/catalog.api'
 export { createCategoriesApi, type CategoriesApi } from '@/lib/api/categories.api'
+export { createCostsApi, type CostsApi } from '@/lib/api/costs.api'
 export { createDashboardApi, type DashboardApi } from '@/lib/api/dashboard.api'
 export { createGoodsReceiptsApi, type GoodsReceiptsApi } from '@/lib/api/goods-receipts.api'
 export { createInvoicesApi, type InvoicesApi } from '@/lib/api/invoices.api'
+export { createReturnsApi, type ReturnsApi } from '@/lib/api/returns.api'
 export { createSalesApi, type SalesApi } from '@/lib/api/sales.api'
 export { createSettingsApi, type SettingsApi } from '@/lib/api/settings.api'
 export { createStockApi, type StockApi } from '@/lib/api/stock.api'
@@ -126,4 +128,29 @@ export type {
   CloseCashSessionInput,
   CashCorrectionInput,
   ListCashSessionsParams,
+  ApiReturn,
+  ApiReturnSummary,
+  ApiReturnableSale,
+  ApiReturnableSaleLine,
+  ApiReturnLine,
+  ApiReturnRefund,
+  ApiReturnRefundPayment,
+  ApiReturnExchange,
+  ApiReturnStatus,
+  ApiReturnCustody,
+  ApiReturnCondition,
+  ApproveReturnInput,
+  CreateReturnInput,
+  HandbackReturnInput,
+  LinkExchangeInput,
+  ListReturnsParams,
+  RefundPaymentInput,
+  RejectReturnInput,
+  ReleaseReturnInput,
+  ApiSkuCost,
+  SetSkuCostInput,
+  ApiProfitReport,
+  ApiProfitRow,
+  ApiProfitTotals,
+  ProfitReportParams,
 } from '@/lib/api/types'

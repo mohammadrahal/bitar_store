@@ -4,13 +4,14 @@ import { AlertTriangle, Check, PackageX, Receipt, ShoppingBag } from 'lucide-rea
 import { StatCard, countOf } from '@/components/dashboard/stat-cards'
 import { StaggerList } from '@/components/motion/stagger'
 import { useDashboardTrend, useTrendComparison } from '@/hooks/use-dashboard-trend'
+import { useOperationsSummary } from '@/hooks/use-inventory'
 import { usePermission } from '@/hooks/use-permission'
 import { useStockHealth } from '@/hooks/use-stock-health'
 import { deltaOf, type RangeDays } from '@/lib/dashboard-range'
 import { formatNumber, formatPrice } from '@/lib/format'
 import { adminHubHref } from '@/lib/admin-hub'
 import { inventoryHref } from '@/lib/inventory-filters'
-import type { BranchScope } from '@/types'
+import { ALL_BRANCHES, type BranchScope } from '@/types'
 
 function RowSkeleton() {
   return (
@@ -37,20 +38,47 @@ export function KpiRow({ scope, days }: { scope: BranchScope; days: RangeDays })
   const trend = useDashboardTrend(scope, days)
   const previous = useTrendComparison(scope, days)
   const health = useStockHealth(scope)
-  const { can, canManageMinimums, canViewFinancialReports } = usePermission()
+  const { can, canManageMinimums, canViewFinancialReports, canViewTodayShopKpi } = usePermission()
+
+  const stock = can('stock.view') || canManageMinimums()
+  const money = canViewFinancialReports()
+  const branchScope = scope !== ALL_BRANCHES && scope !== '__none__'
+  const showTodayShop = branchScope && canViewTodayShopKpi(scope)
+  const todayShop = useOperationsSummary(scope, { enabled: showTodayShop })
 
   const since = `vs previous ${days} days`
   const revenueDelta = trend.data && previous.data ? deltaOf(trend.data.revenue, previous.data.revenue) : null
   const salesDelta = trend.data && previous.data ? deltaOf(trend.data.sales, previous.data.sales) : null
   const comparisonReady = Boolean(trend.data && previous.data)
 
-  const stock = can('stock.view') || canManageMinimums()
-  const money = canViewFinancialReports()
-
   if (money && !trend.data && !trend.isError) return <RowSkeleton />
 
   return (
     <StaggerList className="stats-grid">
+      {showTodayShop && (
+        <>
+          <StatCard
+            simple
+            label="Today's sales"
+            value={todayShop.data ? formatPrice(todayShop.data.todayRevenue) : ''}
+            animateValue={todayShop.data?.todayRevenue}
+            formatAnimated={formatPrice}
+            detail="Revenue · shop day"
+            icon={Receipt}
+            href="/sales/b2c"
+          />
+          <StatCard
+            simple
+            label="Sales today"
+            value={todayShop.data ? formatNumber(todayShop.data.todaySales) : ''}
+            animateValue={todayShop.data?.todaySales}
+            formatAnimated={formatNumber}
+            detail="This shop day"
+            icon={ShoppingBag}
+            href="/sales/b2c"
+          />
+        </>
+      )}
       {money && (
         <StatCard
           simple

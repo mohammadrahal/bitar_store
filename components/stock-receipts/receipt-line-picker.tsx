@@ -134,7 +134,7 @@ export function ReceiptLinePicker({
                           inputMode="decimal"
                           className="input input-sm tabular"
                           value={line.unitCost === 0 ? '' : line.unitCost}
-                          placeholder="0.00"
+                          placeholder="0"
                           aria-label={`Cost per piece of ${line.label}`}
                           onChange={(event) => setCost(line.skuId, Number(event.target.value) || 0)}
                         />

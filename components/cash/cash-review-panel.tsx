@@ -92,7 +92,7 @@ export function CashReviewPanel({ session }: { session: ApiCashSession }) {
               inputMode="decimal"
               className="tabular"
               value={value}
-              placeholder="0.00"
+              placeholder="0"
               onChange={(event) => setValue(event.target.value.replace(/[^\d.]/g, ''))}
             />
           </Field>

@@ -13,6 +13,8 @@ import {
   ScanLine,
   ScrollText,
   Tags,
+  Truck,
+  Undo2,
   Warehouse,
   type LucideIcon,
 } from 'lucide-react'
@@ -66,9 +68,8 @@ export function activeHref(current: string, hrefs: string[]) {
  * cannot open, and a section with nothing left in it disappears rather than
  * leaving a heading over a gap.
  *
- * Three links the brief asked for have no backend: **Social orders**,
- * **Suppliers** and **Stock control** (physical counts and holds). They are
- * absent rather than stubbed, and listed in `ARCHITECTURE.md` section 9.
+ * **Suppliers** uses `GET /suppliers`. **Social orders** and **Stock control**
+ * (physical counts and holds) still have no backend and stay absent.
  */
 export function useNavEntries(): NavSection[] {
   const {
@@ -82,6 +83,7 @@ export function useNavEntries(): NavSection[] {
     canDispatchTransfers,
     canManageMinimums,
     canViewFinancialReports,
+    canSeeReturns,
     canViewAdminWarehouseTools,
     canViewInvoicesLedger,
   } = usePermission()
@@ -111,6 +113,14 @@ export function useNavEntries(): NavSection[] {
   if (canAny(['cash.open', 'cash.accept', 'cash.close', 'cash.move'])) {
     sell.push({ href: '/cash', label: 'Cash drawer', icon: Banknote })
   }
+  /* Returns sit with the till for the same reason: the person who takes goods
+     back is standing at the counter. A manager's approve/release work is on
+     each return rather than a screen of its own, so one nav item covers both.
+     `canSeeReturns` is true for a manager by role, since deciding a return is
+     not a grantable permission. */
+  if (canSeeReturns()) {
+    sell.push({ href: '/returns', label: 'Returns', icon: Undo2 })
+  }
 
   const stock: NavLinkItem[] = []
   if (can('stock.view')) {
@@ -134,6 +144,9 @@ export function useNavEntries(): NavSection[] {
   if (canViewAdminWarehouseTools()) {
     stock.push({ href: '/stock-network', label: 'Stock everywhere', icon: Warehouse })
   }
+  if (can('stock.adjust')) {
+    stock.push({ href: '/suppliers', label: 'Suppliers', icon: Truck })
+  }
 
   const catalog: NavLinkItem[] = []
   if (can('catalog.view')) catalog.push({ href: '/products', label: 'Products', icon: Package })
@@ -153,6 +166,9 @@ export function useNavEntries(): NavSection[] {
     }
     if (canViewAdminWarehouseTools()) {
       admin.push({ href: adminHubHref('audit'), label: 'Audit log', icon: ScrollText })
+    }
+    if (can('stock.adjust')) {
+      admin.push({ href: adminHubHref('suppliers'), label: 'Suppliers', icon: Truck })
     }
   }
 

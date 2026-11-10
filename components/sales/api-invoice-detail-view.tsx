@@ -11,9 +11,20 @@ import { useApiInvoice, useFinalizeInvoice, useUpdateInvoicePrices } from '@/hoo
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { usePermission } from '@/hooks/use-permission'
 import { getApiClient } from '@/lib/api'
-import { invoiceLabel, linesMissingPrice, priceSourceLabel } from '@/services/invoices-api.service'
+import {
+  draftUnitPrice,
+  invoiceLabel,
+  linesMissingPriceWithDraft,
+  patchPayloadForMissingLines,
+  priceSourceLabel,
+} from '@/services/invoices-api.service'
+import { toast } from 'sonner'
+import { InvoiceLbpFootnote, InvoicePaymentAmount, invoicePaymentMethodLabel } from '@/components/sales/invoice-lbp'
+import { PriceWithLbp } from '@/components/shared/price-with-lbp'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
 import type { ApiInvoice } from '@/lib/api/types'
+import { InvoiceLineBarcode } from '@/components/sales/invoice-line-barcode'
+import { primaryBarcodeFor, useSkuBarcodes } from '@/hooks/use-sku-barcodes'
 
 function InvoiceLines({
   invoice,
@@ -26,6 +37,8 @@ function InvoiceLines({
   prices: Record<string, string>
   onPriceChange: (skuId: string, value: string) => void
 }) {
+  const barcodeMap = useSkuBarcodes(invoice.lines.map((line) => line.sku.id))
+  const showBarcode = invoice.kind === 'b2c'
   /*
    * Where a price came from is a **supply invoice** question.
    *
@@ -36,13 +49,15 @@ function InvoiceLines({
    * reader nothing and clutters the row it sits in.
    */
   const showPriceSource = invoice.kind === 'b2b'
+  const rate = invoice.exchangeRate
 
   return (
     <div className="table-wrap">
-      <table className="card-table">
+      <table className="card-table card-table--invoice-detail">
         <thead>
           <tr>
             <th scope="col">Item</th>
+            {showBarcode ? <th scope="col">Barcode</th> : null}
             <th scope="col" className="num">
               Qty
             </th>
@@ -58,7 +73,11 @@ function InvoiceLines({
           {invoice.lines.map((line) => (
             <tr
               key={line.lineNo}
-              className={showPriceSource && line.priceSource === 'missing' ? 'detail-alert' : undefined}
+              className={
+                showPriceSource && line.priceSource === 'missing' && draftUnitPrice(prices, line) === null
+                  ? 'detail-alert'
+                  : undefined
+              }
             >
               <td className="card-title">
                 {line.description}
@@ -68,6 +87,17 @@ function InvoiceLines({
                     : line.sku.code}
                 </small>
               </td>
+              {showBarcode ? (
+                <td className="invoice-line-barcode-cell">
+                  <InvoiceLineBarcode
+                    code={primaryBarcodeFor(
+                      line.sku.id,
+                      barcodeMap.data,
+                      line.barcode ?? line.sku.barcode,
+                    )}
+                  />
+                </td>
+              ) : null}
               <td className="num tabular">{line.quantity}</td>
               <td className="num tabular">
                 {editable ? (
@@ -80,10 +110,12 @@ function InvoiceLines({
                     onChange={(event) => onPriceChange(line.sku.id, event.target.value)}
                   />
                 ) : (
-                  formatPrice(Number(line.unitPrice))
+                  <PriceWithLbp usd={Number(line.unitPrice)} exchangeRateUsdLbp={rate} />
                 )}
               </td>
-              <td className="num tabular">{formatPrice(Number(line.lineTotal))}</td>
+              <td className="num tabular">
+                <PriceWithLbp usd={Number(line.lineTotal)} exchangeRateUsdLbp={rate} />
+              </td>
             </tr>
           ))}
         </tbody>
@@ -116,12 +148,12 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
       : '/sales/b2c'
 
   const isDraftB2b = invoice.kind === 'b2b' && invoice.status === 'draft' && !invoice.voided
-  const missingPrices = linesMissingPrice(invoice)
   const canEdit = isDraftB2b && canDispatchTransfers()
   const note = noteDraft ?? invoice.note ?? ''
   const prices =
     priceDrafts ??
     Object.fromEntries(invoice.lines.map((line) => [line.sku.id, line.unitPrice]))
+  const missingPrices = linesMissingPriceWithDraft(invoice, prices)
 
   const printPdf = async () => {
     const blob = await getApiClient().downloadInvoicePdf(invoice.id)
@@ -130,25 +162,50 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
   }
 
-  const saveDraft = () => {
-    const lines = invoice.lines
-      .map((line) => {
-        const raw = prices[line.sku.id] ?? line.unitPrice
-        const unitPrice = raw.trim()
-        if (!unitPrice || unitPrice === line.unitPrice) return null
-        return { skuId: line.sku.id, unitPrice }
-      })
-      .filter(Boolean) as { skuId: string; unitPrice: string }[]
+  const saveDraft = async () => {
+    const missingPatches = patchPayloadForMissingLines(invoice, prices)
+    const lines = [
+      ...missingPatches,
+      ...invoice.lines
+        .map((line) => {
+          if (line.priceSource === 'missing') return null
+          const unitPrice = draftUnitPrice(prices, line)
+          if (!unitPrice || unitPrice === line.unitPrice.trim()) return null
+          return { skuId: line.sku.id, unitPrice }
+        })
+        .filter(Boolean),
+    ] as { skuId: string; unitPrice: string }[]
     const noteTrim = note.trim()
     const noteChanged = noteTrim !== (invoice.note ?? '').trim()
-    if (lines.length === 0 && !noteChanged) return
-    updatePrices.mutate({
+    if (lines.length === 0 && !noteChanged) {
+      toast.error('Nothing to save — enter a unit price greater than zero on unpriced lines.')
+      return
+    }
+    await updatePrices.mutateAsync({
       id: invoice.id,
       input: {
         ...(lines.length > 0 ? { lines } : {}),
         ...(noteChanged ? { note: noteTrim || undefined } : {}),
       },
     })
+    setPriceDrafts(null)
+  }
+
+  const handleFinalize = async () => {
+    if (missingPrices.length > 0) {
+      toast.error('Enter a unit price greater than zero on every highlighted line first.')
+      return
+    }
+    const pendingMissing = patchPayloadForMissingLines(invoice, prices)
+    try {
+      if (pendingMissing.length > 0) {
+        await updatePrices.mutateAsync({ id: invoice.id, input: { lines: pendingMissing } })
+        setPriceDrafts(null)
+      }
+      await finalize.mutateAsync(invoice.id)
+    } catch {
+      /* Errors are toasted in the mutation hooks. */
+    }
   }
 
   return (
@@ -199,23 +256,23 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
                   <button
                     type="button"
                     className="btn btn-secondary"
-                    disabled={updatePrices.isPending}
-                    onClick={saveDraft}
+                    disabled={updatePrices.isPending || finalize.isPending}
+                    onClick={() => void saveDraft()}
                   >
                     {updatePrices.isPending ? 'Saving…' : 'Save draft'}
                   </button>
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={finalize.isPending || missingPrices.length > 0}
+                    disabled={finalize.isPending || updatePrices.isPending || missingPrices.length > 0}
                     title={
                       missingPrices.length > 0
-                        ? 'Set a price on every line first. The server refuses a draft with an unpriced line'
+                        ? 'Enter a unit price greater than zero on every highlighted line'
                         : undefined
                     }
-                    onClick={() => finalize.mutate(invoice.id)}
+                    onClick={() => void handleFinalize()}
                   >
-                    {finalize.isPending ? 'Finalizing…' : 'Finalize invoice'}
+                    {finalize.isPending || updatePrices.isPending ? 'Finalizing…' : 'Finalize invoice'}
                   </button>
                 </div>
               </>
@@ -223,10 +280,10 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
             {isDraftB2b && missingPrices.length > 0 && (
               <p className="field-error" style={{ margin: 0 }}>
                 {missingPrices.length === 1
-                  ? `No purchase cost is known for ${missingPrices[0].sku.code}, so it is priced at 0.00.`
-                  : `No purchase cost is known for ${missingPrices.length} lines, so they are priced at 0.00.`}{' '}
+                  ? `No purchase cost is known for ${missingPrices[0].sku.code}, so it is priced at ${formatPrice(0)}.`
+                  : `No purchase cost is known for ${missingPrices.length} lines, so they are priced at ${formatPrice(0)}.`}{' '}
                 {canEdit
-                  ? 'Type the price above and save the draft; the invoice cannot be finalized until you do.'
+                  ? 'Type a unit price greater than zero in the line above, then Save draft or Finalize (Finalize saves prices first).'
                   : 'A warehouse manager has to price them before this invoice can be finalized.'}
               </p>
             )}
@@ -270,7 +327,7 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
       {invoice.kind === 'b2c' && invoice.payments.length > 0 && (
         <Panel title="Payment">
           <div className="table-wrap">
-            <table className="card-table">
+            <table className="card-table card-table--invoice-detail card-table--invoice-payment">
               <thead>
                 <tr>
                   <th scope="col">Method</th>
@@ -283,9 +340,11 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
               <tbody>
                 {invoice.payments.map((payment, index) => (
                   <tr key={index}>
-                    <td className="card-title capitalize">{payment.method}</td>
-                    <td className="num tabular">{formatPrice(Number(payment.amount))}</td>
-                    <td>{payment.reference ?? ''}</td>
+                    <td className="card-title">{invoicePaymentMethodLabel(payment)}</td>
+                    <td className="num tabular">
+                      <InvoicePaymentAmount payment={payment} exchangeRateUsdLbp={invoice.exchangeRate} />
+                    </td>
+                    <td>{payment.method === 'whish' ? '' : (payment.reference ?? '')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -295,7 +354,7 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
       )}
       <Panel title="Totals">
         <div className="table-wrap">
-          <table className="card-table card-table--invoice-totals">
+          <table className="card-table card-table--invoice-detail card-table--invoice-totals">
             <thead>
               <tr>
                 <th scope="col" className="num">
@@ -311,12 +370,26 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
             </thead>
             <tbody>
               <tr>
-                <td className="num tabular">{formatPrice(Number(invoice.subtotal))}</td>
-                <td className="num tabular">{formatPrice(Number(invoice.discountTotal))}</td>
-                <td className="num tabular card-table-total">{formatPrice(Number(invoice.total))}</td>
+                <td className="num tabular">
+                  <PriceWithLbp usd={Number(invoice.subtotal)} exchangeRateUsdLbp={invoice.exchangeRate} />
+                </td>
+                <td className="num tabular">
+                  <PriceWithLbp usd={Number(invoice.discountTotal)} exchangeRateUsdLbp={invoice.exchangeRate} />
+                </td>
+                <td className="num tabular card-table-total">
+                  <PriceWithLbp
+                    usd={Number(invoice.total)}
+                    exchangeRateUsdLbp={invoice.exchangeRate}
+                    lbpAmount={invoice.totalLbp}
+                    strong
+                  />
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <div className="panel-body invoice-lbp-footnote-wrap">
+          <InvoiceLbpFootnote exchangeRate={invoice.exchangeRate} />
         </div>
       </Panel>
     </>

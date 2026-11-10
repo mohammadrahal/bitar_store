@@ -14,6 +14,7 @@ import { useCashSession } from '@/hooks/use-cash-sessions'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { usePermission } from '@/hooks/use-permission'
 import { priceOf } from '@/lib/api/map-catalog'
+import { actorName } from '@/lib/cash-display'
 import { cashHubHref } from '@/lib/cash-hub'
 import { formatPrice, formatRelativeDateTime } from '@/lib/format'
 
@@ -115,7 +116,7 @@ export function CashSessionDetailView({ sessionId }: { sessionId: string }) {
                       {movement.reason}
                       <small>{formatRelativeDateTime(movement.at)}</small>
                     </td>
-                    <td>{movement.by.name ?? 'Unknown'}</td>
+                    <td>{actorName(movement.by)}</td>
                     <td className={`num tabular ${movement.direction === 'out' ? 'detail-alert' : ''}`}>
                       {movement.direction === 'out' ? '−' : '+'}
                       {formatPrice(priceOf(movement.amount))}

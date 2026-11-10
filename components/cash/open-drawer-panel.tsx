@@ -83,7 +83,7 @@ export function OpenDrawerPanel({
             inputMode="decimal"
             className="tabular"
             value={float}
-            placeholder="0.00"
+            placeholder="0"
             autoFocus
             onChange={(event) => setFloat(event.target.value.replace(/[^\d.]/g, ''))}
           />

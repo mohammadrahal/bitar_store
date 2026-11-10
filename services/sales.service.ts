@@ -1,7 +1,15 @@
 import { ApiError, getApiClient } from '@/lib/api'
 import { apiFeatureHint, isApiFeatureMissing, noteMissingApiFeature } from '@/lib/api/capabilities'
 import { priceText } from '@/lib/api/map-catalog'
-import type { ApiSale, CreateSaleInput, SalesHistoryParams, SalesHistoryResult, SalesListParams } from '@/lib/api/types'
+import type {
+  ApiSale,
+  ApiSaleChannel,
+  ApiSocialPlatform,
+  CreateSaleInput,
+  SalesHistoryParams,
+  SalesHistoryResult,
+  SalesListParams,
+} from '@/lib/api/types'
 
 /** A completed POS sale, named for the screens so they need no API types. */
 export type { ApiSale as Sale, ApiSaleLine as SaleLine, ApiSalePayment as SalePayment } from '@/lib/api/types'
@@ -20,12 +28,17 @@ export interface NewSalePayment {
   amount: number
   /** Cash only: what the customer handed over, so the server can return change. */
   tendered?: number
+  currency?: 'USD' | 'LBP'
+  /** Cash in USD: dollars of change given back as pounds. */
+  changeLbp?: number
   /** Whish only, and unique. the server refuses a reference it has seen. */
   reference?: string
 }
 
 export interface NewSaleInput {
   branchId: string
+  channel?: ApiSaleChannel
+  socialPlatform?: ApiSocialPlatform
   note?: string
   customerName?: string
   customerPhone?: string
@@ -38,9 +51,13 @@ export interface NewSaleInput {
  * current catalog price, so the figures on screen are a preview of its answer.
  */
 function toApiInput(input: NewSaleInput): CreateSaleInput {
+  const channel = input.channel ?? 'in_store'
   return {
     branchId: input.branchId,
-    channel: 'in_store',
+    channel,
+    ...(channel === 'social_media' && input.socialPlatform
+      ? { socialPlatform: input.socialPlatform }
+      : {}),
     note: input.note?.trim() || null,
     customerName: input.customerName?.trim() || null,
     customerPhone: input.customerPhone?.trim() || null,
@@ -56,15 +73,21 @@ function toApiInput(input: NewSaleInput): CreateSaleInput {
             }
           : undefined,
     })),
-    payments: input.payments.map((payment) =>
-      payment.method === 'cash'
-        ? {
-            method: 'cash' as const,
-            amount: priceText(payment.amount),
-            tendered: priceText(payment.tendered ?? payment.amount),
-          }
-        : { method: 'whish' as const, amount: priceText(payment.amount), reference: payment.reference ?? '' },
-    ),
+    payments: input.payments.map((payment) => {
+      if (payment.method !== 'cash') {
+        return { method: 'whish' as const, amount: priceText(payment.amount), reference: payment.reference ?? '' }
+      }
+      const base = {
+        method: 'cash' as const,
+        amount: priceText(payment.amount),
+        ...(payment.currency === 'LBP' ? { currency: 'LBP' as const } : {}),
+        ...(payment.changeLbp != null && payment.changeLbp > 0
+          ? { changeLbp: priceText(payment.changeLbp) }
+          : {}),
+      }
+      if (payment.currency === 'LBP') return base
+      return { ...base, tendered: priceText(payment.tendered ?? payment.amount) }
+    }),
   }
 }
 

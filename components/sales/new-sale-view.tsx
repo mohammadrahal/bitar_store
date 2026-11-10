@@ -3,12 +3,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
+import Link from 'next/link'
+import { Pause, Trash2 } from 'lucide-react'
 import { LineDiscountField, type LineDiscount } from '@/components/sales/line-discount'
 import { CashSessionGate } from '@/components/cash/cash-session-gate'
 import { PaymentFields } from '@/components/sales/payment-fields'
 import { SaleFooter } from '@/components/sales/sale-footer'
 import { CatalogLinePicker } from '@/components/sales/catalog-line-picker'
+import { SaleChannelFields } from '@/components/sales/sale-channel-fields'
+import type { ApiSaleChannel, ApiSocialPlatform } from '@/lib/api/types'
 import { Field } from '@/components/shared/field'
 import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
@@ -29,6 +32,7 @@ import { usePermission } from '@/hooks/use-permission'
 import { isConflict, messageOf } from '@/lib/errors'
 import { formatPrice } from '@/lib/format'
 import { fromCents, toCents } from '@/lib/money'
+import { useExchangeRate } from '@/hooks/use-settings'
 import { emptyPayment, paymentProblem, paymentsFor, syncTendered, type PaymentDraft } from '@/lib/sale-payments'
 import type { VariantOption } from '@/types'
 
@@ -36,6 +40,28 @@ interface CartLine {
   option: VariantOption
   quantity: number
   discount?: LineDiscount
+}
+
+interface SaleDraft {
+  lines: CartLine[]
+  customerName: string
+  customerPhone: string
+  channel: ApiSaleChannel
+  socialPlatform: ApiSocialPlatform
+  payment: PaymentDraft
+  pendingDraftId: string | null
+}
+
+function emptyDraft(): SaleDraft {
+  return {
+    lines: [],
+    customerName: '',
+    customerPhone: '',
+    channel: 'in_store',
+    socialPlatform: 'whatsapp',
+    payment: emptyPayment(),
+    pendingDraftId: null,
+  }
 }
 
 function lineNet(line: CartLine): number {
@@ -60,6 +86,10 @@ function optionFromPendingLine(line: { skuId: string; label: string; unitPrice: 
   }
 }
 
+function draftUnits(draft: SaleDraft): number {
+  return draft.lines.reduce((sum, line) => sum + line.quantity, 0)
+}
+
 export function NewSaleView() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -73,42 +103,78 @@ export function NewSaleView() {
   const idempotency = useIdempotencyKey()
 
   const [branchChoice, setBranch] = useState('')
-  const [lines, setLines] = useState<CartLine[]>([])
-  const [customerName, setCustomerName] = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
-  const [payment, setPayment] = useState<PaymentDraft>(emptyPayment)
-  const [pendingDraftId, setPendingDraftId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<SaleDraft>(() => emptyDraft())
+  const [held, setHeld] = useState<SaleDraft | null>(null)
+  const [lastCompleted, setLastCompleted] = useState<{ reference: string; href: string } | null>(null)
   const branchId = locationScoped ? defaultBranch : branchChoice
+
+  const { lines, customerName, customerPhone, channel, socialPlatform, payment, pendingDraftId } = draft
+
+  const resetDraft = () => {
+    idempotency.reset()
+    setDraft(emptyDraft())
+    if (searchParams.get('pending')) router.replace('/sales/new')
+  }
+
+  const holdAndStartNext = () => {
+    if (lines.length === 0) return
+    if (held) {
+      toast.message('Resume the held sale first, or finish it, before holding another.')
+      return
+    }
+    setHeld(draft)
+    resetDraft()
+    toast.success('Sale held. Ring up the next customer, then tap Resume held sale.')
+  }
+
+  const resumeHeld = () => {
+    if (!held) return
+    if (lines.length > 0) {
+      toast.message('Finish or hold the current sale before resuming the held one.')
+      return
+    }
+    setDraft(held)
+    setHeld(null)
+  }
 
   useEffect(() => {
     const draftId = searchParams.get('pending')
     if (!draftId) return
-    const draft = getPendingSale(draftId)
-    if (!draft) return
-    if (!locationScoped) setBranch(draft.branchId)
-    setPendingDraftId(draft.id)
-    setCustomerName(draft.customerName?.trim() || draft.note?.trim() || '')
-    setCustomerPhone(draft.customerPhone?.trim() || '')
-    setLines(draft.lines.map((line) => ({ option: optionFromPendingLine(line), quantity: line.quantity })))
+    const pending = getPendingSale(draftId)
+    if (!pending) return
+    if (!locationScoped) setBranch(pending.branchId)
+    setDraft({
+      ...emptyDraft(),
+      pendingDraftId: pending.id,
+      customerName: pending.customerName?.trim() || pending.note?.trim() || '',
+      customerPhone: pending.customerPhone?.trim() || '',
+      lines: pending.lines.map((line) => ({ option: optionFromPendingLine(line), quantity: line.quantity })),
+    })
   }, [searchParams, locationScoped])
 
   const mayApplyDiscount = can('discounts.apply', branchId || undefined)
-  /* `requireOpenCashSession` with no open drawer: `POST /sales` would answer
-     409, so the sale is held here instead of at the last step. */
   const drawerBlocks = useDrawerBlocksSale(branchId || undefined)
+  const rateQuery = useExchangeRate()
 
   const total = fromCents(lines.reduce((sum, line) => sum + lineNet(line), 0))
   const units = lines.reduce((sum, line) => sum + line.quantity, 0)
   const inCart = Object.fromEntries(lines.map((line) => [line.option.variantId, line.quantity]))
 
-  /* Cash received follows the sale total until the cashier types a larger bill. */
   useEffect(() => {
-    setPayment((current) => syncTendered(current, total))
-  }, [total])
+    setDraft((current) => ({ ...current, payment: syncTendered(current.payment, total, rateQuery.rate) }))
+  }, [total, rateQuery.rate])
 
-  const problem = paymentProblem(payment, total)
-  /* The server refuses a Whish reference it has already recorded. */
+  const problem =
+    paymentProblem(payment, total, rateQuery.rate) ??
+    (channel === 'social_media' && !socialPlatform ? 'Choose a social platform.' : null)
   const referenceError = isConflict(create.error) ? messageOf(create.error) : undefined
+
+  const setLines = (next: CartLine[] | ((current: CartLine[]) => CartLine[])) => {
+    setDraft((current) => ({
+      ...current,
+      lines: typeof next === 'function' ? next(current.lines) : next,
+    }))
+  }
 
   const add = (option: VariantOption, quantity: number) =>
     setLines((current) => {
@@ -135,7 +201,7 @@ export function NewSaleView() {
       },
       {
         onSuccess: (sale) => {
-          setPendingDraftId(sale.id)
+          setDraft((current) => ({ ...current, pendingDraftId: sale.id }))
           toast.success('Pending sale saved. Complete payment at the till when ready')
           router.push('/sales/b2c')
         },
@@ -150,6 +216,8 @@ export function NewSaleView() {
       {
         input: {
           branchId,
+          channel,
+          socialPlatform: channel === 'social_media' ? socialPlatform : undefined,
           note: customerName.trim() || undefined,
           customerName: customerName.trim() || undefined,
           customerPhone: customerPhone.trim() || undefined,
@@ -160,7 +228,7 @@ export function NewSaleView() {
             discountPercent: line.discount?.percent,
             discountReason: line.discount?.reason,
           })),
-          payments: paymentsFor(payment, total),
+          payments: paymentsFor(payment, total, rateQuery.rate),
         },
         idempotencyKey: idempotency.current(),
       },
@@ -180,16 +248,20 @@ export function NewSaleView() {
             branchName,
             customerName: name,
           })
+          let receiptHref = `/sales/${sale.id}`
           try {
             const invoice = await createB2cInvoiceForSale(sale.id, {
               name,
               phone,
               note: customerName.trim() || undefined,
             })
-            router.push(`/sales/invoices/${invoice.id}`)
+            receiptHref = `/sales/invoices/${invoice.id}`
           } catch {
-            router.push(`/sales/${sale.id}`)
+            /* Fiscal invoice optional; the till sale is still the receipt of record. */
           }
+          setLastCompleted({ reference: sale.reference, href: receiptHref })
+          resetDraft()
+          toast.success(`${sale.reference} completed.`)
         },
       },
     )
@@ -204,14 +276,46 @@ export function NewSaleView() {
 
   return (
     <form className="sale-layout sale-layout--till" onSubmit={submit} noValidate>
-      <PageHeader eyebrow="Sales" title="New sale" />
+      <PageHeader
+        title="New sale"
+        actions={
+          lines.length > 0 ? (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={holdAndStartNext}>
+              <Pause size={16} aria-hidden="true" />
+              Hold for next
+            </button>
+          ) : undefined
+        }
+      />
+
+      {held ? (
+        <div className="sale-held-banner" role="status">
+          <p>
+            Held sale — {draftUnits(held)} {draftUnits(held) === 1 ? 'item' : 'items'}
+          </p>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={resumeHeld} disabled={lines.length > 0}>
+            Resume
+          </button>
+        </div>
+      ) : null}
+
+      {lastCompleted ? (
+        <p className="sale-complete-line" role="status">
+          Done: <strong className="tabular">{lastCompleted.reference}</strong>
+          {' · '}
+          <Link href={lastCompleted.href} className="text-link">
+            Receipt
+          </Link>
+        </p>
+      ) : null}
+
       {!locationScoped && (
-        <Field label="Selling from" className="sale-location-field">
+        <Field label="Location" className="sale-location-field">
           <LocationSelect
             value={branchChoice}
             onChange={(value) => {
               setBranch(value)
-              setLines([])
+              setDraft((current) => ({ ...current, lines: [] }))
             }}
             onlyAccessible
             onlyFullAccess
@@ -222,102 +326,120 @@ export function NewSaleView() {
       <ViewOnlyNotice locationId={branchId} action="ring up sales" />
       <CashSessionGate branchId={branchId} />
 
-      <div className="sale-till-stack">
-        <section className="sale-panel sale-panel--catalog" aria-label="Product catalog">
+      <div className="sale-till-grid">
+        <section className="sale-panel sale-panel--catalog" aria-label="Products">
           {branchId ? (
             <CatalogLinePicker
               branchId={branchId}
               inCart={inCart}
               onAdd={add}
               availability="enforce"
-              addLabel="Add to sale"
-              searchPlaceholder="Search model, code or SKU"
+              addLabel="Add"
+              searchPlaceholder="Search or scan"
               searchAriaLabel="Search models for sale"
               itemLabel="add to sale"
               className="catalog-picker catalog-picker--sale"
               pickerUi="till"
             />
           ) : (
-            <p className="muted">Choose the selling location above before adding items.</p>
+            <p className="muted">Choose the selling location first.</p>
           )}
         </section>
 
-        <section className="sale-panel sale-panel--staged" aria-label="Staged items">
+        <aside className="sale-ticket" aria-label="This sale">
           <header className="sale-staged-head">
-            <h2 className="sale-staged-title">Staged items</h2>
+            <h2 className="sale-staged-title">Cart</h2>
             <span className="sale-staged-count">{lineCountLabel}</span>
           </header>
           {lines.length === 0 ? (
-            <p className="sale-staged-empty muted">Nothing staged yet. Open a product and add a variant.</p>
+            <p className="sale-staged-empty muted">Add a product from the list.</p>
           ) : (
-            <>
-              <ul className="sale-staged-lines">
-                {lines.map((line) => (
-                  <li key={line.option.variantId} className="sale-staged-line-wrap">
-                    <div className="sale-staged-line">
-                      <span className="sale-staged-line-label">
-                        {line.quantity}× {line.option.productName} {line.option.color} / {line.option.size}
-                      </span>
-                      <span className="row-actions sale-staged-line-actions">
-                        <span className="tabular sale-staged-line-price">{formatPrice(fromCents(lineNet(line)))}</span>
-                        <button
-                          type="button"
-                          className="icon-btn"
-                          aria-label={`Remove ${line.option.productName} ${line.option.color} / ${line.option.size}`}
-                          onClick={() => setLines((current) => current.filter((entry) => entry !== line))}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </span>
-                    </div>
-                    <LineDiscountField
-                      lineTotal={line.quantity * line.option.sellPrice}
-                      mayApply={mayApplyDiscount}
-                      value={line.discount}
-                      onChange={(discount) =>
-                        setLines((current) =>
-                          current.map((entry) => (entry === line ? { ...entry, discount } : entry)),
-                        )
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-              <div className="form-grid sale-customer-grid">
-                <Field label="Customer name (optional)">
-                  <input
-                    value={customerName}
-                    onChange={(event) => setCustomerName(event.target.value)}
-                    autoComplete="name"
-                    placeholder="Walk-in customer"
+            <ul className="sale-staged-lines">
+              {lines.map((line) => (
+                <li key={line.option.variantId} className="sale-staged-line-wrap">
+                  <div className="sale-staged-line">
+                    <span className="sale-staged-line-label">
+                      {line.quantity}× {line.option.productName} {line.option.color} / {line.option.size}
+                    </span>
+                    <span className="row-actions sale-staged-line-actions">
+                      <span className="tabular sale-staged-line-price">{formatPrice(fromCents(lineNet(line)))}</span>
+                      <button
+                        type="button"
+                        className="icon-btn"
+                        aria-label={`Remove ${line.option.productName} ${line.option.color} / ${line.option.size}`}
+                        onClick={() => setLines((current) => current.filter((entry) => entry !== line))}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </span>
+                  </div>
+                  <LineDiscountField
+                    lineTotal={line.quantity * line.option.sellPrice}
+                    mayApply={mayApplyDiscount}
+                    value={line.discount}
+                    onChange={(discount) =>
+                      setLines((current) =>
+                        current.map((entry) => (entry === line ? { ...entry, discount } : entry)),
+                      )
+                    }
                   />
-                </Field>
-                <Field label="Phone number (optional)">
-                  <input
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(event) => setCustomerPhone(event.target.value)}
-                    autoComplete="tel"
-                    placeholder="+961 70 000 000"
-                    inputMode="tel"
-                    className="tabular"
-                  />
-                </Field>
-              </div>
-            </>
+                </li>
+              ))}
+            </ul>
           )}
-        </section>
-      </div>
 
-      {lines.length > 0 && (
-        <PaymentFields
-          draft={payment}
-          total={total}
-          onChange={setPayment}
-          referenceError={referenceError}
-          showRateHint={false}
-        />
-      )}
+          <div className="form-grid sale-customer-grid">
+            <Field label="Customer name">
+              <input
+                value={customerName}
+                onChange={(event) => setDraft((current) => ({ ...current, customerName: event.target.value }))}
+                autoComplete="name"
+                placeholder="Walk-in"
+              />
+            </Field>
+            <Field label="Phone">
+              <input
+                type="tel"
+                value={customerPhone}
+                onChange={(event) => setDraft((current) => ({ ...current, customerPhone: event.target.value }))}
+                autoComplete="tel"
+                placeholder="+961 …"
+                inputMode="tel"
+                className="tabular"
+              />
+            </Field>
+          </div>
+
+          {lines.length > 0 ? (
+            <details className="sale-ticket-details">
+              <summary>Channel</summary>
+              <SaleChannelFields
+                channel={channel}
+                socialPlatform={socialPlatform}
+                onChannelChange={(next) => {
+                  setDraft((current) => ({
+                    ...current,
+                    channel: next,
+                    socialPlatform: next === 'in_store' ? 'whatsapp' : current.socialPlatform,
+                  }))
+                }}
+                onSocialPlatformChange={(platform) => setDraft((current) => ({ ...current, socialPlatform: platform }))}
+              />
+            </details>
+          ) : null}
+
+          {lines.length > 0 ? (
+            <PaymentFields
+              draft={payment}
+              total={total}
+              onChange={(next) => setDraft((current) => ({ ...current, payment: next }))}
+              referenceError={referenceError}
+              showRateHint={false}
+              embedded
+            />
+          ) : null}
+        </aside>
+      </div>
 
       <SaleFooter
         total={total}

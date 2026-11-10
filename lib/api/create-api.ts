@@ -3,12 +3,14 @@ import { createBranchesApi } from '@/lib/api/branches.api'
 import { createCatalogApi } from '@/lib/api/catalog.api'
 import { createCashSessionsApi } from '@/lib/api/cash-sessions.api'
 import { createCategoriesApi } from '@/lib/api/categories.api'
+import { createCostsApi } from '@/lib/api/costs.api'
 import { createDashboardApi } from '@/lib/api/dashboard.api'
 import { createGoodsReceiptsApi } from '@/lib/api/goods-receipts.api'
 import { createInvoicesApi } from '@/lib/api/invoices.api'
 import { createPageRequest, createRequest, createTotalRequest } from '@/lib/api/client'
 import { createReorderLevelsApi } from '@/lib/api/reorder-levels.api'
 import { createReportsApi } from '@/lib/api/reports.api'
+import { createReturnsApi } from '@/lib/api/returns.api'
 import { createSalesApi } from '@/lib/api/sales.api'
 import { createSettingsApi } from '@/lib/api/settings.api'
 import { createStockApi } from '@/lib/api/stock.api'
@@ -39,6 +41,8 @@ export function createApi(token: string) {
     ...createSettingsApi(request),
     ...createSuppliersApi(request, pageRequest),
     ...createCashSessionsApi(request, pageRequest),
+    ...createReturnsApi(request, pageRequest),
+    ...createCostsApi(request),
     health: fetchHealth,
   }
 }

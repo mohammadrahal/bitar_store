@@ -10,7 +10,7 @@ import { CashShiftTimeline } from '@/components/cash/cash-shift-timeline'
 import { CloseDrawerPanel } from '@/components/cash/close-drawer-panel'
 import { printCashSessionXReport } from '@/components/cash/cash-session-print'
 import { PriceWithLbp } from '@/components/shared/price-with-lbp'
-import { useCashSessions } from '@/hooks/use-cash-sessions'
+import { useCashSessionsWithTotals } from '@/hooks/use-cash-sessions'
 import { useCurrentUser } from '@/store/user-store'
 import { priceOf } from '@/lib/api/map-catalog'
 import type { ApiCashSession } from '@/lib/api/types'
@@ -32,7 +32,7 @@ export function CashDrawerZLayout({
 }) {
   const user = useCurrentUser()
   const closeRef = useRef<HTMLDivElement>(null)
-  const recent = useCashSessions({ branchId: session.branch.id, offset: 0 })
+  const recent = useCashSessionsWithTotals({ branchId: session.branch.id, offset: 0 })
   const recentRows = cashSessionListItems(recent.data?.items).slice(0, 6)
 
   const totals = cashSessionTotals(session)
@@ -207,7 +207,11 @@ export function CashDrawerZLayout({
         </aside>
       </div>
 
-      <CashShiftTimeline sessions={recentRows} activeId={session.id} loading={recent.isPending} />
+      <CashShiftTimeline
+        sessions={recentRows}
+        activeId={session.id}
+        loading={recent.isPending || recent.isEnrichingTotals}
+      />
     </div>
   )
 }

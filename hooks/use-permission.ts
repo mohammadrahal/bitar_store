@@ -2,12 +2,17 @@
 
 import { useMemo } from 'react'
 import {
+  canDecideReturns,
   canDispatchTransfers,
   canManageMinimums,
   canReceiveTransfers,
+  canRecordReturns,
+  canRefundReturns,
   canRequestTransfer,
+  canSeeReturns,
   canSeeTransfers,
   canViewAdminWarehouseTools,
+  canViewCosts,
   canViewFinancialReports,
   hasApiPermission,
   type ApiPermission,
@@ -19,6 +24,7 @@ import {
   canViewBranchSalesTelemetry,
   canViewInvoicesLedger,
   canViewNetworkSalesTelemetry,
+  canViewTodayShopKpi,
   isLocationScoped,
   isViewOnlyAt,
   locationAccess,
@@ -61,7 +67,13 @@ export function usePermission() {
       canViewInvoicesLedger: () => canViewInvoicesLedger(user),
       canViewBranchSalesTelemetry: (locationId = activeLocationId ?? undefined) =>
         canViewBranchSalesTelemetry(user, locationId),
+      canViewTodayShopKpi: (locationId: string) => canViewTodayShopKpi(user, locationId),
       canViewNetworkSalesTelemetry: () => canViewNetworkSalesTelemetry(user),
+      canSeeReturns: () => canSeeReturns(user),
+      canRecordReturns: () => canRecordReturns(user),
+      canRefundReturns: () => canRefundReturns(user),
+      canDecideReturns: () => canDecideReturns(user),
+      canViewCosts: () => canViewCosts(user),
     }),
     [user, activeLocationId],
   )

@@ -38,6 +38,13 @@ export const EMPLOYEE_PERMISSIONS = [
   'cash.accept',
   'cash.close',
   'cash.move',
+  /* The two keys `GET /auth/me` sends for `/returns`. The pair is deliberately
+     uneven, and the server enforces it: `returns.create` takes goods in and
+     hands a rejected return back, `returns.refund` pays the money — but
+     **approving, rejecting and releasing stay with a manager** whatever is
+     granted here. There is no `returns.approve` to grant. */
+  'returns.create',
+  'returns.refund',
   'reports.view_branch',
 ] as const
 
@@ -124,6 +131,8 @@ export const PERMISSION_LABELS: Record<EmployeePermission, string> = {
   'cash.accept': 'Take the drawer over',
   'cash.close': 'Close the drawer',
   'cash.move': 'Move cash in or out',
+  'returns.create': 'Take returns in',
+  'returns.refund': 'Pay refunds',
   'reports.view_branch': "See the location's reports",
 }
 
@@ -140,6 +149,10 @@ export const PERMISSION_HINTS: Record<EmployeePermission, string> = {
   'cash.accept': 'Can count the drawer and take it over from the last person.',
   'cash.close': 'Can close the drawer at the end of the shift.',
   'cash.move': 'Can take cash out of the drawer or put cash in, with a reason.',
+  'returns.create':
+    'Can take returned goods into custody and hand a rejected return back. Only a manager approves one.',
+  'returns.refund':
+    'Can pay the refund on a return a manager approved, in cash or by Whish.',
   'reports.view_branch': 'Can see reports for this location.',
 }
 
@@ -149,5 +162,6 @@ export const PERMISSION_GROUPS: { label: string; platformWide?: boolean; keys: r
   { label: 'Catalog', platformWide: true, keys: ['catalog.create', 'catalog.edit'] },
   { label: 'Stock', keys: ['stock.view'] },
   { label: 'Cash drawer', keys: ['cash.open', 'cash.accept', 'cash.close', 'cash.move'] },
+  { label: 'Returns', keys: ['returns.create', 'returns.refund'] },
   { label: 'Reports', keys: ['reports.view_branch'] },
 ]
