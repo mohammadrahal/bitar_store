@@ -328,47 +328,59 @@ details.optional[open] summary { margin-bottom: 16px; }
 .action-bar { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px 24px; border-top: 1px solid hsl(var(--border)); }
 
 /* ---------- New sale ---------- */
-.sale-complete-line {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: hsl(var(--muted-foreground));
-}
-.sale-held-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 16px;
-  padding: 10px 14px;
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--r-sm);
-  background: hsl(var(--card));
-  font-size: var(--fs-sm);
-}
-.sale-held-banner p { margin: 0; color: hsl(var(--foreground)); }
 .sale-layout { width: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; padding-bottom: 160px; }
 .sale-layout--till {
   max-width: none;
   margin: 0;
   gap: 16px;
-  padding-bottom: 108px;
+  padding-bottom: 0;
 }
+
+/* Header: location switcher sits with the page title, not as a form row. */
+.sale-location-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 14rem;
+  color: hsl(var(--muted-foreground));
+}
+.sale-location-inline > :last-child { flex: 1 1 auto; min-width: 0; }
+
+/* Held sale and the last completed sale: one row of compact status pills. */
+.sale-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sale-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-md);
+  background: hsl(var(--card));
+  font-size: var(--fs-sm);
+  color: hsl(var(--foreground));
+}
+.sale-status > svg { flex: none; }
+.sale-status--held > svg { color: hsl(var(--accent)); }
+.sale-status--done { padding-right: 12px; }
+.sale-status--done > svg { color: hsl(var(--success)); }
+
+/* Two columns: catalog on the left, the ticket on the right at full height. */
+/* The ticket is the cashier's main surface, so it takes the larger share. */
 .sale-till-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 22.5rem);
+  grid-template-columns: minmax(0, 1fr) minmax(28rem, 1.6fr);
   gap: 16px;
   align-items: start;
 }
-.sale-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--r-md);
+@media (max-width: 1200px) {
+  .sale-till-grid { grid-template-columns: minmax(0, 1fr) minmax(24rem, 1.3fr); }
 }
-.sale-ticket {
+.sale-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -378,85 +390,607 @@ details.optional[open] summary { margin-bottom: 16px; }
   border: 1px solid hsl(var(--border));
   border-radius: var(--r-md);
 }
-.sale-ticket-details {
+
+.sale-catalog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.sale-catalog-empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: hsl(var(--accent));
+  background: hsl(var(--accent) / 0.12);
+}
+.sale-catalog-empty h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.sale-catalog-empty p {
+  margin: 0;
+  max-width: 40ch;
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: hsl(var(--muted-foreground));
+}
+.sale-catalog-empty-field {
+  width: 100%;
+  max-width: 320px;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.sale-ticket {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-md);
+}
+/* The ticket is pinned beside the catalog and as tall as the viewport, so the
+   total and Confirm never scroll away; only the lines between scroll. */
+@media (min-width: 961px) {
+  .sale-ticket {
+    position: sticky;
+    top: 16px;
+    height: calc(100dvh - var(--topbar-h) - 32px);
+    min-height: 28rem;
+  }
+}
+.sale-ticket-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 20px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+.sale-ticket-head .sale-staged-title { font-size: var(--fs-xl); }
+.sale-ticket-clear {
+  margin-left: auto;
+  color: hsl(var(--muted-foreground));
+}
+.sale-ticket-clear:hover { color: hsl(var(--destructive)); }
+.sale-ticket-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+.sale-ticket-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
   border-top: 1px solid hsl(var(--border));
-  padding-top: 8px;
+}
+.sale-ticket-subhead {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.sale-ticket-subhead span {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
 }
 .sale-ticket-details summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
   cursor: pointer;
   font-size: var(--fs-sm);
   color: hsl(var(--muted-foreground));
   list-style: none;
 }
+.sale-ticket-details summary span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+}
 .sale-ticket-details summary::-webkit-details-marker { display: none; }
-.sale-ticket-details[open] summary { margin-bottom: 12px; color: hsl(var(--foreground)); }
+.sale-ticket-details summary:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+.sale-ticket-details[open] summary { margin-bottom: 12px; }
 .sale-ticket-pay {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid hsl(var(--border));
 }
+
+/* Checkout: total and the finishing buttons, always at the foot of the ticket. */
+.sale-checkout {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.5);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
+.sale-checkout-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sale-checkout-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.sale-checkout-label small {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: hsl(var(--muted-foreground));
+}
+.sale-checkout-price {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.sale-checkout-price strong {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.sale-checkout-price .price-lbp {
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}
+.sale-checkout-problem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: hsl(var(--warning));
+  background: hsl(var(--warning) / 0.1);
+}
+.sale-checkout-problem svg { flex: none; margin-top: 1px; }
+.sale-checkout-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sale-checkout-actions .btn { width: 100%; }
+.btn.sale-checkout-confirm {
+  height: var(--control-h-sm);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+/* A faded gold button still reads as pressable; a disabled Confirm has to look
+   switched off. */
+.btn.sale-checkout-confirm:disabled {
+  opacity: 1;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.btn.sale-checkout-confirm:focus-visible,
+.btn.sale-checkout-save:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
 @media (max-width: 960px) {
   .sale-till-grid { grid-template-columns: 1fr; }
+  /* Stacked: the checkout rides the bottom of the screen like the old footer. */
+  .sale-checkout {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: hsl(var(--card));
+    box-shadow: 0 -8px 24px hsl(var(--background) / 0.6);
+  }
 }
+
+/* ---------- Till catalog: product cards and size tiles ---------- */
+.till-catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.till-catalog-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.till-catalog-scan-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}
+.till-catalog-note {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+}
+.till-catalog-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 32px 16px;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+}
+.till-catalog-empty strong { color: hsl(var(--foreground)); font-weight: 600; }
+.till-catalog-more { align-self: center; }
+
+.till-products {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 8px;
+}
+.till-product {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 80px;
+  padding: 12px;
+  text-align: left;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-md);
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.till-product:hover { border-color: hsl(var(--accent) / 0.5); background: hsl(var(--muted)); }
+.till-product:focus-visible,
+.till-tile:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.till-product--open {
+  border-color: hsl(var(--accent));
+  background: hsl(var(--accent) / 0.08);
+}
+.till-product-name {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.till-product--open .till-product-name { color: hsl(var(--accent)); }
+.till-product-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}
+.till-product--skeleton,
+.till-tile--skeleton {
+  border-color: transparent;
+  background: hsl(var(--muted));
+  animation: till-pulse 1.2s ease-in-out infinite;
+  cursor: default;
+}
+
+.till-variants {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid hsl(var(--accent) / 0.35);
+  border-radius: var(--r-md);
+  background: hsl(var(--accent) / 0.05);
+  scroll-margin-top: 16px;
+}
+.till-variants-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.till-variants-head h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.till-variants-head p {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}
+.till-variants-head .icon-btn { margin: -8px -8px 0 0; }
+
+.till-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: 8px;
+}
+/* Two lines: what it is (size, color), then what it costs and what is left.
+   56px keeps it a comfortable tap target without filling the panel. */
+.till-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 56px;
+  padding: 8px 12px;
+  text-align: left;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-md);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.1s;
+}
+.till-tile:hover:not(:disabled) { border-color: hsl(var(--accent) / 0.6); background: hsl(var(--muted)); }
+.till-tile:active:not(:disabled) { transform: scale(0.97); }
+.till-tile:disabled { opacity: 0.45; cursor: not-allowed; }
+.till-tile--in-cart { border-color: hsl(var(--accent) / 0.7); }
+.till-tile--flash { background: hsl(var(--accent) / 0.18); }
+/* Sits on the corner rather than inside, so it never pushes the text. */
+.till-tile-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: hsl(210 7% 4%);
+  background: hsl(var(--accent));
+  box-shadow: 0 0 0 2px hsl(var(--card));
+}
+.till-tile-product {
+  max-width: 100%;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.till-tile-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.till-tile-size {
+  flex: none;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.till-tile-color {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.till-tile-color .catalog-color-swatch { width: 8px; height: 8px; }
+.till-tile-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+.till-tile-foot strong {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.till-tile-low { color: hsl(var(--warning)); }
+.till-tiles--scanned { grid-template-columns: minmax(0, 11rem); padding-top: 4px; }
+.till-tiles--scanned .till-tile {
+  border-color: hsl(var(--accent));
+  box-shadow: 0 0 0 3px hsl(var(--accent) / 0.15);
+}
+.till-tiles--scanned .till-tile:disabled { box-shadow: none; }
+.till-variants-all {
+  align-self: flex-start;
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}
+@keyframes till-pulse {
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .till-product--skeleton,
+  .till-tile--skeleton { animation: none; }
+  .till-tile:active:not(:disabled) { transform: none; }
+}
+
 .sale-staged-head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px 16px;
 }
 .sale-staged-title {
   margin: 0;
-  font-size: var(--fs-xs);
+  font-size: var(--fs-lg);
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
+  line-height: 1.25;
+  color: hsl(var(--foreground));
 }
 .sale-staged-count {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: hsl(var(--accent));
+  background: hsl(var(--accent) / 0.12);
 }
 .sale-staged-empty {
-  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 16px;
+  border: 1px dashed hsl(var(--border));
+  border-radius: var(--r-md);
+  text-align: center;
   font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
 }
+.sale-staged-empty svg {
+  margin-bottom: 4px;
+  color: hsl(var(--muted-foreground));
+}
+.sale-staged-empty strong {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.sale-staged-empty span { max-width: 32ch; line-height: 1.5; }
 .sale-staged-lines {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .sale-staged-line-wrap {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  padding: 16px;
+  background: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--r-md);
 }
 .sale-staged-line {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px;
-  background: hsl(var(--background));
-  border: 1px solid hsl(var(--border));
-  border-radius: var(--r-md);
   font-size: var(--fs-sm);
 }
-.sale-staged-line-label {
-  min-width: 0;
+.sale-staged-line-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.sale-staged-line-tools .qty-stepper--compact button { width: 32px; height: 32px; }
+.sale-staged-line-tools .qty-stepper--compact output { min-width: 32px; }
+.sale-staged-line-tools .line-discount-form { flex: 1 1 100%; }
+.line-discount-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
   font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.15s, background-color 0.15s;
+}
+.line-discount-toggle:hover { color: hsl(var(--accent)); background: hsl(var(--accent) / 0.1); }
+.line-discount-toggle:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+.line-discount-applied {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: hsl(var(--accent));
+}
+.line-discount-applied .text-btn { font-size: var(--fs-xs); padding: 0; }
+.line-discount-form { align-items: flex-end; }
+.line-discount-form .field { flex: 1 1 7rem; }
+.line-discount-form .btn { margin-top: 0; }
+.sale-staged-line-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sale-staged-line-label strong {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sale-staged-line-label small {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
 }
 .sale-staged-line-price {
+  flex: none;
   font-weight: 600;
-  font-size: var(--fs-md);
+  font-size: var(--fs-xl);
+}
+.sale-staged-line-remove { margin-right: -4px; }
+.sale-staged-line-remove:hover:not(:disabled) {
+  color: hsl(var(--destructive));
+  background: hsl(var(--destructive) / 0.12);
+}
+.sale-staged-line-remove:focus-visible,
+.btn-sale-catalog-open:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 .sale-channel-fields {
   display: flex;
@@ -542,12 +1076,57 @@ details.optional[open] summary { margin-bottom: 16px; }
   background: hsl(var(--gold-500) / 0.12) !important;
 }
 .btn-sale-catalog-open {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
   color: hsl(var(--muted-foreground));
+}
+.search-field--till { height: 48px; padding: 0 16px; gap: 12px; }
+.search-field--till input { font-size: var(--fs-md); }
+.invoice-picker-table-wrap--till {
+  border-radius: var(--r-md);
 }
 .invoice-picker-table-wrap--till .invoice-picker-table thead th {
   background: hsl(var(--card));
   border-bottom: 1px solid hsl(var(--border));
-  padding: 10px 12px;
+  padding: 10px 16px;
+}
+.invoice-picker-table-wrap--till .catalog-picker-model > td {
+  height: 56px;
+  padding: 8px 16px;
+  font-size: var(--fs-md);
+  transition: background-color 0.15s;
+}
+.invoice-picker-table-wrap--till .catalog-picker-model > td:first-child {
+  box-shadow: inset 3px 0 0 transparent;
+  transition: background-color 0.15s, box-shadow 0.15s;
+}
+.invoice-picker-table-wrap--till .catalog-picker-model--open > td:first-child {
+  box-shadow: inset 3px 0 0 hsl(var(--accent));
+}
+.invoice-picker-table-wrap--till .catalog-picker-model--open > td { font-weight: inherit; }
+.invoice-picker-table-wrap--till .catalog-picker-model--open strong { color: hsl(var(--accent)); }
+.invoice-picker-table-wrap--till .catalog-picker-model:hover .btn-sale-catalog-open {
+  color: hsl(var(--foreground));
+}
+.invoice-picker-table-wrap--till .catalog-picker-model > td:last-child { width: 1%; text-align: right; }
+.invoice-picker-table-wrap--till .catalog-picker-variants > td {
+  padding: 4px 16px 16px;
+}
+.invoice-picker-table-wrap--till .catalog-picker-variants-wrap tbody td { padding: 8px 12px; }
+.invoice-picker-table-wrap--till .catalog-picker-model > td.catalog-picker-code {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.04em;
+  color: hsl(var(--muted-foreground));
+}
+.catalog-picker-count {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted));
+  white-space: nowrap;
 }
 .sale-card { display: flex; flex-direction: column; gap: 16px; padding: 20px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: var(--r-md); }
 .sale-card .chip-row { align-items: stretch; }
@@ -621,15 +1200,22 @@ details.optional[open] summary { margin-bottom: 16px; }
 .sale-footer-items-badge {
   display: inline-flex;
   padding: 4px 10px;
-  border-radius: var(--r-sm);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
   color: hsl(var(--muted-foreground));
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--muted) / 0.35);
+  background: hsl(var(--muted));
 }
+.sale-footer-problem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 8px 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: hsl(var(--warning));
+}
+.sale-footer-problem svg { flex: none; }
 .sale-footer-price {
   display: inline-flex;
   align-items: baseline;
@@ -644,7 +1230,7 @@ details.optional[open] summary { margin-bottom: 16px; }
   font-size: var(--fs-xs);
   color: hsl(var(--muted-foreground));
 }
-.sale-footer-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.sale-footer-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
 .sale-footer-actions .btn { flex: 0 1 auto; }
 .sale-footer-btn-outline {
   border: 1px solid hsl(var(--border)) !important;
@@ -653,10 +1239,6 @@ details.optional[open] summary { margin-bottom: 16px; }
 .sale-footer-btn-confirm {
   min-width: 9rem;
   font-weight: 700;
-}
-.sale-footer-note {
-  display: block;
-  text-align: center;
 }
 .sale-total { display: flex; justify-content: space-between; align-items: baseline; font-size: var(--fs-md); }
 .sale-total strong { font-size: var(--fs-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -668,6 +1250,7 @@ details.optional[open] summary { margin-bottom: 16px; }
 }
 @media (max-width: 900px) {
   .sale-footer-actions { width: 100%; }
+  .sale-footer-problem { flex: 1 1 100%; margin: 0; }
   .sale-footer-actions .btn.btn-till { flex: 1 1 calc(50% - 4px); }
 }
 
@@ -1731,13 +2314,23 @@ details.optional[open] summary { margin-bottom: 16px; }
 .cash-gate {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 12px 16px;
-  padding: 14px 16px;
+  padding: 16px;
   border: 1px solid hsl(var(--warning) / .4);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   background: hsl(var(--warning) / .1);
+}
+.cash-gate-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: hsl(var(--warning));
+  background: hsl(var(--warning) / .16);
 }
 .cash-gate-copy { min-width: 0; flex: 1 1 22rem; }
 .cash-gate-copy strong { display: block; font-size: var(--fs-sm); color: hsl(var(--foreground)); }
@@ -2650,4 +3243,21 @@ details.optional[open] summary { margin-bottom: 16px; }
   font-size: var(--fs-xs);
   color: hsl(var(--muted-foreground));
   line-height: 1.4;
+}
+
+/* ---------- Model page: variant table ---------- */
+/* The row actions stay pinned to the right edge, so Edit is never scrolled out
+   of reach on a narrow screen. */
+.sku-table th,
+.sku-table td { padding-left: 16px; padding-right: 16px; }
+@media (min-width: 761px) {
+  .sku-table th:last-child,
+  .sku-table td:last-child {
+    position: sticky;
+    right: 0;
+    background: hsl(var(--card));
+    box-shadow: inset 1px 0 0 hsl(var(--border));
+  }
+  .sku-table th:last-child { z-index: 2; }
+  .table-wrap .sku-table tbody tr:hover td:last-child { background: hsl(var(--muted)); }
 }

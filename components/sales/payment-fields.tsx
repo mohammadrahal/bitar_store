@@ -112,10 +112,12 @@ export function PaymentFields({
         ))}
       </div>
 
-      <div className="till-total-row">
-        <span className="muted">{totalLabel}</span>
-        <PriceWithLbp usd={total} strong />
-      </div>
+      {embedded ? null : (
+        <div className="till-total-row">
+          <span className="muted">{totalLabel}</span>
+          <PriceWithLbp usd={total} strong />
+        </div>
+      )}
 
       <div className="form-grid">
         {draft.mode === 'split' && (

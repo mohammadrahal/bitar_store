@@ -27,18 +27,31 @@ export function LineDiscountField({
   onChange: (next: LineDiscount | undefined) => void
 }) {
   const [draft, setDraft] = useState<LineDiscount>({ percent: 0, reason: '' })
+  const [editing, setEditing] = useState(false)
 
   if (!mayApply) return null
 
   if (value) {
     const off = (lineTotal * value.percent) / 100
     return (
-      <p className="muted">
-        <BadgePercent size={14} aria-hidden="true" /> {value.percent}% off. {formatPrice(off)} · {value.reason}{' '}
+      <p className="line-discount-applied">
+        <BadgePercent size={14} aria-hidden="true" />
+        <span>
+          {value.percent}% off · −{formatPrice(off)} · {value.reason}
+        </span>
         <button type="button" className="text-btn" onClick={() => onChange(undefined)}>
           Remove
         </button>
       </p>
+    )
+  }
+
+  if (!editing) {
+    return (
+      <button type="button" className="line-discount-toggle" onClick={() => setEditing(true)}>
+        <BadgePercent size={14} aria-hidden="true" />
+        Add discount
+      </button>
     )
   }
 
@@ -47,7 +60,7 @@ export function LineDiscountField({
   const ready = draft.percent > 0 && draft.reason.trim() !== ''
 
   return (
-    <div className="inline-add">
+    <div className="inline-add line-discount-form">
       <Field label="Discount %">
         <input
           type="number"
@@ -76,9 +89,20 @@ export function LineDiscountField({
         onClick={() => {
           onChange({ percent: draft.percent, reason: draft.reason.trim() })
           setDraft({ percent: 0, reason: '' })
+          setEditing(false)
         }}
       >
         Apply
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost"
+        onClick={() => {
+          setDraft({ percent: 0, reason: '' })
+          setEditing(false)
+        }}
+      >
+        Cancel
       </button>
     </div>
   )

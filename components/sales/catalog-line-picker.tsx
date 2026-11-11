@@ -48,7 +48,7 @@ function leftToSell(option: VariantOption, inCart: Record<string, number>): numb
 /** Column count of the model table, so a nested row can span it. */
 const MODEL_COLUMNS = 4
 
-function swatchClass(color: string): string {
+export function swatchClass(color: string): string {
   const key = color.trim().toLowerCase()
   if (key.includes('red')) return 'catalog-color-swatch catalog-color-swatch--red'
   if (key.includes('blue')) return 'catalog-color-swatch catalog-color-swatch--blue'
@@ -111,7 +111,9 @@ function VariantRows({
             <th scope="col" className="num">
               Qty
             </th>
-            <th scope="col">{till ? 'Action' : <span className="sr-only">Add</span>}</th>
+            <th scope="col">
+              <span className="sr-only">Add</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -352,6 +354,23 @@ export function CatalogLinePicker({
 
   const showSkuMatches = skuMatches.length > 0 && skuSearchReady(search)
 
+  const searchRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (till) searchRef.current?.focus()
+  }, [till, branchId])
+
+  /* Scanners end every code with Enter. On the till the picker sits inside the
+     sale form, so an unhandled Enter would confirm the sale mid-basket. */
+  const onSearchKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    if (!till || input.trim() !== search.trim() || skuMatches.length !== 1) return
+    const only = skuMatches[0]!
+    if (enforceStock && leftToSell(only, inCart) <= 0) return
+    onAdd(only, 1)
+    setInput('')
+  }
+
   const variantRowProps = {
     inCart,
     qtyFor,
@@ -365,13 +384,16 @@ export function CatalogLinePicker({
 
   return (
     <div className={className}>
-      <SearchInput
-        className="search-field--full"
-        value={input}
-        onChange={setInput}
-        placeholder={searchPlaceholder}
-        aria-label={searchAriaLabel}
-      />
+      <div onKeyDown={onSearchKeyDown}>
+        <SearchInput
+          ref={searchRef}
+          className={`search-field--full${till ? ' search-field--till' : ''}`}
+          value={input}
+          onChange={setInput}
+          placeholder={searchPlaceholder}
+          aria-label={searchAriaLabel}
+        />
+      </div>
 
       {modelsQuery.isPending && <p className="invoice-picker-hint">Loading catalog…</p>}
       {modelsQuery.isError && <p className="field-error">Could not load products.</p>}
@@ -405,7 +427,9 @@ export function CatalogLinePicker({
                   <th scope="col" className="num">
                     Variants
                   </th>
-                  <th scope="col">{till ? 'Action' : <span className="sr-only">Open</span>}</th>
+                  <th scope="col">
+                    <span className="sr-only">Open</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -484,23 +508,32 @@ function ModelRow({
         className={`catalog-picker-model${open ? ' catalog-picker-model--open' : ''}`}
         onClick={onToggle}
       >
-        <td className="tabular">{product.productCode}</td>
+        <td className="tabular catalog-picker-code">{product.productCode}</td>
         <td>
           <strong>{product.productName}</strong>
         </td>
-        <td className="num tabular">{product.variantCount ?? ''}</td>
-        <td>
+        <td className="num tabular">
+          {tillOpen && product.variantCount != null ? (
+            <span className="catalog-picker-count">
+              {product.variantCount} {product.variantCount === 1 ? 'variant' : 'variants'}
+            </span>
+          ) : (
+            (product.variantCount ?? '')
+          )}
+        </td>
+        <td className="catalog-picker-toggle-cell">
           <button
             type="button"
             className={`btn btn-ghost btn-sm invoice-picker-add${tillOpen ? ' btn-sale-catalog-open' : ''}`}
             aria-expanded={open}
             aria-controls={panelId}
+            aria-label={tillOpen ? `${open ? 'Close' : 'Open'} ${product.productName}` : undefined}
             onClick={(event) => {
               event.stopPropagation()
               onToggle()
             }}
           >
-            {open ? 'Close' : 'Open'}
+            {tillOpen ? null : open ? 'Close' : 'Open'}
             <ChevronRight
               size={14}
               aria-hidden="true"

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Barcode, CircleOff, Printer, RotateCcw, Tag } from 'lucide-react'
+import { Barcode, CircleOff, Pencil, Printer, RotateCcw } from 'lucide-react'
 import { printBarcodeLabels } from '@/components/products/barcode-print'
 import { Can } from '@/components/shared/can'
 import { useBranchScope } from '@/hooks/use-branch-scope'
@@ -17,11 +17,11 @@ import type { ProductDetail, Variant } from '@/types'
 /** One row per SKU: its own price, barcodes and on-sale status. */
 export function SkuTable({
   product,
-  onPrice,
+  onEdit,
   onBarcodes,
 }: {
   product: ProductDetail
-  onPrice: (variant: Variant) => void
+  onEdit: (variant: Variant) => void
   onBarcodes: (variant: Variant) => void
 }) {
   const setActive = useSetVariantActive()
@@ -34,7 +34,7 @@ export function SkuTable({
   return (
     <>
     <div className="table-wrap">
-      <table className="card-table">
+      <table className="card-table sku-table">
         <caption className="sr-only">Color and size variants for {product.name}</caption>
         <thead>
           <tr>
@@ -95,8 +95,15 @@ export function SkuTable({
                   {editable && (
                     <Can permission="catalog.edit">
                       <div className="row-actions">
-                        <button type="button" className="icon-btn" onClick={() => onPrice(variant)} aria-label={`Price of ${variant.sku}`} title="Price and history">
-                          <Tag size={16} />
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => onEdit(variant)}
+                          aria-label={`Edit ${variant.sku}`}
+                          title="Edit color, size and price"
+                        >
+                          <Pencil size={14} aria-hidden="true" />
+                          Edit
                         </button>
                         <button type="button" className="icon-btn" onClick={() => onBarcodes(variant)} aria-label={`Barcodes of ${variant.sku}`} title="Barcodes">
                           <Barcode size={16} />

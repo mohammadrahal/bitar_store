@@ -2,7 +2,7 @@ import { Suspense } from 'react'
 import { InventoryView } from '@/components/inventory/inventory-view'
 import { Skeleton } from '@/components/shared/skeleton'
 
-export const metadata = { title: 'Inventory' }
+export const metadata = { title: 'Warehouse' }
 
 export default function InventoryPage() {
   return (

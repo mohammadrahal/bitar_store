@@ -193,7 +193,7 @@ export function InventoryVariantsView({ showPageHeader = true }: { showPageHeade
     <>
       {showPageHeader ? (
         <PageHeader
-          eyebrow="Inventory"
+          eyebrow="Warehouse"
           title="Stock by variant"
           description="Every color and size with its five balances. Available is what can be sold or sent."
           actions={

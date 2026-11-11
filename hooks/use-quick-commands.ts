@@ -147,7 +147,7 @@ export function useQuickCommands(): QuickCommand[] {
     if (can('stock.view')) {
       add({
         id: 'inventory',
-        label: 'Inventory',
+        label: 'Warehouse',
         hint: 'Stock by variant with its five balances',
         href: inventoryHubHref('variants'),
         icon: Boxes,

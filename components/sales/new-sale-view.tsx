@@ -4,20 +4,22 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { Pause, Trash2 } from 'lucide-react'
+import { CircleCheck, MapPin, Pause, Printer, ShoppingBag, Trash2, UserPlus } from 'lucide-react'
 import { LineDiscountField, type LineDiscount } from '@/components/sales/line-discount'
+import { QtyStepper } from '@/components/sales/qty-stepper'
 import { CashSessionGate } from '@/components/cash/cash-session-gate'
 import { PaymentFields } from '@/components/sales/payment-fields'
 import { SaleFooter } from '@/components/sales/sale-footer'
-import { CatalogLinePicker } from '@/components/sales/catalog-line-picker'
+import { TillCatalog } from '@/components/sales/till-catalog'
 import { SaleChannelFields } from '@/components/sales/sale-channel-fields'
 import type { ApiSaleChannel, ApiSocialPlatform } from '@/lib/api/types'
+import { SALE_CHANNEL_OPTIONS, SOCIAL_PLATFORM_OPTIONS } from '@/lib/sale-channel'
 import { Field } from '@/components/shared/field'
 import { LocationSelect } from '@/components/shared/location-select'
 import { PageHeader } from '@/components/shared/page-header'
 import { ViewOnlyNotice } from '@/components/shared/view-only-notice'
 import { receiptFromSale } from '@/components/sales/sale-receipt-build'
-import { printSaleReceipt } from '@/components/sales/sale-receipt-print'
+import { printSaleReceipt, type ReceiptPrintInput } from '@/components/sales/sale-receipt-print'
 import { useDefaultBranchId } from '@/hooks/use-branch-scope'
 import { useBranches } from '@/hooks/use-branches'
 import { useCurrentUser } from '@/store/user-store'
@@ -86,6 +88,12 @@ function optionFromPendingLine(line: { skuId: string; label: string; unitPrice: 
   }
 }
 
+/** Lines restored from a pending sale carry no stock figure; the server checks those on submit. */
+function lineMax(line: CartLine): number {
+  const available = line.option.available ?? 0
+  return available > 0 ? available : 9999
+}
+
 function draftUnits(draft: SaleDraft): number {
   return draft.lines.reduce((sum, line) => sum + line.quantity, 0)
 }
@@ -105,7 +113,12 @@ export function NewSaleView() {
   const [branchChoice, setBranch] = useState('')
   const [draft, setDraft] = useState<SaleDraft>(() => emptyDraft())
   const [held, setHeld] = useState<SaleDraft | null>(null)
-  const [lastCompleted, setLastCompleted] = useState<{ reference: string; href: string } | null>(null)
+  const [lastCompleted, setLastCompleted] = useState<{
+    reference: string
+    href: string
+    receipt: ReceiptPrintInput
+  } | null>(null)
+  const [customerOpen, setCustomerOpen] = useState(false)
   const branchId = locationScoped ? defaultBranch : branchChoice
 
   const { lines, customerName, customerPhone, channel, socialPlatform, payment, pendingDraftId } = draft
@@ -113,6 +126,7 @@ export function NewSaleView() {
   const resetDraft = () => {
     idempotency.reset()
     setDraft(emptyDraft())
+    setCustomerOpen(false)
     if (searchParams.get('pending')) router.replace('/sales/new')
   }
 
@@ -243,11 +257,7 @@ export function NewSaleView() {
           const branchName = branches?.find((branch) => branch.id === sale.branchId)?.name
           const name = customerName.trim() || sale.customerName?.trim() || undefined
           const phone = customerPhone.trim() || sale.customerPhone?.trim() || undefined
-          printSaleReceipt({
-            ...receiptFromSale(sale, user.name),
-            branchName,
-            customerName: name,
-          })
+          const receipt: ReceiptPrintInput = { ...receiptFromSale(sale, user.name), branchName, customerName: name }
           let receiptHref = `/sales/${sale.id}`
           try {
             const invoice = await createB2cInvoiceForSale(sale.id, {
@@ -259,7 +269,7 @@ export function NewSaleView() {
           } catch {
             /* Fiscal invoice optional; the till sale is still the receipt of record. */
           }
-          setLastCompleted({ reference: sale.reference, href: receiptHref })
+          setLastCompleted({ reference: sale.reference, href: receiptHref, receipt })
           resetDraft()
           toast.success(`${sale.reference} completed.`)
         },
@@ -274,54 +284,93 @@ export function NewSaleView() {
         ? '1 line item'
         : `${lines.length} line items`
 
+  const channelLabel =
+    channel === 'social_media'
+      ? (SOCIAL_PLATFORM_OPTIONS.find((option) => option.value === socialPlatform)?.label ?? 'Social media')
+      : (SALE_CHANNEL_OPTIONS.find((option) => option.value === channel)?.label ?? 'In store')
+
+  const clearCart = () => {
+    const cleared = lines
+    setLines([])
+    toast('Cart cleared', { action: { label: 'Undo', onClick: () => setLines(cleared) } })
+  }
+
+  const setQuantity = (line: CartLine, quantity: number) =>
+    setLines((current) => current.map((entry) => (entry === line ? { ...entry, quantity } : entry)))
+
+  const chooseBranch = (value: string) => {
+    setBranch(value)
+    setDraft((current) => ({ ...current, lines: [] }))
+  }
+
   return (
     <form className="sale-layout sale-layout--till" onSubmit={submit} noValidate>
       <PageHeader
         title="New sale"
         actions={
-          lines.length > 0 ? (
-            <button type="button" className="btn btn-secondary btn-sm" onClick={holdAndStartNext}>
-              <Pause size={16} aria-hidden="true" />
-              Hold for next
-            </button>
-          ) : undefined
+          <>
+            {!locationScoped && branchId ? (
+              <div className="sale-location-inline">
+                <MapPin size={16} aria-hidden="true" />
+                <LocationSelect
+                  value={branchChoice}
+                  onChange={chooseBranch}
+                  onlyAccessible
+                  onlyFullAccess
+                  aria-label="Selling location"
+                />
+              </div>
+            ) : null}
+            {lines.length > 0 ? (
+              <button type="button" className="btn btn-secondary" onClick={holdAndStartNext}>
+                <Pause size={16} aria-hidden="true" />
+                Hold for next
+              </button>
+            ) : null}
+          </>
         }
       />
 
-      {held ? (
-        <div className="sale-held-banner" role="status">
-          <p>
-            Held sale — {draftUnits(held)} {draftUnits(held) === 1 ? 'item' : 'items'}
-          </p>
-          <button type="button" className="btn btn-secondary btn-sm" onClick={resumeHeld} disabled={lines.length > 0}>
-            Resume
-          </button>
+      {held || lastCompleted ? (
+        <div className="sale-status-row">
+          {held ? (
+            <div className="sale-status sale-status--held" role="status">
+              <Pause size={16} aria-hidden="true" />
+              <span>
+                Held sale · {draftUnits(held)} {draftUnits(held) === 1 ? 'item' : 'items'}
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={resumeHeld}
+                disabled={lines.length > 0}
+                title={lines.length > 0 ? 'Finish or hold the current sale first' : undefined}
+              >
+                Resume
+              </button>
+            </div>
+          ) : null}
+          {lastCompleted ? (
+            <div className="sale-status sale-status--done" role="status">
+              <CircleCheck size={16} aria-hidden="true" />
+              <span>
+                <strong className="tabular">{lastCompleted.reference}</strong> completed
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => printSaleReceipt(lastCompleted.receipt)}
+              >
+                <Printer size={14} aria-hidden="true" />
+                Print receipt
+              </button>
+              <Link href={lastCompleted.href} className="text-link">
+                {lastCompleted.href.startsWith('/sales/invoices/') ? 'View invoice' : 'View sale'}
+              </Link>
+            </div>
+          ) : null}
         </div>
       ) : null}
-
-      {lastCompleted ? (
-        <p className="sale-complete-line" role="status">
-          Done: <strong className="tabular">{lastCompleted.reference}</strong>
-          {' · '}
-          <Link href={lastCompleted.href} className="text-link">
-            Receipt
-          </Link>
-        </p>
-      ) : null}
-
-      {!locationScoped && (
-        <Field label="Location" className="sale-location-field">
-          <LocationSelect
-            value={branchChoice}
-            onChange={(value) => {
-              setBranch(value)
-              setDraft((current) => ({ ...current, lines: [] }))
-            }}
-            onlyAccessible
-            onlyFullAccess
-          />
-        </Field>
-      )}
 
       <ViewOnlyNotice locationId={branchId} action="ring up sales" />
       <CashSessionGate branchId={branchId} />
@@ -329,133 +378,181 @@ export function NewSaleView() {
       <div className="sale-till-grid">
         <section className="sale-panel sale-panel--catalog" aria-label="Products">
           {branchId ? (
-            <CatalogLinePicker
-              branchId={branchId}
-              inCart={inCart}
-              onAdd={add}
-              availability="enforce"
-              addLabel="Add"
-              searchPlaceholder="Search or scan"
-              searchAriaLabel="Search models for sale"
-              itemLabel="add to sale"
-              className="catalog-picker catalog-picker--sale"
-              pickerUi="till"
-            />
+            <TillCatalog branchId={branchId} inCart={inCart} onAdd={add} />
           ) : (
-            <p className="muted">Choose the selling location first.</p>
+            <div className="sale-catalog-empty">
+              <span className="sale-catalog-empty-icon" aria-hidden="true">
+                <MapPin size={22} />
+              </span>
+              <h2>Where are you selling from?</h2>
+              <p>Products and stock depend on the location. Pick one to load the catalog.</p>
+              {!locationScoped ? (
+                <Field label="Selling location" className="sale-catalog-empty-field">
+                  <LocationSelect value={branchChoice} onChange={chooseBranch} onlyAccessible onlyFullAccess />
+                </Field>
+              ) : null}
+            </div>
           )}
         </section>
 
         <aside className="sale-ticket" aria-label="This sale">
-          <header className="sale-staged-head">
+          <header className="sale-ticket-head">
             <h2 className="sale-staged-title">Cart</h2>
-            <span className="sale-staged-count">{lineCountLabel}</span>
+            {lines.length > 0 ? (
+              <>
+                <span className="sale-staged-count">{lineCountLabel}</span>
+                <button type="button" className="text-btn sale-ticket-clear" onClick={clearCart}>
+                  Clear
+                </button>
+              </>
+            ) : null}
           </header>
-          {lines.length === 0 ? (
-            <p className="sale-staged-empty muted">Add a product from the list.</p>
-          ) : (
-            <ul className="sale-staged-lines">
-              {lines.map((line) => (
-                <li key={line.option.variantId} className="sale-staged-line-wrap">
-                  <div className="sale-staged-line">
-                    <span className="sale-staged-line-label">
-                      {line.quantity}× {line.option.productName} {line.option.color} / {line.option.size}
-                    </span>
-                    <span className="row-actions sale-staged-line-actions">
+
+          <div className="sale-ticket-body">
+            {lines.length === 0 ? (
+              <div className="sale-staged-empty">
+                <ShoppingBag size={22} aria-hidden="true" />
+                <strong>The cart is empty</strong>
+                <span>Scan a tag, or tap a product and then a size.</span>
+              </div>
+            ) : (
+              <ul className="sale-staged-lines">
+                {lines.map((line) => (
+                  <li key={line.option.variantId} className="sale-staged-line-wrap">
+                    <div className="sale-staged-line">
+                      <span className="sale-staged-line-label">
+                        <strong>{line.option.productName}</strong>
+                        <small>
+                          {line.option.color} / {line.option.size} · {formatPrice(line.option.sellPrice)} each
+                        </small>
+                      </span>
                       <span className="tabular sale-staged-line-price">{formatPrice(fromCents(lineNet(line)))}</span>
                       <button
                         type="button"
-                        className="icon-btn"
+                        className="icon-btn sale-staged-line-remove"
                         aria-label={`Remove ${line.option.productName} ${line.option.color} / ${line.option.size}`}
                         onClick={() => setLines((current) => current.filter((entry) => entry !== line))}
                       >
                         <Trash2 size={16} />
                       </button>
-                    </span>
-                  </div>
-                  <LineDiscountField
-                    lineTotal={line.quantity * line.option.sellPrice}
-                    mayApply={mayApplyDiscount}
-                    value={line.discount}
-                    onChange={(discount) =>
-                      setLines((current) =>
-                        current.map((entry) => (entry === line ? { ...entry, discount } : entry)),
-                      )
+                    </div>
+                    <div className="sale-staged-line-tools">
+                      <QtyStepper
+                        compact
+                        hideHint
+                        value={line.quantity}
+                        max={lineMax(line)}
+                        label={`Quantity of ${line.option.productName} ${line.option.color} / ${line.option.size}`}
+                        onChange={(quantity) => setQuantity(line, quantity)}
+                      />
+                      <LineDiscountField
+                        lineTotal={line.quantity * line.option.sellPrice}
+                        mayApply={mayApplyDiscount}
+                        value={line.discount}
+                        onChange={(discount) =>
+                          setLines((current) =>
+                            current.map((entry) => (entry === line ? { ...entry, discount } : entry)),
+                          )
+                        }
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <details
+              className="sale-ticket-details sale-ticket-section"
+              open={customerOpen}
+              onToggle={(event) => setCustomerOpen(event.currentTarget.open)}
+            >
+              <summary>
+                {customerName.trim() || customerPhone.trim() ? (
+                  <>
+                    Customer <span>{customerName.trim() || customerPhone.trim()}</span>
+                  </>
+                ) : (
+                  <>
+                    <UserPlus size={16} aria-hidden="true" /> Add customer (optional)
+                  </>
+                )}
+              </summary>
+              <div className="form-grid sale-customer-grid">
+                <Field label="Name">
+                  <input
+                    value={customerName}
+                    onChange={(event) => setDraft((current) => ({ ...current, customerName: event.target.value }))}
+                    autoComplete="name"
+                    placeholder="Walk-in"
+                  />
+                </Field>
+                <Field label="Phone">
+                  <input
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(event) => setDraft((current) => ({ ...current, customerPhone: event.target.value }))}
+                    autoComplete="tel"
+                    placeholder="+961 …"
+                    inputMode="tel"
+                    className="tabular"
+                  />
+                </Field>
+              </div>
+            </details>
+
+            {lines.length > 0 ? (
+              <section className="sale-ticket-section" aria-labelledby="sale-payment-heading">
+                <h3 id="sale-payment-heading" className="sale-ticket-subhead">
+                  Payment
+                </h3>
+                <PaymentFields
+                  draft={payment}
+                  total={total}
+                  onChange={(next) => setDraft((current) => ({ ...current, payment: next }))}
+                  referenceError={referenceError}
+                  showRateHint={false}
+                  embedded
+                />
+                <details className="sale-ticket-details">
+                  <summary>
+                    Sold through <span>{channelLabel}</span>
+                  </summary>
+                  <SaleChannelFields
+                    channel={channel}
+                    socialPlatform={socialPlatform}
+                    onChannelChange={(next) => {
+                      setDraft((current) => ({
+                        ...current,
+                        channel: next,
+                        socialPlatform: next === 'in_store' ? 'whatsapp' : current.socialPlatform,
+                      }))
+                    }}
+                    onSocialPlatformChange={(platform) =>
+                      setDraft((current) => ({ ...current, socialPlatform: platform }))
                     }
                   />
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="form-grid sale-customer-grid">
-            <Field label="Customer name">
-              <input
-                value={customerName}
-                onChange={(event) => setDraft((current) => ({ ...current, customerName: event.target.value }))}
-                autoComplete="name"
-                placeholder="Walk-in"
-              />
-            </Field>
-            <Field label="Phone">
-              <input
-                type="tel"
-                value={customerPhone}
-                onChange={(event) => setDraft((current) => ({ ...current, customerPhone: event.target.value }))}
-                autoComplete="tel"
-                placeholder="+961 …"
-                inputMode="tel"
-                className="tabular"
-              />
-            </Field>
+                </details>
+              </section>
+            ) : null}
           </div>
 
-          {lines.length > 0 ? (
-            <details className="sale-ticket-details">
-              <summary>Channel</summary>
-              <SaleChannelFields
-                channel={channel}
-                socialPlatform={socialPlatform}
-                onChannelChange={(next) => {
-                  setDraft((current) => ({
-                    ...current,
-                    channel: next,
-                    socialPlatform: next === 'in_store' ? 'whatsapp' : current.socialPlatform,
-                  }))
-                }}
-                onSocialPlatformChange={(platform) => setDraft((current) => ({ ...current, socialPlatform: platform }))}
-              />
-            </details>
-          ) : null}
-
-          {lines.length > 0 ? (
-            <PaymentFields
-              draft={payment}
-              total={total}
-              onChange={(next) => setDraft((current) => ({ ...current, payment: next }))}
-              referenceError={referenceError}
-              showRateHint={false}
-              embedded
-            />
-          ) : null}
+          <SaleFooter
+            total={total}
+            units={units}
+            pending={create.isPending}
+            disabled={lines.length === 0 || !online || !branchId || Boolean(problem) || drawerBlocks}
+            problem={
+              drawerBlocks
+                ? 'Open the cash drawer before completing a sale.'
+                : lines.length > 0
+                  ? (problem ?? undefined)
+                  : undefined
+            }
+            onSavePending={branchId && lines.length > 0 ? saveAsPending : undefined}
+            savingPending={savePending.isPending}
+          />
         </aside>
       </div>
-
-      <SaleFooter
-        total={total}
-        units={units}
-        pending={create.isPending}
-        disabled={lines.length === 0 || !online || !branchId || Boolean(problem) || drawerBlocks}
-        problem={
-          drawerBlocks
-            ? 'Open the cash drawer before completing a sale.'
-            : lines.length > 0
-              ? (problem ?? undefined)
-              : undefined
-        }
-        onSavePending={branchId && lines.length > 0 ? saveAsPending : undefined}
-        savingPending={savePending.isPending}
-      />
     </form>
   )
 }

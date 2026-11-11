@@ -12,6 +12,7 @@ import {
   Package,
   ScanLine,
   ScrollText,
+  Settings,
   Tags,
   Truck,
   Undo2,
@@ -133,7 +134,7 @@ export function useNavEntries(): NavSection[] {
     if (canReceiveTransfers()) hubBadges.push('incoming')
     stock.push({
       href: '/inventory',
-      label: 'Inventory',
+      label: 'Warehouse',
       icon: Boxes,
       ...(hubBadges.length > 0 ? { badges: hubBadges } : {}),
     })
@@ -156,8 +157,16 @@ export function useNavEntries(): NavSection[] {
   const showAdminSection =
     can('opening_stock.post') ||
     canViewFinancialReports() ||
-    canViewAdminWarehouseTools()
+    canViewAdminWarehouseTools() ||
+    can('users.manage') ||
+    can('locations.view_all') ||
+    can('settings.manage')
   if (showAdminSection) {
+    /* The hub opens on its first visible tab (Employees, then Locations, then
+       Settings); a bare path also keeps this lit on any of those tabs. */
+    if (can('users.manage') || can('locations.view_all') || can('settings.manage')) {
+      admin.push({ href: '/admin', label: 'Settings', icon: Settings })
+    }
     if (can('opening_stock.post')) {
       admin.push({ href: adminHubHref('opening-stock'), label: 'Opening stock', icon: ClipboardList })
     }
@@ -166,9 +175,6 @@ export function useNavEntries(): NavSection[] {
     }
     if (canViewAdminWarehouseTools()) {
       admin.push({ href: adminHubHref('audit'), label: 'Audit log', icon: ScrollText })
-    }
-    if (can('stock.adjust')) {
-      admin.push({ href: adminHubHref('suppliers'), label: 'Suppliers', icon: Truck })
     }
   }
 

@@ -90,6 +90,40 @@ async function lookUp(code: string): Promise<boolean> {
 }
 
 /**
+ * The one SKU a scanned code belongs to: exact barcode or SKU code, never a
+ * partial match. The mirror holds one barcode per SKU, so a code it does not
+ * know (a second barcode, or a SKU not opened yet) is asked of the API.
+ * With `branchId` the option carries what is available there.
+ */
+export async function findVariantByCode(code: string, branchId?: string): Promise<VariantOption | null> {
+  const trimmed = code.trim()
+  if (!trimmed) return null
+  const exact = (db: MockDb) => {
+    const lower = trimmed.toLowerCase()
+    return optionsFrom(db, '').find((option) => option.barcode === trimmed || option.sku.toLowerCase() === lower)
+  }
+  let option = exact(readDb())
+  if (!option && SCANNABLE.test(trimmed)) {
+    try {
+      const sku = await getApiClient().lookupSku(trimmed)
+      const variant = mapApiSku(sku, sku.style.code, trimmed)
+      mirrorCatalog([], [variant])
+      option = optionsFrom(readDb(), '').find((candidate) => candidate.variantId === sku.id)
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null
+      throw error
+    }
+  }
+  if (!option) return null
+  if (branchId) {
+    const { branchSellableMap } = await import('@/services/stock-api.service')
+    const sellable = await branchSellableMap(branchId)
+    option = { ...option, available: sellable.get(option.variantId) ?? sellable.get(option.sku) ?? 0 }
+  }
+  return option
+}
+
+/**
  * Catalog variants for pickers, matched on SKU, barcode, name or category.
  * Inactive SKUs and archived models never appear: they cannot be sold or
  * sent. With `branchId` each option carries what is available there.

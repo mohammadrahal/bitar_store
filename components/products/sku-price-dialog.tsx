@@ -3,10 +3,10 @@
 import { useId, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { usePriceHistory, useSetVariantPrice } from '@/hooks/use-skus'
+import { usePriceHistory, useUpdateVariant } from '@/hooks/use-skus'
 import { useModalBehavior } from '@/hooks/use-modal-behavior'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
-import { skuPriceSchema, type SkuPriceFormValues } from '@/schemas/product.schema'
+import { skuEditSchema, type SkuEditFormValues } from '@/schemas/product.schema'
 import type { Variant } from '@/types'
 
 function PriceHistory({ variantId }: { variantId: string }) {
@@ -28,54 +28,88 @@ function PriceHistory({ variantId }: { variantId: string }) {
   )
 }
 
-/** Sets one SKU's price. The API records every change, listed underneath. */
-export function SkuPriceDialog({ variant, onClose }: { variant: Variant; onClose: () => void }) {
+/**
+ * Edits one SKU: its color, size and price. The price goes through its own
+ * endpoint so the API records it, listed underneath; the SKU code never changes.
+ */
+export function SkuEditDialog({ variant, onClose }: { variant: Variant; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
-  const fieldId = useId()
-  const setPrice = useSetVariantPrice()
+  const colorId = useId()
+  const sizeId = useId()
+  const priceId = useId()
+  const update = useUpdateVariant()
   useModalBehavior(ref, onClose)
   const {
     register,
     handleSubmit,
-    formState: { errors },
-  } = useForm<SkuPriceFormValues>({ resolver: zodResolver(skuPriceSchema), defaultValues: { price: variant.sellPrice } })
+    formState: { errors, isDirty },
+  } = useForm<SkuEditFormValues>({
+    resolver: zodResolver(skuEditSchema),
+    defaultValues: { color: variant.color, size: variant.size, price: variant.sellPrice },
+  })
 
-  const submit = handleSubmit(({ price }) => {
-    if (price === variant.sellPrice) return onClose()
-    setPrice.mutate({ variantId: variant.id, price, sku: variant.sku }, { onSuccess: onClose })
+  const submit = handleSubmit((values) => {
+    if (!isDirty) return onClose()
+    update.mutate({ variant, values, sku: variant.sku }, { onSuccess: onClose })
   })
 
   return (
     <div className="overlay overlay-center">
       <div className="overlay-backdrop" onClick={onClose} aria-hidden="true" />
       <div ref={ref} className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-        <h2 id={titleId}>Price of {variant.sku}</h2>
+        <h2 id={titleId}>Edit {variant.sku}</h2>
         <p>
-          {variant.color} / {variant.size}. A new price applies from now on; past sales keep the price they were made at.
+          The SKU code and barcodes stay the same. A new price applies from now on; past sales keep the price they were
+          made at.
         </p>
         <form className="dialog-form" noValidate onSubmit={submit}>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor={colorId}>Color</label>
+              <input
+                id={colorId}
+                {...register('color')}
+                autoComplete="off"
+                aria-invalid={errors.color ? true : undefined}
+                aria-describedby={errors.color ? `${colorId}-error` : undefined}
+                data-autofocus
+              />
+              {errors.color && <span id={`${colorId}-error`} className="field-error">{errors.color.message}</span>}
+            </div>
+            <div className="field">
+              <label htmlFor={sizeId}>Size</label>
+              <input
+                id={sizeId}
+                {...register('size')}
+                autoComplete="off"
+                aria-invalid={errors.size ? true : undefined}
+                aria-describedby={errors.size ? `${sizeId}-error` : undefined}
+              />
+              {errors.size && <span id={`${sizeId}-error`} className="field-error">{errors.size.message}</span>}
+            </div>
+          </div>
           <div className="field">
-            <label htmlFor={fieldId}>Price ({variant.currency})</label>
+            <label htmlFor={priceId}>Sell price ({variant.currency})</label>
             <input
-              id={fieldId}
+              id={priceId}
               {...register('price', { valueAsNumber: true })}
               type="number"
               min="0"
               step="0.01"
               inputMode="decimal"
+              className="tabular"
               aria-invalid={errors.price ? true : undefined}
-              aria-describedby={errors.price ? `${fieldId}-error` : undefined}
-              data-autofocus
+              aria-describedby={errors.price ? `${priceId}-error` : undefined}
             />
-            {errors.price && <span id={`${fieldId}-error`} className="field-error">{errors.price.message}</span>}
+            {errors.price && <span id={`${priceId}-error`} className="field-error">{errors.price.message}</span>}
           </div>
           <div className="dialog-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={setPrice.isPending}>
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={update.isPending}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" disabled={setPrice.isPending}>
-              {setPrice.isPending ? 'Saving…' : 'Save price'}
+            <button type="submit" className="btn btn-primary" disabled={update.isPending}>
+              {update.isPending ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         </form>

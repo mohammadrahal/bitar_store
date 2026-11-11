@@ -63,8 +63,19 @@ export function CashSessionGate({ branchId }: { branchId: string }) {
   const typed = float.trim()
   const openingCash = typed === '' ? null : parseMoneyInput(typed, MAX_CASH_TENDERED)
 
+  const openDrawer = () => {
+    if (openingCash === null || open.isPending) return
+    open.mutate(
+      { branchId, openingCash, idempotencyKey: idempotency.current() },
+      { onSuccess: idempotency.reset },
+    )
+  }
+
   return (
     <div className="cash-gate" role="status">
+      <span className="cash-gate-icon" aria-hidden="true">
+        <Banknote size={18} />
+      </span>
       <div className="cash-gate-copy">
         <strong>No cash drawer is open at this branch.</strong>
         <p>
@@ -74,17 +85,8 @@ export function CashSessionGate({ branchId }: { branchId: string }) {
         </p>
       </div>
       {canOpen && (
-        <form
-          className="cash-gate-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (openingCash === null) return
-            open.mutate(
-              { branchId, openingCash, idempotencyKey: idempotency.current() },
-              { onSuccess: idempotency.reset },
-            )
-          }}
-        >
+        /* Rendered inside the sale <form>, so this cannot be a <form> of its own. */
+        <div className="cash-gate-form" role="group" aria-label="Open the cash drawer">
           <label className="sr-only" htmlFor="cash-gate-float">
             Opening float
           </label>
@@ -96,11 +98,21 @@ export function CashSessionGate({ branchId }: { branchId: string }) {
             value={float}
             placeholder="Opening float"
             onChange={(event) => setFloat(event.target.value.replace(/[^\d.]/g, ''))}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter') return
+              event.preventDefault()
+              openDrawer()
+            }}
           />
-          <button type="submit" className="btn btn-primary" disabled={open.isPending || openingCash === null}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={open.isPending || openingCash === null}
+            onClick={openDrawer}
+          >
             {open.isPending ? 'Opening…' : 'Open the drawer'}
           </button>
-        </form>
+        </div>
       )}
     </div>
   )

@@ -85,9 +85,13 @@ export const emptyNewProductValues: NewProductFormValues = {
   openingQuantities: {},
 }
 
-/** A new price for one SKU. */
-export const skuPriceSchema = z.object({ price: priceField })
-export type SkuPriceFormValues = z.infer<typeof skuPriceSchema>
+/** Everything about one SKU that can change after it is created. */
+export const skuEditSchema = z.object({
+  color: z.string().trim().min(1, 'Enter a color').max(40, 'Keep it under 40 characters'),
+  size: z.string().trim().min(1, 'Enter a size').max(20, 'Keep it under 20 characters'),
+  price: priceField,
+})
+export type SkuEditFormValues = z.infer<typeof skuEditSchema>
 
 /** Barcodes are scanned, so anything printable goes except spaces. */
 export const barcodeSchema = z.object({

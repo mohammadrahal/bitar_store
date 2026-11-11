@@ -9,7 +9,7 @@ import { AddVariantsDrawer } from '@/components/products/add-variants-drawer'
 import { ArchiveProductDialog } from '@/components/products/archive-product-dialog'
 import { ProductForm } from '@/components/products/product-form'
 import { SkuBarcodesDialog } from '@/components/products/sku-barcodes-dialog'
-import { SkuPriceDialog } from '@/components/products/sku-price-dialog'
+import { SkuEditDialog } from '@/components/products/sku-price-dialog'
 import { ProductStockHint } from '@/components/products/product-stock-hint'
 import { SkuTable } from '@/components/products/sku-table'
 import { Can } from '@/components/shared/can'
@@ -24,7 +24,7 @@ import { formatPrice } from '@/lib/format'
 
 type Dialog =
   | { kind: 'edit' | 'variants' | 'archive' }
-  | { kind: 'price' | 'barcodes'; variantId: string }
+  | { kind: 'edit-variant' | 'barcodes'; variantId: string }
 
 export function ProductDetailView({ productId }: { productId: string }) {
   /* `?created=1` is set by the new-model form. It only changes the wording and
@@ -60,7 +60,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
               <Can permission="catalog.edit">
                 <button type="button" className="btn btn-secondary" onClick={() => setDialog({ kind: 'edit' })}>
                   <Pencil size={16} aria-hidden="true" />
-                  Edit
+                  Edit model
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={() => setDialog({ kind: 'variants' })}>
                   <Plus size={16} aria-hidden="true" />
@@ -122,7 +122,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
         ) : (
           <SkuTable
             product={product}
-            onPrice={(variant) => setDialog({ kind: 'price', variantId: variant.id })}
+            onEdit={(variant) => setDialog({ kind: 'edit-variant', variantId: variant.id })}
             onBarcodes={(variant) => setDialog({ kind: 'barcodes', variantId: variant.id })}
           />
         )}
@@ -131,7 +131,7 @@ export function ProductDetailView({ productId }: { productId: string }) {
       {dialog?.kind === 'edit' && <ProductForm key={product.id} product={product} onClose={close} />}
       {dialog?.kind === 'variants' && <AddVariantsDrawer product={product} onClose={close} />}
       {dialog?.kind === 'archive' && <ArchiveProductDialog product={product} onClose={close} />}
-      {dialog?.kind === 'price' && selected && <SkuPriceDialog variant={selected} onClose={close} />}
+      {dialog?.kind === 'edit-variant' && selected && <SkuEditDialog variant={selected} onClose={close} />}
       {dialog?.kind === 'barcodes' && selected && (
         <SkuBarcodesDialog variant={selected} barcodes={product.barcodes[selected.id] ?? []} onClose={close} />
       )}

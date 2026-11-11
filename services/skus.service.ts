@@ -33,6 +33,11 @@ export async function setVariantPrice(variantId: string, price: number): Promise
   await getApiClient().setSkuPrice(variantId, priceText(price))
 }
 
+/** Color and size go through `PATCH /skus/:id`; the SKU code is fixed once created. */
+export async function updateVariantDetails(variantId: string, changes: { color: string; size: string }): Promise<void> {
+  await getApiClient().updateSku(variantId, { color: changes.color.trim(), size: changes.size.trim() })
+}
+
 export async function listPriceHistory(variantId: string): Promise<PriceChange[]> {
   return (await getApiClient().getPriceHistory(variantId, 50)).map(mapApiPriceChange)
 }

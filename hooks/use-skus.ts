@@ -11,6 +11,7 @@ import {
   removeBarcode,
   setVariantActive,
   setVariantPrice,
+  updateVariantDetails,
 } from '@/services/skus.service'
 import { resolveSkuReferenceToId } from '@/services/variant-search.service'
 
@@ -45,6 +46,29 @@ export function useSetVariantPrice() {
     onSuccess: (_result, { sku }) => {
       invalidate()
       toast.success(`New price saved for ${sku}`)
+    },
+    onError: reportError,
+  })
+}
+
+export function useUpdateVariant() {
+  const { invalidate, reportError } = useProductMutationCallbacks()
+  return useMutation({
+    mutationFn: async ({
+      variant,
+      values,
+    }: {
+      variant: { id: string; color: string; size: string; sellPrice: number }
+      values: { color: string; size: string; price: number }
+      sku: string
+    }) => {
+      const detailsChanged = values.color.trim() !== variant.color || values.size.trim() !== variant.size
+      if (detailsChanged) await updateVariantDetails(variant.id, values)
+      if (values.price !== variant.sellPrice) await setVariantPrice(variant.id, values.price)
+    },
+    onSuccess: (_result, { sku }) => {
+      invalidate()
+      toast.success(`${sku} updated`)
     },
     onError: reportError,
   })
