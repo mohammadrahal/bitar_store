@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { TransferStatusPill } from '@/components/transfers/transfer-status-pill'
 import { TransferStatusStepper } from '@/components/transfers/transfer-status-stepper'
 import { useConfirm } from '@/components/shared/confirm-dialog'
@@ -116,7 +116,13 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
   const accept = useAcceptTransfer()
   const resolve = useResolveTransfer()
   const cancel = useCancelTransfer()
-  const idempotency = useIdempotencyKey()
+  /* One key per action. They used to share a single key that is only cleared on
+     success, so a receive that timed out left its key behind for the next
+     button pressed, and the server answers a repeated key with a 409. */
+  const dispatchKey = useIdempotencyKey()
+  const receiveKey = useIdempotencyKey()
+  const acceptKey = useIdempotencyKey()
+  const resolveKey = useIdempotencyKey()
   const [reason, setReason] = useState('')
   const [confirm, confirmDialog] = useConfirm()
 
@@ -215,7 +221,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
         )}
         {atDestination && transfer.totals.onTheRoad > 0 && (
           <span className="muted">
-            Inbound to {transfer.to.name}: {formatNumber(transfer.totals.onTheRoad)} still on the road. receive, then report
+            Inbound to {transfer.to.name}: {formatNumber(transfer.totals.onTheRoad)} still on the road. Receive, then report
             and invoice, then confirm for sale.
           </span>
         )}
@@ -238,8 +244,8 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
           pending={dispatch.isPending}
           onDispatch={(lines) =>
             dispatch.mutate(
-              { id: transfer.id, idempotencyKey: idempotency.current(), lines },
-              { onSuccess: idempotency.reset },
+              { id: transfer.id, idempotencyKey: dispatchKey.current(), lines },
+              { onSuccess: dispatchKey.reset },
             )
           }
           secondaryAction={canCancelDraft ? cancelDraftButton : undefined}
@@ -253,8 +259,8 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
           pending={receive.isPending}
           onReceive={(lines, note) =>
             receive.mutate(
-              { id: transfer.id, idempotencyKey: idempotency.current(), lines, note },
-              { onSuccess: idempotency.reset },
+              { id: transfer.id, idempotencyKey: receiveKey.current(), lines, note },
+              { onSuccess: receiveKey.reset },
             )
           }
         />
@@ -304,8 +310,8 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
                 disabled={accept.isPending || !canAcceptForSale}
                 onClick={() =>
                   accept.mutate(
-                    { id: transfer.id, idempotencyKey: idempotency.current(), lines: acceptLines },
-                    { onSuccess: idempotency.reset },
+                    { id: transfer.id, idempotencyKey: acceptKey.current(), lines: acceptLines },
+                    { onSuccess: acceptKey.reset },
                   )
                 }
               >
@@ -344,12 +350,28 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
               type="button"
               className="btn btn-secondary"
               disabled={resolve.isPending || reason.trim().length < 3}
-              onClick={() =>
+              onClick={async () => {
+                /* Writing pieces off cannot be taken back, and this button sits
+                   one line below "Confirm for sale". */
+                const pieces = transfer.totals.onTheRoad
+                const confirmed = await confirm({
+                  title: `Write off ${formatNumber(pieces)} ${pieces === 1 ? 'piece' : 'pieces'} as lost?`,
+                  description: `Everything still on the road from ${transfer.from.name} to ${transfer.to.name} is recorded as lost and can no longer be received. This cannot be undone.`,
+                  confirmLabel: 'Confirm lost',
+                  cancelLabel: 'Keep on the road',
+                  tone: 'danger',
+                })
+                if (!confirmed) return
                 resolve.mutate(
-                  { id: transfer.id, reason: reason.trim(), idempotencyKey: idempotency.current() },
-                  { onSuccess: idempotency.reset },
+                  { id: transfer.id, reason: reason.trim(), idempotencyKey: resolveKey.current() },
+                  {
+                    onSuccess: () => {
+                      resolveKey.reset()
+                      setReason('')
+                    },
+                  },
                 )
-              }
+              }}
             >
               Confirm lost
             </button>

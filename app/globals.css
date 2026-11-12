@@ -1080,6 +1080,9 @@ button.stat-card:focus-visible {
   font-weight: 400;
   line-height: 1.4;
 }
+/* After `.stat-foot`, whose `margin: 0` would otherwise cancel the gap under the figure. */
+.stat-foot.stat-foot-split { margin-top: var(--space-2); }
+.stat-foot.stat-foot-split + .stat-foot.stat-foot-split { margin-top: var(--space-1); }
 .stat-foot-change { font-weight: 500; }
 .stat-foot-change.tone-good { color: hsl(var(--success)); }
 .stat-foot-change.tone-bad { color: hsl(var(--destructive)); }
@@ -1091,7 +1094,7 @@ button.stat-card:focus-visible {
   font-size: var(--fs-2xl);
   font-weight: 600;
   line-height: 1.2;
-  margin: 10px 0 4px;
+  margin: 10px 0 var(--space-2);
 }
 .stat-detail { color: hsl(var(--muted-foreground)); font-size: var(--fs-xs); }
 /* The second line under a KPI — "$80.00 today" — belongs to the headline
@@ -1587,16 +1590,12 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: l
 .form-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .transfer-form-actions { flex-direction: column; align-items: flex-start; gap: 8px; }
 
-/* Prepare transfer — luxury dispatch layout */
+/* Prepare transfer */
 .prepare-transfer-page {
   display: flex;
   flex-direction: column;
   gap: var(--layout-gap);
   padding-bottom: 88px;
-}
-.prepare-transfer-header-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 .prepare-transfer-section.panel {
   border-top: 2px solid hsl(var(--gold-500) / 0.45);
@@ -1644,23 +1643,6 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: l
 .prepare-transfer-note {
   min-height: 6.5rem;
 }
-.prepare-transfer-batch-summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid hsl(var(--border));
-  font-size: var(--fs-sm);
-  color: hsl(var(--muted-foreground));
-}
-.prepare-transfer-batch-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: hsl(var(--border));
-}
 .prepare-transfer-lines-table .prepare-transfer-line-item strong {
   font-weight: 600;
   font-size: var(--fs-sm);
@@ -1670,48 +1652,6 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: l
 }
 .prepare-transfer-table-wrap {
   border-radius: var(--r-md);
-}
-.prepare-transfer-auth-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--layout-gap);
-}
-@media (max-width: 768px) {
-  .prepare-transfer-auth-grid { grid-template-columns: 1fr; }
-}
-.prepare-transfer-auth-card {
-  padding: 20px 22px;
-  border-radius: var(--r-md);
-  border: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
-}
-.prepare-transfer-auth-card h3 {
-  margin: 0 0 8px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
-.prepare-transfer-auth-card--active {
-  border-color: hsl(var(--gold-500) / 0.45);
-  box-shadow: inset 0 0 0 1px hsl(var(--gold-500) / 0.2);
-}
-.dark .prepare-transfer-auth-card--active {
-  border-color: hsl(var(--gold-400) / 0.4);
-}
-.prepare-transfer-auth-card--active svg {
-  color: hsl(var(--gold-ink));
-  margin-bottom: 8px;
-}
-.dark .prepare-transfer-auth-card--active svg {
-  color: hsl(var(--gold-400));
-}
-.prepare-transfer-auth-name {
-  margin: 0 0 6px;
-  font-size: var(--fs-md);
-  font-weight: 600;
-}
-.prepare-transfer-auth-detail {
-  margin: 0;
-  font-size: var(--fs-sm);
 }
 .prepare-transfer-footer {
   position: sticky;

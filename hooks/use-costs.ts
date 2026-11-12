@@ -1,11 +1,11 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { queryKeys } from '@/lib/query-keys'
 import { messageOf } from '@/lib/errors'
 import { usePermission } from '@/hooks/use-permission'
-import { getProfitReport, getSkuCost, setSkuCost } from '@/services/costs.service'
+import { effectiveCost, getProfitReport, getSkuCost, setSkuCost } from '@/services/costs.service'
 
 /**
  * Cost and profit, over `/costs`.
@@ -32,6 +32,33 @@ export function useSkuCost(skuId: string | undefined, enabled = true) {
     queryFn: () => getSkuCost(skuId ?? ''),
     enabled: enabled && allowed && Boolean(skuId),
     staleTime: 60_000,
+  })
+}
+
+/**
+ * The unit cost of several SKUs at once, keyed by SKU id: the figure a supply
+ * invoice is priced at. A SKU with no known cost is left out of the map, and
+ * the map is empty for an account that may not see costs.
+ *
+ * Shares `useSkuCost`'s cache entries, so a cost already read is not re-read.
+ */
+export function useUnitCosts(skuIds: string[], enabled = true): Record<string, number> {
+  const allowed = useCanViewCosts()
+  return useQueries({
+    queries: skuIds.map((skuId) => ({
+      queryKey: queryKeys.costs.sku(skuId),
+      queryFn: () => getSkuCost(skuId),
+      enabled: enabled && allowed && Boolean(skuId),
+      staleTime: 60_000,
+    })),
+    combine: (results) => {
+      const costs: Record<string, number> = {}
+      results.forEach((result, index) => {
+        const cost = result.data ? effectiveCost(result.data) : null
+        if (cost !== null && cost > 0) costs[skuIds[index]] = cost
+      })
+      return costs
+    },
   })
 }
 

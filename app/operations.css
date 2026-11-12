@@ -2288,7 +2288,7 @@ details.optional[open] summary { margin-bottom: 16px; }
   align-items: stretch;
 }
 .create-invoice-gateway-grid > .panel { display: flex; flex-direction: column; }
-.create-invoice-gateway-grid > .panel > .panel-body { flex: 1; }
+.create-invoice-gateway-grid > .panel > .panel-body { flex: 1; gap: var(--space-4); }
 .create-invoice-gateway-grid > .panel > .panel-body > .btn { margin-top: auto; }
 @media (max-width: 767px) {
   .create-invoice-gateway-grid { grid-template-columns: 1fr; }

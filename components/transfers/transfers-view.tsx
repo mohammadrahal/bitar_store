@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { ArrowLeftRight, Plus } from 'lucide-react'
 import { TransferStatusPill } from '@/components/transfers/transfer-status-pill'
@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/shared/skeleton'
 import { useAllowPageBranchFilter, useEffectiveListBranchId } from '@/hooks/use-branch-scope'
 import { usePermission } from '@/hooks/use-permission'
 import { useTransfersList } from '@/hooks/use-transfers'
+import { formatDocumentDate } from '@/lib/format'
 import type { TransferStatus } from '@/lib/api/types'
 
 const STATUSES: ChipOption<TransferStatus | 'all'>[] = [
@@ -48,6 +49,8 @@ export function TransfersView({
   const requestOnly = canRequestTransfer() && !canDispatchTransfers()
   const allowPageBranchFilter = useAllowPageBranchFilter()
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [pageBranchId, setPageBranchId] = useState('')
   const branchId = useEffectiveListBranchId(pageBranchId)
   const [status, setStatus] = useState<TransferStatus | 'all'>(() => {
@@ -62,10 +65,24 @@ export function TransfersView({
     setPage(1)
   }, [searchParams, initialStatus])
 
+  /* The chosen status lives in the URL, next to whatever else is there (the
+     hub's `section`). Opening a transfer and coming back used to drop the
+     filter and land on All; now Back restores the list that was left. */
+  const chooseStatus = (value: TransferStatus | 'all') => {
+    setStatus(value)
+    setPage(1)
+    const next = new URLSearchParams(searchParams.toString())
+    if (value === 'all') next.delete('status')
+    else next.set('status', value)
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+
   const query = useTransfersList(branchId, status === 'all' ? '' : status, offset)
   const total = query.data?.total ?? 0
   const pages = Math.max(1, Math.ceil(total / 20))
   const items = query.data?.items ?? []
+  const filtered = (status !== 'all' && !initialStatus) || Boolean(pageBranchId)
 
   return (
     <>
@@ -85,7 +102,8 @@ export function TransfersView({
         title="Transfer list"
         description={query.isPending ? undefined : `${total} transfers`}
         actions={
-          canRequestTransfer() ? (
+          /* The inventory hub already carries this button in its header. */
+          canRequestTransfer() && !embedded ? (
             <Link href="/transfers/new" className="btn btn-primary">
               <Plus size={16} aria-hidden="true" />
               {requestOnly ? 'Request replenishment' : 'Prepare transfer'}
@@ -113,10 +131,7 @@ export function TransfersView({
               label="Status"
               options={STATUSES}
               value={status}
-              onChange={(value) => {
-                setStatus(value)
-                setPage(1)
-              }}
+              onChange={chooseStatus}
             />
           ) : null}
         </div>
@@ -133,8 +148,14 @@ export function TransfersView({
           <div className="panel-body">
             <EmptyState
               icon={ArrowLeftRight}
-              title="No transfers match"
-              description="Try another status filter or prepare a new shipment."
+              title={filtered ? 'No transfers match' : 'No transfers yet'}
+              description={
+                filtered
+                  ? 'Nothing in this status at this location. Try another filter.'
+                  : requestOnly
+                    ? 'Requests you send to the warehouse are listed here.'
+                    : 'Stock sent between locations is listed here.'
+              }
               action={
                 canRequestTransfer() ? (
                   <Link href="/transfers/new" className="btn btn-primary">
@@ -164,6 +185,7 @@ export function TransfersView({
                       <span>
                         <TransferStatusPill status={transfer.status} />
                       </span>
+                      <span>{formatDocumentDate(transfer.requestedAt)}</span>
                       {transfer.totals.onTheRoad > 0 && (
                         <span>{transfer.totals.onTheRoad} on the road</span>
                       )}
@@ -180,6 +202,7 @@ export function TransfersView({
                     <th scope="col">Reference</th>
                     <th scope="col">From</th>
                     <th scope="col">To</th>
+                    <th scope="col">Requested</th>
                     <th scope="col">Status</th>
                     <th scope="col" className="num">
                       Pieces
@@ -199,6 +222,7 @@ export function TransfersView({
                       </td>
                       <td>{transfer.from.name}</td>
                       <td>{transfer.to.name}</td>
+                      <td className="tabular">{formatDocumentDate(transfer.requestedAt)}</td>
                       <td>
                         <TransferStatusPill status={transfer.status} />
                       </td>

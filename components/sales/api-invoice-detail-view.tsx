@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useApiInvoice, useFinalizeInvoice, useUpdateInvoicePrices } from '@/hooks/use-api-invoices'
+import { useUnitCosts } from '@/hooks/use-costs'
 import { useDocumentTitle } from '@/hooks/use-document-title'
 import { usePermission } from '@/hooks/use-permission'
 import { getApiClient } from '@/lib/api'
@@ -17,6 +18,7 @@ import {
   invoiceLabel,
   isTransferInvoice,
   linesMissingPriceWithDraft,
+  linesOffUnitCost,
   patchPayloadForMissingLines,
   priceSourceLabel,
 } from '@/services/invoices-api.service'
@@ -32,11 +34,14 @@ function InvoiceLines({
   invoice,
   editable,
   prices,
+  offCost,
   onPriceChange,
 }: {
   invoice: ApiInvoice
   editable: boolean
   prices: Record<string, string>
+  /** SKU id to the unit cost a line should carry, for lines priced at something else. */
+  offCost: Record<string, string>
   onPriceChange: (skuId: string, value: string) => void
 }) {
   const barcodeMap = useSkuBarcodes(invoice.lines.map((line) => line.sku.id))
@@ -64,7 +69,7 @@ function InvoiceLines({
               Qty
             </th>
             <th scope="col" className="num">
-              Unit
+              {showPriceSource ? 'Unit cost' : 'Unit'}
             </th>
             <th scope="col" className="num">
               Total
@@ -103,6 +108,7 @@ function InvoiceLines({
               <td className="num tabular">{line.quantity}</td>
               <td className="num tabular">
                 {editable ? (
+                  <>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -111,6 +117,17 @@ function InvoiceLines({
                     value={prices[line.sku.id] ?? line.unitPrice}
                     onChange={(event) => onPriceChange(line.sku.id, event.target.value)}
                   />
+                  {offCost[line.sku.id] ? (
+                    <button
+                      type="button"
+                      className="text-link text-sm"
+                      style={{ display: 'block', marginLeft: 'auto', marginTop: 4 }}
+                      onClick={() => onPriceChange(line.sku.id, offCost[line.sku.id])}
+                    >
+                      Use unit cost {formatPrice(Number(offCost[line.sku.id]))}
+                    </button>
+                  ) : null}
+                  </>
                 ) : (
                   <PriceWithLbp usd={Number(line.unitPrice)} exchangeRateUsdLbp={rate} />
                 )}
@@ -136,6 +153,14 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
 
   useDocumentTitle(invoice ? invoiceLabel(invoice) : undefined)
 
+  const draftSupplyInvoice = Boolean(
+    invoice && isTransferInvoice(invoice) && invoice.status === 'draft' && !invoice.voided,
+  )
+  const unitCosts = useUnitCosts(
+    invoice?.lines.map((line) => line.sku.id) ?? [],
+    draftSupplyInvoice && canDispatchTransfers(),
+  )
+
   if (isPending) return <Skeleton rows={1} stats={0} />
   if (isError || !invoice) {
     return <ErrorState title="Could not load this invoice" error={error} onRetry={() => void refetch()} />
@@ -156,6 +181,10 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
     priceDrafts ??
     Object.fromEntries(invoice.lines.map((line) => [line.sku.id, line.unitPrice]))
   const missingPrices = linesMissingPriceWithDraft(invoice, prices)
+  /* A supply invoice is charged at unit cost, not at the selling price. The
+     server prices a new draft that way; this catches the lines that are not. */
+  const offCostLines = canEdit ? linesOffUnitCost(invoice, prices, unitCosts) : []
+  const offCost = Object.fromEntries(offCostLines.map(({ line, unitCost }) => [line.sku.id, unitCost]))
 
   const printPdf = async () => {
     const blob = await getApiClient().downloadInvoicePdf(invoice.id)
@@ -254,7 +283,7 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
                     onChange={(event) => setNoteDraft(event.target.value)}
                   />
                 </label>
-                <div className="form-actions">
+                <div className="form-actions mb-2">
                   <button
                     type="button"
                     className="btn btn-secondary"
@@ -289,6 +318,21 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
                   : 'A warehouse manager has to price them before this invoice can be finalized.'}
               </p>
             )}
+            {offCostLines.length > 0 && (
+              <p className="field-error" style={{ margin: 0 }}>
+                {offCostLines.length === 1
+                  ? `${offCostLines[0].line.sku.code} is not priced at its unit cost.`
+                  : `${offCostLines.length} lines are not priced at their unit cost.`}{' '}
+                A supply invoice charges what the pieces cost, not the selling price.{' '}
+                <button
+                  type="button"
+                  className="text-link"
+                  onClick={() => setPriceDrafts((current) => ({ ...(current ?? prices), ...offCost }))}
+                >
+                  Set {offCostLines.length === 1 ? 'it' : 'them all'} to unit cost
+                </button>
+              </p>
+            )}
             {invoice.transfer && (
               <p className="muted text-sm" style={{ margin: 0 }}>
                 Linked to transfer{' '}
@@ -316,13 +360,15 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
           invoice={invoice}
           editable={canEdit}
           prices={prices}
+          offCost={offCost}
           onPriceChange={(skuId, value) =>
             setPriceDrafts((current) => ({ ...(current ?? prices), [skuId]: value }))
           }
         />
         {canEdit ? (
           <p className="panel-body muted text-sm section-note">
-            Adjust unit prices if needed, save the draft, then finalize. Prices on the catalog do not change.
+            Lines are charged at unit cost, not the selling price. Adjust if needed, save the draft, then finalize.
+            Prices on the catalog do not change.
           </p>
         ) : null}
       </Panel>

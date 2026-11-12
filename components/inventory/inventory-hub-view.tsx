@@ -42,9 +42,9 @@ type TabDef = {
   visible: boolean
 }
 
-const HUB_TITLE = 'Stock by variant & multi-location transfers'
+const HUB_TITLE = 'Inventory'
 const HUB_DESCRIPTION =
-  'Real-time inventory synchronization across boutiques and warehouses. Balances update through verified transfers and are reconciled on a continuous cycle.'
+  'What every location holds, variant by variant, and the transfers moving stock between them.'
 
 /**
  * Stock hub: variant ledger, transfers, receiving and replenishment. Supplier
@@ -61,6 +61,7 @@ export function InventoryHubView() {
     canReceiveTransfers,
     canManageMinimums,
     canRequestTransfer,
+    canDispatchTransfers,
     canViewBranchSalesTelemetry,
     canViewNetworkSalesTelemetry,
   } = usePermission()
@@ -128,7 +129,7 @@ export function InventoryHubView() {
   return (
     <>
       <PageHeader
-        eyebrow="Maison logistics / Inventory"
+        eyebrow="Stock"
         title={HUB_TITLE}
         description={HUB_DESCRIPTION}
         actions={
@@ -142,7 +143,7 @@ export function InventoryHubView() {
             {canRequestTransfer() ? (
               <Link href="/transfers/new" className="btn btn-primary">
                 <Plus size={16} aria-hidden="true" />
-                Prepare transfer
+                {canDispatchTransfers() ? 'Prepare transfer' : 'Request replenishment'}
               </Link>
             ) : null}
           </div>

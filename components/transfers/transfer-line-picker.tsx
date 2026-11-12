@@ -87,10 +87,10 @@ export function TransferLinePicker({
               <caption className="sr-only">{linesHeading}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Item & specifications</th>
-                  <th scope="col">SKU / model</th>
+                  <th scope="col">Variant</th>
+                  <th scope="col">SKU</th>
                   <th scope="col" className="num">
-                    Transfer quantity
+                    Quantity
                   </th>
                   <th scope="col" className="num prepare-transfer-lines-action">
                     <span className="sr-only">Remove line</span>

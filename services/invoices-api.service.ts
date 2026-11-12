@@ -88,6 +88,36 @@ export function patchPayloadForMissingLines(
     .filter(Boolean) as { skuId: string; unitPrice: string }[]
 }
 
+/**
+ * Draft lines that are **not** priced at unit cost, with the cost they should
+ * carry.
+ *
+ * A supply invoice charges a branch what the pieces cost, never the shop's
+ * selling price. The server prices a new draft that way (`priceSource:
+ * 'cost'`), so those lines are left alone even when the warehouse average has
+ * moved since. What is caught here is the rest: a price typed by hand, a line
+ * with no cost at the time, and an invoice raised before `priceSource` existed,
+ * whose price may be the selling price. A line whose cost is still unknown
+ * cannot be compared and is left out.
+ */
+export function linesOffUnitCost(
+  invoice: ApiInvoice,
+  prices: Record<string, string>,
+  unitCosts: Record<string, number>,
+): { line: ApiInvoiceLine; unitCost: string }[] {
+  return invoice.lines.flatMap((line) => {
+    const cost = unitCosts[line.sku.id]
+    if (cost === undefined) return []
+    const edited = prices[line.sku.id] !== undefined && prices[line.sku.id].trim() !== line.unitPrice.trim()
+    if (line.priceSource === 'cost' && !edited) return []
+    const unitCost = cost.toFixed(2)
+    if (Number(unitCost) <= 0) return []
+    const current = Number.parseFloat((prices[line.sku.id] ?? line.unitPrice).replace(/,/g, ''))
+    if (Number.isFinite(current) && current.toFixed(2) === unitCost) return []
+    return [{ line, unitCost }]
+  })
+}
+
 export function canFinalizeInvoice(invoice: ApiInvoice): boolean {
   return invoice.status === 'draft' && linesMissingPrice(invoice).length === 0
 }

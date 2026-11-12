@@ -5,7 +5,7 @@ import { HydrationGate } from '@/components/shared/hydration-gate'
 
 export const metadata: Metadata = {
   title: 'Sign in',
-  description: 'Welcome to our online store! Please sign in to access your account.',
+  description: 'Sign in to the Bitar Fashion stock and sales workspace.',
 }
 
 export default function LoginPage() {

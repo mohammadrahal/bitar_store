@@ -35,7 +35,10 @@ export function TransferReceivingReportView({ transferId }: { transferId: string
   const audit = useTransferAuditEvents(transferId, canViewAdminWarehouseTools())
   const receive = useReceiveTransfer()
   const accept = useAcceptTransfer()
-  const idempotency = useIdempotencyKey()
+  /* A key each: sharing one let a receive that timed out hand its key to the
+     release for sale that follows it on this page. */
+  const receiveKey = useIdempotencyKey()
+  const acceptKey = useIdempotencyKey()
 
   const supplyInvoiceQuery = useTransferSupplyInvoice(
     transferId,
@@ -125,8 +128,8 @@ export function TransferReceivingReportView({ transferId }: { transferId: string
           pending={receive.isPending}
           onReceive={(lines, note) =>
             receive.mutate(
-              { id: transfer.id, idempotencyKey: idempotency.current(), lines, note },
-              { onSuccess: idempotency.reset },
+              { id: transfer.id, idempotencyKey: receiveKey.current(), lines, note },
+              { onSuccess: receiveKey.reset },
             )
           }
         />
@@ -310,8 +313,8 @@ export function TransferReceivingReportView({ transferId }: { transferId: string
                   title={acceptLines.length === 0 ? 'No good stock waiting to release' : undefined}
                   onClick={() =>
                     accept.mutate(
-                      { id: transfer.id, idempotencyKey: idempotency.current(), lines: acceptLines },
-                      { onSuccess: idempotency.reset },
+                      { id: transfer.id, idempotencyKey: acceptKey.current(), lines: acceptLines },
+                      { onSuccess: acceptKey.reset },
                     )
                   }
                 >

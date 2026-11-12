@@ -114,7 +114,7 @@ export function AdjustStockDialog({
        tap after a lost answer applied the same delta twice. */
     correct.mutate(
       {
-        input: { branchId: location.branchId, skuId, quantityDelta: delta, reason, note },
+        input: { branchId: location.branchId, skuId, quantityDelta: delta, reason, note: note.trim() },
         idempotencyKey: idempotency.current(),
       },
       {

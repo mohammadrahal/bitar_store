@@ -20,7 +20,13 @@ export const metadata: Metadata = {
     default: 'Bitar Fashion Inventory',
     template: '%s · Bitar Fashion',
   },
-  description: 'Bitar Fashion is a fashion store that sells clothes and accessories.',
+  applicationName: 'Bitar Fashion Inventory',
+  // Same wording as app/manifest.ts, so the tab and the installed app agree.
+  description: 'Stock, sales and transfers for Bitar Fashion.',
+  /* A staff tool behind a sign-in: nothing here is meant to be found through
+     search. Only the login screen is reachable without a session, and it
+     should stay out of search results too. */
+  robots: { index: false, follow: false },
 }
 
 export const viewport: Viewport = {
