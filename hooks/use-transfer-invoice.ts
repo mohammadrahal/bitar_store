@@ -40,6 +40,7 @@ export function useCreateSupplyInvoice() {
     mutationFn: ({ transferId, note }: { transferId: string; note?: string }) =>
       createSupplyInvoice(transferId, note),
     onSuccess: async (invoice) => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.apiInvoices.all })
       if (invoice.transfer?.id) {
         await queryClient.invalidateQueries({
           queryKey: queryKeys.transfers.supplyInvoice(invoice.transfer.id),

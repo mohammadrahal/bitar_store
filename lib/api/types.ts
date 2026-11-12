@@ -843,11 +843,17 @@ export interface ListGoodsReceiptsParams {
   offset?: number
 }
 
-export type ApiInvoiceKind = 'b2b' | 'b2c'
+/**
+ * `b2b`: the warehouse invoices a branch for what it sent. `b2b_return`: a
+ * branch invoices the warehouse for goods it sent back. Both are raised as
+ * drafts when a transfer is dispatched (a branch-to-branch transfer gets one
+ * of each). `b2c`: the invoice of a till sale.
+ */
+export type ApiInvoiceKind = 'b2b' | 'b2b_return' | 'b2c'
 export type ApiInvoiceStatus = 'draft' | 'final' | 'void'
 
 export type CreateInvoiceInput =
-  | { transferId: string; note?: string }
+  | { transferId: string; note?: string; invoiceKind?: 'b2b' | 'b2b_return' }
   | { saleId: string; customerName?: string; customerPhone?: string; note?: string }
 
 export interface ApiInvoiceSummary {

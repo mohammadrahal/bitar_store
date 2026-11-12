@@ -31,11 +31,14 @@ export function TransferDispatchPanel({
   lines,
   pending,
   onDispatch,
+  secondaryAction,
 }: {
   /** Lines with pieces still waiting to be sent. */
   lines: ApiTransferLine[]
   pending: boolean
   onDispatch: (lines: DispatchLineInput[] | undefined) => void
+  /** Sits beside the send button, e.g. cancelling the draft. */
+  secondaryAction?: React.ReactNode
 }) {
   const outstanding = (line: ApiTransferLine) => Math.max(0, line.requested - line.dispatched)
 
@@ -149,6 +152,7 @@ export function TransferDispatchPanel({
           >
             {pending ? 'Sending…' : `Send ${formatNumber(totals.sending)} pieces`}
           </button>
+          {secondaryAction}
           {totals.remaining > 0 && !problem && (
             <p className="muted text-sm">
               {formatNumber(totals.remaining)} {totals.remaining === 1 ? 'piece' : 'pieces'} stay requested at the

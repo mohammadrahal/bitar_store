@@ -13,7 +13,9 @@ import { usePermission } from '@/hooks/use-permission'
 import { getApiClient } from '@/lib/api'
 import {
   draftUnitPrice,
+  invoiceKindLabel,
   invoiceLabel,
+  isTransferInvoice,
   linesMissingPriceWithDraft,
   patchPayloadForMissingLines,
   priceSourceLabel,
@@ -48,7 +50,7 @@ function InvoiceLines({
    * printing that under each SKU on a retail invoice is a label that tells the
    * reader nothing and clutters the row it sits in.
    */
-  const showPriceSource = invoice.kind === 'b2b'
+  const showPriceSource = isTransferInvoice(invoice)
   const rate = invoice.exchangeRate
 
   return (
@@ -147,7 +149,7 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
       ? `/sales/${invoice.sale.id}`
       : '/sales/b2c'
 
-  const isDraftB2b = invoice.kind === 'b2b' && invoice.status === 'draft' && !invoice.voided
+  const isDraftB2b = isTransferInvoice(invoice) && invoice.status === 'draft' && !invoice.voided
   const canEdit = isDraftB2b && canDispatchTransfers()
   const note = noteDraft ?? invoice.note ?? ''
   const prices =
@@ -219,7 +221,7 @@ export function ApiInvoiceDetailView({ invoiceId }: { invoiceId: string }) {
             : 'Sales'}
       </Link>
       <PageHeader
-        eyebrow={invoice.kind === 'b2c' ? 'Retail invoice' : 'Supply invoice'}
+        eyebrow={invoiceKindLabel(invoice)}
         title={reference}
         description={`${formatDocumentDate(invoice.finalizedAt ?? invoice.createdAt)} · ${customer}${invoice.note ? ` · ${invoice.note}` : ''}`}
         actions={

@@ -14,9 +14,9 @@ import { homePathFor } from '@/lib/permissions'
 import { useCurrentUser } from '@/store/user-store'
 import { clearLegacyWholesaleInvoices } from '@/lib/clear-legacy-wholesale-invoices'
 import { formatNumber } from '@/lib/format'
+import type { LedgerKind } from '@/lib/invoices-ledger'
 
 const LEDGER_DAYS = 30
-
 export function InvoicesView() {
   const router = useRouter()
   const allowPageBranchFilter = useAllowPageBranchFilter()
@@ -39,7 +39,8 @@ export function InvoicesView() {
     return activeLocationId ? branches?.find((b) => b.id === activeLocationId)?.name : undefined
   }, [branchId, branches, activeLocationId])
 
-  const kpis = useInvoicesLedgerKpis(branchId, LEDGER_DAYS)
+  const [kind, setKind] = useState<LedgerKind>('all')
+  const kpis = useInvoicesLedgerKpis(branchId, LEDGER_DAYS, kind)
   const startInvoice = () => router.push('/sales/invoices/new')
 
   return (
@@ -56,7 +57,7 @@ export function InvoicesView() {
             <span className="invoices-ledger-record-count tabular">{formatNumber(kpis.count)} records</span>
           </h1>
           <p className="subtitle">
-            All rows load from the API: retail invoices after till sales and supply invoices from warehouse transfers.
+            All rows load from the API: retail invoices after till sales, and supply or return invoices once a transfer is sent.
           </p>
         </div>
         <div className="invoices-ledger-header-actions heading-actions">
@@ -80,6 +81,8 @@ export function InvoicesView() {
         allowAllBranches={allowPageBranchFilter}
         onBranchChange={setPageBranchId}
         days={LEDGER_DAYS}
+        kind={kind}
+        onKindChange={setKind}
         onCreate={startInvoice}
       />
     </div>

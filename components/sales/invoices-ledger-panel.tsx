@@ -26,7 +26,9 @@ import {
   ledgerRangeIso,
   ledgerStatusLabel,
   matchesInvoiceSearch,
+  matchesLedgerKind,
   matchesLedgerTab,
+  type LedgerKind,
   type LedgerTab,
 } from '@/lib/invoices-ledger'
 import { formatRelativeDateTime } from '@/lib/format'
@@ -79,12 +81,16 @@ export function InvoicesLedgerPanel({
   allowAllBranches,
   onBranchChange,
   days,
+  kind,
+  onKindChange,
   onCreate,
 }: {
   branchId: string
   allowAllBranches: boolean
   onBranchChange: (branchId: string) => void
   days: number
+  kind: LedgerKind
+  onKindChange: (kind: LedgerKind) => void
   onCreate: () => void
 }) {
   const { data: branches } = useBranches()
@@ -106,10 +112,23 @@ export function InvoicesLedgerPanel({
 
   const branchName = (id: string) => branches?.find((b) => b.id === id)?.name ?? ''
 
+  const kindItems = useMemo(
+    () => (listQuery.data?.items ?? []).filter((inv) => matchesLedgerKind(inv, kind)),
+    [listQuery.data?.items, kind],
+  )
+
+  const kindCounts = useMemo(() => {
+    const items = listQuery.data?.items ?? []
+    return {
+      all: items.length,
+      b2c: items.filter((inv) => matchesLedgerKind(inv, 'b2c')).length,
+      b2b: items.filter((inv) => matchesLedgerKind(inv, 'b2b')).length,
+    }
+  }, [listQuery.data?.items])
+
   const rows = useMemo(() => {
-    const apiItems = listQuery.data?.items ?? []
     const term = search.trim().toLowerCase()
-    return apiItems
+    return kindItems
       .filter((inv) => !term || matchesInvoiceSearch(inv, term))
       .map((invoice) => ({
         id: invoice.id,
@@ -118,11 +137,11 @@ export function InvoicesLedgerPanel({
       }))
       .filter((row) => matchesLedgerTab(ledgerDisplayStatus(row.invoice), tab))
       .sort((a, b) => b.at.localeCompare(a.at))
-  }, [listQuery.data?.items, search, tab])
+  }, [kindItems, search, tab])
 
   const tabCounts = useMemo(() => {
     const counts: Record<LedgerTab, number> = { all: 0, paid: 0, pending: 0, drafts: 0, void: 0 }
-    for (const inv of listQuery.data?.items ?? []) {
+    for (const inv of kindItems) {
       const status = ledgerDisplayStatus(inv)
       counts.all++
       if (status === 'paid') counts.paid++
@@ -131,12 +150,12 @@ export function InvoicesLedgerPanel({
       if (status === 'void') counts.void++
     }
     return counts
-  }, [listQuery.data?.items])
+  }, [kindItems])
 
   useEffect(() => {
     setPage(1)
     setChecked(new Set())
-  }, [search, tab, branchId, days])
+  }, [search, tab, branchId, days, kind])
 
   const total = rows.length
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -194,21 +213,19 @@ export function InvoicesLedgerPanel({
     <div className={`invoices-ledger-split ${selection ? 'has-inspector' : ''}`}>
       <div className="invoices-ledger-main">
         <div className="invoices-ledger-toolbar">
-          <FilterChips label="Invoice status" options={tabOptions(tabCounts)} value={tab} onChange={setTab} />
-          <div className="invoices-ledger-toolbar-actions">
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              disabled={checked.size === 0}
-              onClick={() => void bulkPrint()}
-            >
-              <Printer size={14} aria-hidden="true" />
-              Bulk print
-            </button>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportCsv(rows, branchName)}>
-              <Download size={14} aria-hidden="true" />
-              Export CSV
-            </button>
+          <div className="invoices-ledger-filters">
+            <FilterChips
+              label="Invoice type"
+              options={[
+                { value: 'all', label: 'All types', count: kindCounts.all },
+                { value: 'b2c', label: 'B2C', count: kindCounts.b2c },
+                { value: 'b2b', label: 'B2B', count: kindCounts.b2b },
+              ]}
+              value={kind}
+              onChange={onKindChange}
+            />
+            <span className="invoices-ledger-filters-divider" aria-hidden="true" />
+            <FilterChips label="Invoice status" options={tabOptions(tabCounts)} value={tab} onChange={setTab} />
           </div>
           <div className="invoices-ledger-toolbar-row">
             {allowAllBranches ? (
@@ -222,6 +239,21 @@ export function InvoicesLedgerPanel({
               placeholder="Search by invoice #, client, phone…"
               aria-label="Search invoices"
             />
+            <div className="invoices-ledger-toolbar-actions">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={checked.size === 0}
+                onClick={() => void bulkPrint()}
+              >
+                <Printer size={14} aria-hidden="true" />
+                Bulk print
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => exportCsv(rows, branchName)}>
+                <Download size={14} aria-hidden="true" />
+                Export CSV
+              </button>
+            </div>
           </div>
         </div>
 
@@ -229,7 +261,7 @@ export function InvoicesLedgerPanel({
           <EmptyState
             icon={CalendarDays}
             title="No invoices in this view"
-            description="Invoices come from the API after a till sale (B2C) or a supply transfer (B2B). Try another tab or create one from New sale or Transfers."
+            description="Invoices come from the API after a till sale (B2C), or when a transfer is sent: a supply invoice from the warehouse, a return invoice back to it. A transfer saved as a draft has none yet."
             action={
               <Can permission="sales.create">
                 <button type="button" className="btn btn-primary" onClick={onCreate}>
@@ -265,7 +297,7 @@ export function InvoicesLedgerPanel({
                     </th>
                   </tr>
                 </thead>
-                <MotionTbody dataset={`${branchId}-${tab}-${currentPage}`}>
+                <MotionTbody dataset={`${branchId}-${kind}-${tab}-${currentPage}`}>
                   {visible.map((row, index) => {
                     const selected = selection?.id === row.id
                     const inv = row.invoice
@@ -273,7 +305,13 @@ export function InvoicesLedgerPanel({
                     const totalUsd = invoiceTotal(inv)
                     const customer = inv.recipient.name ?? (inv.kind === 'b2c' ? 'Walk-in' : '—')
                     const branch =
-                      inv.recipient.branchId ? branchName(inv.recipient.branchId) : inv.kind === 'b2b' ? 'Supply' : ''
+                      inv.recipient.branchId
+                        ? branchName(inv.recipient.branchId)
+                        : inv.kind === 'b2b'
+                          ? 'Supply'
+                          : inv.kind === 'b2b_return'
+                            ? 'Return'
+                            : ''
                     return (
                       <MotionTr
                         key={row.id}
@@ -305,6 +343,7 @@ export function InvoicesLedgerPanel({
                         <td>
                           {branch || '—'}
                           {inv.sale ? <small className="muted">POS</small> : null}
+                          {inv.kind === 'b2b_return' ? <small className="muted">Return</small> : null}
                         </td>
                         <td className="num">
                           <PriceWithLbp
@@ -357,7 +396,7 @@ export function InvoicesLedgerPanel({
   )
 }
 
-export function useInvoicesLedgerKpis(branchId: string, days: number) {
+export function useInvoicesLedgerKpis(branchId: string, days: number, kind: LedgerKind = 'all') {
   const range = ledgerRangeIso(days)
   const listQuery = useApiInvoices({
     branchId,
@@ -366,5 +405,8 @@ export function useInvoicesLedgerKpis(branchId: string, days: number) {
     limit: API_INVOICES_LEDGER_LIMIT,
   })
 
-  return useMemo(() => computeApiLedgerKpis(listQuery.data?.items ?? []), [listQuery.data?.items])
+  return useMemo(
+    () => computeApiLedgerKpis((listQuery.data?.items ?? []).filter((inv) => matchesLedgerKind(inv, kind))),
+    [listQuery.data?.items, kind],
+  )
 }

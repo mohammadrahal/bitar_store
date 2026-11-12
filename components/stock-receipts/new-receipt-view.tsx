@@ -29,8 +29,6 @@ import { blankLinesForStyle, type ReceiptPhotoDraft, type StockReceiptLine } fro
 import { useCurrentUser } from '@/store/user-store'
 import type { ApiSupplier } from '@/lib/api/types'
 import { adminHubHref } from '@/lib/admin-hub'
-import { inventoryHubHref } from '@/lib/inventory-hub'
-
 /**
  * Recording a supplier delivery.
  *
@@ -106,7 +104,7 @@ export function NewReceiptView() {
   if (!warehousePending && !warehouseId) {
     return (
       <>
-        <Link href={inventoryHubHref('receive-stock')} className="back-link">
+        <Link href={'/stock-receipts'} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -126,7 +124,7 @@ export function NewReceiptView() {
 
   return (
     <>
-      <Link href={inventoryHubHref('receive-stock')} className="back-link">
+      <Link href={'/stock-receipts'} className="back-link">
         <ArrowLeft size={16} aria-hidden="true" />
         Receive stock
       </Link>

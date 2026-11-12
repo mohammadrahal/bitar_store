@@ -28,8 +28,7 @@ export function CreateInvoiceGateway() {
         >
           <div className="panel-body stack gap-sm">
             <p className="muted text-sm" style={{ margin: 0 }}>
-              The API expects <code className="text-xs">{'{ saleId }'}</code> after{' '}
-              <code className="text-xs">POST /sales</code>. Customer name and phone are optional on the invoice.
+              Customer name and phone are optional on the invoice.
             </p>
             <Link href="/sales/new" className="btn btn-primary">
               <ScanLine size={16} aria-hidden="true" />
@@ -43,8 +42,7 @@ export function CreateInvoiceGateway() {
         >
           <div className="panel-body stack gap-sm">
             <p className="muted text-sm" style={{ margin: 0 }}>
-              The API expects <code className="text-xs">{'{ transferId }'}</code> on a sent transfer. Price and finalize
-              on the invoice detail screen.
+              Open a sent transfer to create it, then set prices and finalize on the invoice screen.
             </p>
             <Link href="/transfers" className="btn btn-primary">
               <ArrowLeftRight size={16} aria-hidden="true" />

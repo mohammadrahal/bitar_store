@@ -175,7 +175,7 @@ export function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavi
         }
 
         const open = isOpen(section.label)
-        const id = `nav-section-${section.label.toLowerCase()}`
+        const id = `nav-section-${section.label.toLowerCase().replace(/\s+/g, '-')}`
         const waiting = section.links.reduce((sum, item) => sum + badgeTotal(item), 0)
 
         return (

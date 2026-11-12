@@ -209,6 +209,13 @@ export interface SalesAnalytics {
   /** Series in fixed order; colours are assigned from this, never from rank. */
   series: SalesSeries[]
   topProducts: TopSellerRow[]
+  /** Units sold per variant id, for every variant that sold. */
+  unitsByVariant: Record<string, number>
+  /**
+   * False when the report hit its row cap, so a variant missing from
+   * `unitsByVariant` may have sold a little rather than nothing.
+   */
+  unitsComplete: boolean
   byBranch: BranchSalesRow[]
   documentCount: number
   totalUnits: number

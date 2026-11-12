@@ -1,6 +1,7 @@
 /** Query `section` on `/inventory`. stock workflows grouped in one screen. */
 export type InventoryHubSection =
   | 'variants'
+  | 'sellers'
   | 'transfers'
   | 'receiving'
   | 'receive-stock'
@@ -8,6 +9,7 @@ export type InventoryHubSection =
 
 const SECTION_VALUES: readonly InventoryHubSection[] = [
   'variants',
+  'sellers',
   'transfers',
   'receiving',
   'receive-stock',
@@ -22,7 +24,6 @@ export function parseInventoryHubSection(value: string | null): InventoryHubSect
 /** Routes that live outside `/inventory` but belong to the stock hub for nav highlighting. */
 export function inventoryHubNavPath(pathname: string): string | null {
   if (pathname === '/transfers' || pathname.startsWith('/transfers/')) return '/inventory'
-  if (pathname === '/stock-receipts' || pathname.startsWith('/stock-receipts/')) return '/inventory'
   if (pathname === '/replenishment' || pathname.startsWith('/replenishment/')) return '/inventory'
   return null
 }

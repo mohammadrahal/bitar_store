@@ -13,14 +13,17 @@
 :root {
   --font-inter: 'Inter';
   --font-cormorant: 'Cormorant Garamond';
-  /* Signature gold scale (#d4af37 at 500). */
+  /* Gold scale. Light runs a deeper brass than the signature #d4af37, which
+     washes out on white; `.dark` restores the signature values. */
   --gold-100: 43 68% 94%;
   --gold-200: 44 73% 85%;
-  --gold-300: 45 74% 75%;
-  --gold-400: 46 68% 64%;
-  --gold-500: 46 65% 52%;         /* #d4af37 */
-  --gold-600: 46 65% 44%;         /* #b89428 */
-  --gold-700: 45 65% 34%;         /* #8e711d */
+  --gold-300: 45 60% 62%;
+  --gold-400: 44 60% 50%;
+  --gold-500: 43 62% 40%;         /* #a5822a */
+  --gold-600: 42 66% 33%;         /* #8c6a1d */
+  --gold-700: 40 70% 26%;         /* #714f14 */
+  /* Gold that has to be read: text, icons, active nav (7.6:1 on white). */
+  --gold-ink: 39 72% 23%;         /* #654510 */
   color-scheme: light;
 
   /* The neutrals carry almost no chroma. An earlier pass ran them as a cream
@@ -36,10 +39,10 @@
   --foreground: 30 4% 10%;         /* #1B1A18 — warm near-black, 16.4:1 */
   --primary: 30 4% 10%;
   --primary-foreground: 40 14% 97%;
-  --accent: var(--gold-500);         /* Bitar gold — highlights and the logo */
-  /* Solid fills (primary CTAs) use the same brass as the logo, with ink on top. */
-  --btn-primary: var(--gold-500);
-  --btn-primary-foreground: 30 6% 7%;
+  --accent: var(--gold-ink);         /* Bitar gold — highlights, active and selected states */
+  /* Solid fills (primary CTAs): gold-600 is the lightest step white text reads on. */
+  --btn-primary: var(--gold-600);
+  --btn-primary-foreground: 0 0% 100%;
   --destructive: 7 56% 41%;        /* #A33C2E */
   --destructive-foreground: 40 14% 97%;
 
@@ -51,8 +54,8 @@
      sit at the value the palette was drawn with. */
   --muted-foreground: 38 7% 42%;   /* [48%] 4.62:1 */
   --ring: var(--gold-600);
-  --success: 115 14% 40%;          /* [42%] 4.65:1 */
-  --success-muted: 115 14% 40%;
+  --success: 145 63% 29%;          /* #1b7943, 5.3:1 */
+  --success-muted: 145 55% 38%;
   --warning: 36 71% 34%;           /* [42%] 4.67:1 */
   /* Two more stock states from BL-02, in the same muted register. At spec. */
   --info: 215 21% 40%;             /* in transit, 5.60:1 */
@@ -123,6 +126,12 @@
   --muted-foreground: 240 4% 46%;  /* zinc-500 */
   --primary: 240 5% 90%;
   --primary-foreground: 210 7% 4%;
+  --gold-300: 45 74% 75%;
+  --gold-400: 46 68% 64%;
+  --gold-500: 46 65% 52%;          /* #d4af37 */
+  --gold-600: 46 65% 44%;          /* #b89428 */
+  --gold-700: 45 65% 34%;          /* #8e711d */
+  --gold-ink: var(--gold-400);
   --accent: var(--gold-400);
   --btn-primary: var(--gold-500);
   --btn-primary-foreground: 210 7% 4%;
@@ -182,6 +191,16 @@
 
 .dark .page-scroll {
   scrollbar-color: #26292e transparent;
+}
+
+.dark .logo-full,
+.dark .logo-mark {
+  background: linear-gradient(
+    165deg,
+    hsl(var(--gold-300)) 0%,
+    hsl(var(--gold-500)) 42%,
+    hsl(var(--gold-700)) 100%
+  );
 }
 
 @theme inline {
@@ -254,7 +273,7 @@ h1 { font-size: var(--fs-2xl); font-weight: 600; letter-spacing: -.02em; }
 }
 .dark .page-heading h1 { color: hsl(240 5% 96%); }
 .welcome-name {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   font-weight: 500;
   font-style: italic;
 }
@@ -412,9 +431,9 @@ p { margin: 0; }
   transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   background: linear-gradient(
     165deg,
-    hsl(var(--gold-300)) 0%,
-    hsl(var(--gold-500)) 42%,
-    hsl(var(--gold-700)) 100%
+    hsl(var(--gold-500)) 0%,
+    hsl(var(--gold-600)) 42%,
+    hsl(var(--gold-ink)) 100%
   );
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
@@ -881,7 +900,7 @@ body.modal-open .page-scroll { overflow: hidden; }
   border-radius: var(--r-lg);
   color: hsl(210 7% 4%);
 }
-.btn-primary:hover:not(:disabled) { background: hsl(var(--gold-600)); }
+.btn-primary:hover:not(:disabled) { background: hsl(var(--gold-700)); }
 .dark .btn-primary:hover:not(:disabled) {
   filter: brightness(1.1);
   background: linear-gradient(to right, #d4af37, #b89428);
@@ -964,12 +983,12 @@ button.stat-card:focus-visible {
   padding: 8px;
   border-radius: 8px;
   background: hsl(var(--gold-500) / 0.1);
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   line-height: 0;
 }
 .stat-icon-wrap.tone-warn {
-  background: hsl(38 92% 50% / 0.1);
-  color: hsl(38 92% 50%);
+  background: hsl(var(--warning) / 0.1);
+  color: hsl(var(--warning));
 }
 .dark .stat-icon-wrap { color: hsl(var(--gold-400)); }
 .dark .stat-icon-wrap.tone-warn { color: hsl(38 92% 60%); }
@@ -1613,7 +1632,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: l
   border: 1px solid hsl(var(--border));
 }
 .prepare-transfer-route-badge--gold {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   border-color: hsl(var(--gold-500) / 0.35);
   background: hsl(var(--gold-500) / 0.08);
 }
@@ -1679,7 +1698,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: l
   border-color: hsl(var(--gold-400) / 0.4);
 }
 .prepare-transfer-auth-card--active svg {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   margin-bottom: 8px;
 }
 .dark .prepare-transfer-auth-card--active svg {
@@ -1880,7 +1899,7 @@ table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: l
   background: hsl(160 84% 39% / 0.1);
 }
 .sale-invoice-change {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   font-weight: 600;
 }
 .dark .sale-invoice-change {
@@ -2463,6 +2482,8 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
 .receipt-bypass-note strong { font-weight: 600; }
 /* The trend is the subject; the mix is the aside beside it. */
 .trend-grid { display: grid; grid-template-columns: 2fr 1fr; gap: var(--layout-gap); align-items: start; min-width: 0; }
+.sellers-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--layout-gap); align-items: start; min-width: 0; }
+@media (max-width: 1023px) { .sellers-grid { grid-template-columns: 1fr; } }
 /* Recent sales carries six columns, best sellers five short rows. */
 .detail-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--layout-gap); align-items: start; min-width: 0; }
 /* Label/value pairs (receipt document, dialogs). Fixed tracks so row 2 lines up with row 1. */
@@ -2662,7 +2683,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   border: 1px solid hsl(var(--border));
 }
 .rank-medal--lead {
-  color: hsl(var(--gold-400));
+  color: hsl(var(--gold-ink));
   background: hsl(var(--gold-500) / 0.2);
   border-color: hsl(var(--gold-500) / 0.4);
 }
@@ -2698,8 +2719,9 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   text-align: right;
 }
 .rank-units { font-size: var(--fs-xs); font-weight: 600; color: hsl(var(--foreground)); }
-.rank-revenue { font-size: 11px; font-weight: 500; color: hsl(var(--gold-500)); font-variant-numeric: tabular-nums; }
+.rank-revenue { font-size: 11px; font-weight: 500; color: hsl(var(--gold-ink)); font-variant-numeric: tabular-nums; }
 .dark .rank-revenue { color: hsl(var(--gold-400)); }
+.rank-stock { font-size: 11px; font-weight: 500; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
 .rank-bar { display: block; height: 6px; border-radius: 999px; background: hsl(var(--muted) / 0.85); overflow: hidden; }
 .rank-bar-fill { display: block; height: 100%; border-radius: 999px; background: hsl(var(--accent)); }
 .dark .rank-bar-fill {
@@ -2727,10 +2749,10 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   gap: 2px;
   font-size: var(--fs-xs);
   font-weight: 500;
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   text-decoration: none;
 }
-.overview-panel-link:hover { color: hsl(var(--gold-400)); text-decoration: underline; text-underline-offset: 3px; }
+.overview-panel-link:hover { color: hsl(var(--gold-ink)); text-decoration: underline; text-underline-offset: 3px; }
 .overview-panel-badge {
   font-size: 11px;
   color: hsl(var(--muted-foreground));
@@ -2755,7 +2777,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   text-decoration: none;
   transition: color 0.15s;
 }
-.overview-panel-footer-link:hover { color: hsl(var(--gold-400)); }
+.overview-panel-footer-link:hover { color: hsl(var(--gold-ink)); }
 
 /* Recent sales: a compact ledger row (same band as best sellers, not a card-table stack). */
 /* A list of documents: a reference and a figure on one line, the detail under
@@ -2800,7 +2822,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   border-radius: var(--r-lg);
   background: hsl(var(--muted) / 0.5);
   border: 1px solid hsl(var(--border));
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .dark .recent-sales-icon {
   background: hsl(0 0% 100% / 0.04);
@@ -2911,7 +2933,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   font-size: var(--fs-sm);
   font-weight: 600;
 }
-.doc-action-link:hover strong { text-decoration: none; color: hsl(var(--gold-500)); }
+.doc-action-link:hover strong { text-decoration: none; color: hsl(var(--gold-ink)); }
 .dark .doc-action-link:hover strong { color: hsl(var(--gold-400)); }
 .doc-action-link small {
   display: block;
@@ -2940,7 +2962,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   border-radius: var(--r-md);
   background: hsl(var(--muted) / 0.45);
   border: 1px solid hsl(var(--border));
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .dark .transfer-documents-panel .transfer-doc-icon {
   background: hsl(0 0% 100% / 0.04);
@@ -2974,7 +2996,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   opacity: 0.65;
 }
 .transfer-documents-panel .transfer-doc-row:hover .transfer-doc-chevron {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   opacity: 1;
 }
 .doc-action-link--muted { cursor: default; opacity: 0.85; }
@@ -2986,7 +3008,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
 }
 .inventory-workspace-link:hover strong {
   text-decoration: none;
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .dark .inventory-workspace-link:hover strong { color: hsl(var(--gold-400)); }
 .inventory-workspace-icon {
@@ -2998,7 +3020,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   border-radius: var(--r-lg);
   background: hsl(var(--muted) / 0.45);
   border: 1px solid hsl(var(--border));
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .dark .inventory-workspace-icon {
   background: hsl(0 0% 100% / 0.04);
@@ -3012,7 +3034,7 @@ a.pill-link:hover .pill { box-shadow: inset 0 0 0 1px hsl(var(--accent) / 0.45);
   color: hsl(var(--muted-foreground));
   opacity: 0.65;
 }
-.inventory-workspace-link:hover .inventory-workspace-chevron { color: hsl(var(--gold-500)); opacity: 1; }
+.inventory-workspace-link:hover .inventory-workspace-chevron { color: hsl(var(--gold-ink)); opacity: 1; }
 .inventory-peek-healthy {
   display: flex;
   align-items: center;

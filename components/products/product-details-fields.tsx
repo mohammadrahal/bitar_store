@@ -3,6 +3,7 @@
 import { Controller, type Control, type FieldErrors, type UseFormRegister } from 'react-hook-form'
 import { CategoryPicker } from '@/components/products/category-picker'
 import { Field } from '@/components/shared/field'
+import { MoneyInput } from '@/components/shared/money-input'
 import type { ProductDetailsFormValues } from '@/schemas/product.schema'
 
 /**
@@ -42,13 +43,37 @@ export function ProductDetailsFields({
           />
         </fieldset>
         {showCost ? (
-          <Field label="Unit cost" error={errors.unitCost?.message} hint={costHint}>
-            <input {...register('unitCost', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
-          </Field>
+          <Controller
+            control={control}
+            name="unitCost"
+            render={({ field }) => (
+              <Field label="Unit cost" error={errors.unitCost?.message} hint={costHint}>
+                <MoneyInput
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onChange={(next) => field.onChange(next ?? 0)}
+                />
+              </Field>
+            )}
+          />
         ) : null}
-        <Field label="Sell price" error={errors.sellPrice?.message} hint={priceHint} className={showCost ? undefined : 'full'}>
-          <input {...register('sellPrice', { valueAsNumber: true })} type="number" min="0" step="0.01" inputMode="decimal" />
-        </Field>
+        <Controller
+          control={control}
+          name="sellPrice"
+          render={({ field }) => (
+            <Field label="Sell price" error={errors.sellPrice?.message} hint={priceHint} className={showCost ? undefined : 'full'}>
+              <MoneyInput
+                ref={field.ref}
+                name={field.name}
+                value={field.value}
+                onBlur={field.onBlur}
+                onChange={(next) => field.onChange(next ?? Number.NaN)}
+              />
+            </Field>
+          )}
+        />
       </div>
     </>
   )

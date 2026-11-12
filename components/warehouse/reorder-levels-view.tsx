@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ClipboardList, Trash2 } from 'lucide-react'
 import { MotionTbody, MotionTr } from '@/components/motion/motion-table'
+import { useConfirm } from '@/components/shared/confirm-dialog'
 import { EmptyState } from '@/components/shared/empty-state'
 import { Field } from '@/components/shared/field'
 import { ErrorState } from '@/components/shared/error-state'
@@ -32,6 +33,7 @@ export function ReorderLevelsView() {
   const list = useReorderLevels(branchId, search)
   const save = useSetReorderLevel()
   const remove = useDeleteReorderLevel()
+  const [confirm, confirmDialog] = useConfirm()
   const rows = list.data ?? []
   const pagination = usePagination(rows, 20, `${branchId}:${search}`)
 
@@ -135,7 +137,15 @@ export function ReorderLevelsView() {
                         type="button"
                         className="btn btn-ghost btn-sm danger"
                         aria-label="Remove minimum"
-                        onClick={() => remove.mutate(row.id)}
+                        onClick={async () => {
+                          const confirmed = await confirm({
+                            title: `Remove the minimum for ${row.sku.code}?`,
+                            description: 'This SKU will no longer be flagged as low stock at this branch.',
+                            confirmLabel: 'Remove',
+                            tone: 'danger',
+                          })
+                          if (confirmed) remove.mutate(row.id)
+                        }}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -192,6 +202,7 @@ export function ReorderLevelsView() {
           </form>
         </Panel>
       )}
+      {confirmDialog}
     </>
   )
 }

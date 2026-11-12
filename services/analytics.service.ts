@@ -30,6 +30,8 @@ export function netRevenueOf(row: { revenue: string; netRevenue?: string }): num
 /** Beyond this many branches the chart folds the tail into one "Other" series. */
 const MAX_BRANCH_SERIES = 5
 const TOP_PRODUCTS = 8
+/** The most `GET /reports/top-skus` will return. */
+const TOP_SKUS_MAX = 100
 const OTHER_BRANCH_ID = 'other'
 interface Tally {
   units: number
@@ -103,7 +105,7 @@ export async function getSalesAnalyticsFromReports(
   const params = { ...(scope === ALL_BRANCHES ? {} : { branchId: scope }), ...window }
   const [summary, topSkus] = await Promise.all([
     fetchSalesSummary(params),
-    fetchTopSkus({ ...params, limit: TOP_PRODUCTS }),
+    fetchTopSkus({ ...params, limit: TOP_SKUS_MAX }),
   ])
 
   const named = branchTotalsOf(summary)
@@ -111,7 +113,8 @@ export async function getSalesAnalyticsFromReports(
   const series = seriesFromBranches(named)
   const bucketId = series[0]?.id ?? OTHER_BRANCH_ID
 
-  const topProducts: TopSellerRow[] = topSkus.rows.map((row) => ({
+  const unitsByVariant = Object.fromEntries(topSkus.rows.map((row) => [row.sku.id, row.quantity]))
+  const topProducts: TopSellerRow[] = topSkus.rows.slice(0, TOP_PRODUCTS).map((row) => ({
     variantId: row.sku.id,
     productName: row.sku.styleName,
     color: row.sku.color,
@@ -127,6 +130,8 @@ export async function getSalesAnalyticsFromReports(
     businessDate: summary.from,
     series,
     topProducts,
+    unitsByVariant,
+    unitsComplete: topSkus.rows.length < TOP_SKUS_MAX,
     byBranch: named,
     documentCount: summary.totals.salesCount,
     totalUnits: named.reduce((sum, branch) => sum + branch.units, 0),
@@ -225,6 +230,8 @@ export async function getSalesAnalyticsFromBranchSales(scope: BranchScope = ALL_
     businessDate,
     series,
     topProducts,
+    unitsByVariant: Object.fromEntries([...variantTotals.values()].map((variant) => [variant.variantId, variant.units])),
+    unitsComplete: true,
     byBranch: named,
     documentCount,
     totalUnits: named.reduce((sum, branch) => sum + branch.units, 0),

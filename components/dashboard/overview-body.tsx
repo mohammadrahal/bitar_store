@@ -3,6 +3,7 @@
 import { BestSellersList } from '@/components/dashboard/best-sellers-list'
 import { ChartsRow } from '@/components/dashboard/charts-row'
 import { KpiRow } from '@/components/dashboard/kpi-row'
+import { LowestSellersList } from '@/components/dashboard/lowest-sellers-list'
 import { NeedsAttention } from '@/components/dashboard/needs-attention'
 import { RecentSales } from '@/components/dashboard/recent-sales'
 import { usePermission } from '@/hooks/use-permission'
@@ -35,7 +36,10 @@ export function OverviewBody({ scope, days }: { scope: BranchScope; days: RangeD
       {showSalesDetail ? (
         <div className="detail-grid">
           <RecentSales scope={scope} days={days} />
-          <BestSellersList scope={scope} days={days} />
+          <div className="stack">
+            <BestSellersList scope={scope} days={days} />
+            <LowestSellersList scope={scope} days={days} />
+          </div>
         </div>
       ) : null}
     </>

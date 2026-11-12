@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { TransferStatusPill } from '@/components/transfers/transfer-status-pill'
 import { TransferStatusStepper } from '@/components/transfers/transfer-status-stepper'
+import { useConfirm } from '@/components/shared/confirm-dialog'
 import { ErrorState } from '@/components/shared/error-state'
 import { PageHeader } from '@/components/shared/page-header'
 import { Panel } from '@/components/shared/panel'
@@ -117,6 +118,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
   const cancel = useCancelTransfer()
   const idempotency = useIdempotencyKey()
   const [reason, setReason] = useState('')
+  const [confirm, confirmDialog] = useConfirm()
 
   const supplyInvoiceQuery = useTransferSupplyInvoice(
     data?.id ?? transferId,
@@ -154,6 +156,29 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
 
   const canDispatchDraft =
     transfer.status === 'draft' && canDispatchTransfers() && atSource && toSendLines.length > 0
+
+  /* Cancel is offered on a draft only: rule 14 blocks cancelling a transfer
+     once it has been dispatched. */
+  const canCancelDraft = transfer.status === 'draft' && canDispatchTransfers() && atSource
+  const cancelDraftButton = (
+    <button
+      type="button"
+      className="btn btn-secondary"
+      disabled={cancel.isPending}
+      onClick={async () => {
+        const confirmed = await confirm({
+          title: `Cancel ${transfer.reference}?`,
+          description: 'This draft is closed and nothing is sent. This cannot be undone.',
+          confirmLabel: 'Cancel draft',
+          cancelLabel: 'Keep draft',
+          tone: 'danger',
+        })
+        if (confirmed) cancel.mutate(transfer.id)
+      }}
+    >
+      Cancel draft
+    </button>
+  )
 
   const invoiceFinal = Boolean(supplyInvoice && supplyInvoice.status === 'final' && !supplyInvoice.voided)
   const receivingNotes = receivingNotesOf(transfer)
@@ -217,6 +242,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
               { onSuccess: idempotency.reset },
             )
           }
+          secondaryAction={canCancelDraft ? cancelDraftButton : undefined}
         />
       )}
 
@@ -255,18 +281,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
       )}
 
       <div className="form-actions">
-        {/* Cancel is offered on a draft only: rule 14 blocks cancelling a
-            transfer once it has been dispatched. */}
-        {transfer.status === 'draft' && canDispatchTransfers() && atSource && (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={cancel.isPending}
-            onClick={() => cancel.mutate(transfer.id)}
-          >
-            Cancel draft
-          </button>
-        )}
+        {canCancelDraft && !canDispatchDraft && cancelDraftButton}
         {showReceivingWorkflow &&
           transfer.totals.onHold > 0 &&
           canReceiveTransfers() &&
@@ -341,6 +356,7 @@ export function TransferDetailView({ transferId }: { transferId: string }) {
           </div>
         )}
       </div>
+      {confirmDialog}
     </>
   )
 }

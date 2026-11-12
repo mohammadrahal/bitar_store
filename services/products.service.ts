@@ -6,8 +6,10 @@ import type { ProductFilters } from '@/lib/query-keys'
 import { buildSku, buildVariantCode, formatModelCode } from '@/lib/sku'
 import { readDb } from '@/mocks/store'
 import { mintBarcode } from '@/services/barcodes.service'
-import { applyModelCosts, getSkuCost, getStyleCost, setStyleCost } from '@/services/catalog-costs.service'
+import { applyModelCosts, getSkuCost, getStyleCost, setSkuCost, setStyleCost } from '@/services/catalog-costs.service'
 import { refreshStyle, syncCatalog } from '@/services/catalog-sync.service'
+import { setSkuCost as saveCatalogCost } from '@/services/costs.service'
+import { statusOf } from '@/lib/errors'
 
 import type { Product, ProductWithVariants, Variant } from '@/types'
 
@@ -143,6 +145,26 @@ function nextStyleCode(products: Product[]): string {
 const reason = (error: unknown) => (error instanceof Error ? error.message : 'refused')
 
 /**
+ * Sends unit costs to `PUT /costs/skus/:id`, which is what a supply (B2B)
+ * invoice is priced from when the warehouse has no purchase average yet.
+ * Zero means "not recorded" and is not sent. A 403 means this account may not
+ * set costs, which is not an error for the product save.
+ */
+async function saveCatalogCosts(costs: [skuId: string, unitCost: number][]) {
+  await Promise.all(
+    costs
+      .filter(([, unitCost]) => unitCost > 0)
+      .map(async ([skuId, unitCost]) => {
+        try {
+          await saveCatalogCost(skuId, unitCost)
+        } catch (error) {
+          if (statusOf(error) !== 403) throw error
+        }
+      }),
+  )
+}
+
+/**
  * Creates SKUs one at a time so each refusal can be reported against its
  * combination, and gives every new SKU its own barcode.
  */
@@ -197,6 +219,9 @@ export async function createProduct(input: ProductInput): Promise<CreatedProduct
   const style = await getApiClient().createStyle({ code, name: input.name.trim(), category })
   const outcome = await createSkus(style.id, style.code, input.variants, input.sellPrice)
   applyModelCosts(style.id, input.unitCost, outcome.created, input.costs ?? {})
+  await saveCatalogCosts(
+    [...outcome.created].map(([key, skuId]) => [skuId, input.costs?.[key] ?? input.unitCost]),
+  )
   await refreshStyle(style.id)
 
   const branchId = input.initialBranchId?.trim()
@@ -221,13 +246,21 @@ export async function createProduct(input: ProductInput): Promise<CreatedProduct
   }
 }
 
-/** Name and category go to the API; a new sell price re-prices every active SKU. */
+/** Name and category go to the API; a new sell price or unit cost applies to every active SKU. */
 export async function updateProduct(productId: string, input: ProductDetailsInput): Promise<ProductWithVariants> {
   const api = getApiClient()
   const current = await getProduct(productId)
   const category = await ensureCategory(input.category)
   await api.updateStyle(productId, { name: input.name.trim(), category })
   setStyleCost(productId, input.unitCost)
+  const live = current.variants.filter((variant) => !variant.archived)
+  const costChanged = input.unitCost > 0 && input.unitCost !== current.unitCost
+  if (costChanged) for (const variant of live) setSkuCost(variant.id, input.unitCost)
+  /* Sent on every save, changed or not, so a cost kept only on this device
+     before costs reached the API is carried over by saving the model once. */
+  await saveCatalogCosts(
+    live.map((variant) => [variant.id, costChanged ? input.unitCost : (variant.unitCost ?? 0)]),
+  )
   if (input.sellPrice !== current.sellPrice) {
     const price = priceText(input.sellPrice)
     const live = current.variants.filter((variant) => !variant.archived && variant.sellPrice !== input.sellPrice)
@@ -241,6 +274,10 @@ export async function addVariants(productId: string, combos: Combination[]): Pro
   const product = await getProduct(productId)
   const { created, ...outcome } = await createSkus(product.id, product.code, combos, product.sellPrice)
   if (outcome.skipped.length === combos.length) throw new Error(`No variants were added. ${outcome.skipped[0]}`)
+  if (product.unitCost !== undefined) {
+    for (const skuId of created.values()) setSkuCost(skuId, product.unitCost)
+    await saveCatalogCosts([...created.values()].map((skuId) => [skuId, product.unitCost!]))
+  }
   await refreshStyle(productId)
   return {
     product: await getProduct(productId),

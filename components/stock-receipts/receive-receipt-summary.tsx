@@ -4,8 +4,6 @@ import Link from 'next/link'
 import { Info } from 'lucide-react'
 import { Panel } from '@/components/shared/panel'
 import { formatNumber, formatPrice } from '@/lib/format'
-import { inventoryHubHref } from '@/lib/inventory-hub'
-
 export function ReceiveReceiptSummary({
   supplierName,
   reference,
@@ -73,7 +71,7 @@ export function ReceiveReceiptSummary({
           </p>
         ) : null}
         <div className="receive-summary-actions">
-          <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary">
+          <Link href={'/stock-receipts'} className="btn btn-secondary">
             Cancel
           </Link>
           <button type="submit" className="btn btn-primary" disabled={Boolean(problem) || pending}>

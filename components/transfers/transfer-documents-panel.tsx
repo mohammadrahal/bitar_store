@@ -5,7 +5,7 @@ import { ArrowRight, FileText, ScrollText } from 'lucide-react'
 import { Panel } from '@/components/shared/panel'
 import { Skeleton } from '@/components/shared/skeleton'
 import { useCreateSupplyInvoice, useTransferSupplyInvoice } from '@/hooks/use-transfer-invoice'
-import { invoiceLabel } from '@/services/invoices-api.service'
+import { invoiceKindLabel, invoiceLabel } from '@/services/invoices-api.service'
 import type { ApiTransfer } from '@/lib/api/types'
 
 export function TransferDocumentsPanel({
@@ -50,7 +50,7 @@ export function TransferDocumentsPanel({
       ? 'Draft. The warehouse finalizes it after the movement is reconciled'
       : invoice
         ? 'Open to review'
-        : 'None raised. Dispatching from the warehouse raises the draft'
+        : 'None raised. Sending the transfer raises the draft'
 
   return (
     <Panel
@@ -91,7 +91,9 @@ export function TransferDocumentsPanel({
               </span>
               <span className="transfer-doc-copy">
                 <span className="transfer-doc-title-row">
-                  <strong>Supply invoice · {invoiceLabel(invoice)}</strong>
+                  <strong>
+                    {invoiceKindLabel(invoice)} · {invoiceLabel(invoice)}
+                  </strong>
                   <ArrowRight size={16} aria-hidden="true" className="transfer-doc-chevron" />
                 </span>
                 <small>{invoiceHint}</small>

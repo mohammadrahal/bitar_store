@@ -321,10 +321,11 @@ browser (`lib/user-access.ts`) because the backend has no endpoint for them yet
 |---|---|---|
 | `/dashboard` | Network stat cards and today's takings, plus the sales charts | stock + sales reads |
 | `/branches`, `/branches/<code>` | Locations, create a branch or warehouse, one branch's figures and stock | branch + stock reads |
-| `/inventory`, `/inventory/<sku>` | Stock by variant with the five balances; one variant across locations | stock reads |
-| `/products`, `/products/new`, `/products/<id>` | Models, colours and sizes, per-SKU prices and barcodes. Creating one places no stock | catalog |
+| `/inventory`, `/inventory/<sku>` | **Warehouse** in the menu. Stock by variant with the five balances; one variant across locations | stock reads |
+| `/products`, `/products/new`, `/products/<id>` | Models, colours and sizes, per-SKU prices and barcodes. Edit the model, and each variant's colour, size and price. Creating one places no stock | catalog |
 | `/stock-receipts`, `/stock-receipts/new` | Supplier deliveries booked in, plus the server's correction log | stock adjustments |
-| `/sales/new` | The till: pick a model, size and colour, discount a line, take cash or Whish | sale create |
+| `/sales/new` | The till: scan a barcode or tap a product then a size, adjust quantities and discounts in the cart, take cash or Whish | sale create |
+| `/admin` | **Settings** in the menu. Employees, locations and store settings as tabs | user, branch and settings endpoints |
 | `/sales/b2c`, `/sales/<id>` | Today's sales and one sale | sale reads |
 | `/opening-stock` | First units at a location, SKU by SKU | stock movements + opening stock |
 | `/users` | Accounts, roles, location access and permission keys | user endpoints (keys stay local) |
@@ -394,3 +395,107 @@ were removed rather than left pretending:
 | Reorder levels in the UI | Low-stock thresholds and suggestions (client calls exist in `lib/api/reorder-levels.api.ts`) |
 | Reports in the UI | Sales summary and top SKUs (client calls exist in `lib/api/reports.api.ts`) |
 | A user's locations and keys | Replaces `lib/user-access.ts` |
+| Editing a SKU code | `PATCH /skus/:id` takes colour and size only, so `MD000002-BLU-M` keeps its code after the colour is renamed |
+
+---
+
+## 11. Changes — November 2026
+
+### Till (`/sales/new`)
+
+**Layout**
+
+- Two columns: the product catalog on the left, the cart on the right. The cart
+  is the wider of the two (`.sale-till-grid` in `app/operations.css`, about 62%
+  on desktop, about 57% under 1200px), because it is where the cashier works.
+- On desktop the cart is pinned beside the catalog and as tall as the screen.
+  Only its items scroll; the total and **Confirm sale** never scroll away.
+- The fixed bar at the bottom of the screen is gone. The total, any warning and
+  the buttons sit at the foot of the cart (`components/sales/sale-footer.tsx`).
+  On phones and tablets the columns stack and the checkout sticks to the bottom
+  of the screen.
+- With no location chosen, the catalog shows "Where are you selling from?" with
+  the location picker in it. Once one is chosen, the picker moves to the page
+  header for switching.
+- "Held sale" and the last completed sale show as small status pills under the
+  title.
+
+**Picking products** (`components/sales/till-catalog.tsx`)
+
+- Products are a grid of cards (name, code, number of sizes). Tapping one opens
+  its sizes in a panel above the grid. Tapping another product switches the
+  panel; the grid never moves.
+- Each size is a compact tile: size and colour on the first line, price and
+  stock left on the second. Low stock is amber, out of stock is greyed and
+  sorted last. One tap adds one; a gold badge on the corner shows how many are
+  in the cart.
+- No quantity box or Add button per row. Quantities are corrected in the cart.
+- Products load 24 at a time with **Show more products**. Loading shows grey
+  placeholder cards.
+- The invoice and transfer screens keep the table picker
+  (`components/sales/catalog-line-picker.tsx`).
+
+**Barcodes**
+
+- The search box is focused on load, ready for a scanner.
+- A full barcode (8–14 digits, with or without the spaces printed on the tag)
+  finds its exact size and colour, with or without Enter. A SKU code such as
+  `MD000002-BLU-M` does the same after Enter.
+- The scan does **not** add the item. It opens the product showing only the
+  scanned tile, outlined in gold; the cashier taps it to add it. **Show all
+  sizes of this product** brings the rest back.
+- `findVariantByCode()` in `services/variant-search.service.ts` matches exactly
+  (never partially) and asks the API when the code is not in the local mirror,
+  so a second barcode on a SKU works too.
+- Enter in the search box never submits the sale form. Before, a scanner's Enter
+  could confirm a sale mid-basket.
+
+**Cart**
+
+- Each item: name, colour / size, price each, line total, **− / +** quantity
+  (capped at the stock available) and a remove button.
+- Discounts are behind an **Add discount** link per item, with Cancel, instead of
+  a form open under every line (`components/sales/line-discount.tsx`).
+- **Clear** empties the cart, with **Undo** in the toast.
+- Customer name and phone are behind **Add customer (optional)**; once filled in,
+  the customer's name shows instead.
+- Payment and **Sold through** (channel) appear only once there is something in
+  the cart. The payment block no longer repeats the total
+  (`components/sales/payment-fields.tsx`).
+- A disabled **Confirm sale** turns grey instead of faded gold. Why it is
+  disabled (drawer closed, offline, payment problem) shows in an amber box above
+  it.
+
+**Printing**
+
+- Confirming a sale no longer opens the print dialog.
+- The completed-sale pill has **Print receipt** and **View invoice** (or **View
+  sale** if no fiscal invoice was created). The invoice page keeps its **Print
+  invoice** button and the sale page its **Print receipt** button.
+
+**Cash drawer**
+
+- The "no cash drawer is open" box (`components/cash/cash-session-gate.tsx`) no
+  longer renders a `<form>` inside the sale form, which was invalid HTML. It
+  uses a button and handles Enter itself.
+
+### Catalog (`/products/<id>`)
+
+- Each variant row has an **Edit** button that opens one dialog for colour, size
+  and sell price, with the price history underneath
+  (`components/products/sku-price-dialog.tsx`, `SkuEditDialog`). Colour and size
+  go through `PATCH /skus/:id`; a new price through the price route, so it is
+  still recorded. The SKU code and barcodes do not change.
+- The row actions column is pinned to the right edge of the table on desktop, so
+  Edit is never scrolled out of view.
+- The header button is now **Edit model** (name, category, cost, price for all
+  variants).
+
+### Sidebar (`components/dashboard/nav-entries.ts`)
+
+- **Inventory** is renamed **Warehouse**, also in the quick-command search, the
+  tab title and the page eyebrow. The URL is still `/inventory`.
+- **Suppliers** appears once, under Stock. The duplicate under Admin is gone.
+- **Settings** is new, first under Admin. It opens `/admin` on the Employees tab,
+  with Locations and Settings beside it, and shows for anyone with
+  `users.manage`, `locations.view_all` or `settings.manage`.

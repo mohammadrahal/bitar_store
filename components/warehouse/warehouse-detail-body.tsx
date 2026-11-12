@@ -8,7 +8,9 @@ import {
   PackagePlus,
   Truck,
 } from 'lucide-react'
+import { SellersPanels } from '@/components/dashboard/sellers-panels'
 import { StatCard, countOf } from '@/components/dashboard/stat-cards'
+import { DEFAULT_RANGE } from '@/lib/dashboard-range'
 import { StaggerList } from '@/components/motion/stagger'
 import { EmptyState } from '@/components/shared/empty-state'
 import { ErrorState } from '@/components/shared/error-state'
@@ -39,7 +41,8 @@ import { inventoryHubHref } from '@/lib/inventory-hub'
  * the branches (`GET /transfers`), the invoices raised for those shipments
  * (`GET /invoices?kind=b2b`), what the branches are still short of
  * (`GET /replenishment/suggestions`), and what is on the shelves right now
- * (`GET /stock`). This band reads in that order.
+ * (`GET /stock`). This band reads in that order. Best and slowest sellers are
+ * the branches' sales held against this warehouse's own stock.
  */
 export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
   const { canSeeTransfers, canManageMinimums, can } = usePermission()
@@ -98,7 +101,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           value={formatNumber(deliveries.data?.total ?? 0)}
           detail="Supplier receipts recorded here"
           icon={PackagePlus}
-          href={inventoryHubHref('receive-stock')}
+          href={'/stock-receipts'}
         />
       </StaggerList>
 
@@ -269,7 +272,7 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           title="Deliveries in"
           description="Supplier receipts. Every delivery is recorded into this warehouse."
           actions={
-            <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary btn-sm">
+            <Link href={'/stock-receipts'} className="btn btn-secondary btn-sm">
               All deliveries
             </Link>
           }
@@ -363,6 +366,8 @@ export function WarehouseDetailBody({ warehouseId }: { warehouseId: string }) {
           )}
         </Panel>
       </div>
+
+      <SellersPanels location={warehouseId} days={DEFAULT_RANGE} />
 
       <BranchStockPanel branchId={warehouseId} />
     </>

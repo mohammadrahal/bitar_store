@@ -23,7 +23,15 @@ const TOP = 5
  * row gives in a third of the height. The bar is scaled to the leader, so the
  * first row is always full. it shows share of the top seller, not of the total.
  */
-export function BestSellersList({ scope, days }: { scope: BranchScope; days: RangeDays }) {
+export function BestSellersList({
+  scope,
+  days,
+  description = 'Velocity ranked by units sold',
+}: {
+  scope: BranchScope
+  days: RangeDays
+  description?: string
+}) {
   const { canViewBranchSalesTelemetry, canViewNetworkSalesTelemetry } = usePermission()
   const allowed =
     scope === ALL_BRANCHES
@@ -41,7 +49,7 @@ export function BestSellersList({ scope, days }: { scope: BranchScope; days: Ran
     <Panel
       title="Best Sellers"
       headingLevel={3}
-      description="Velocity ranked by units sold"
+      description={description}
       className="overview-feed-panel"
       actions={
         <span className="overview-panel-badge">{coversRange ? `${days}d cycle` : 'Today'}</span>

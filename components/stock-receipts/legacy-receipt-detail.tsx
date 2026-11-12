@@ -20,8 +20,6 @@ import {
   receiptTotal,
   receiptUnits,
 } from '@/services/stock-receipts.service'
-import { inventoryHubHref } from '@/lib/inventory-hub'
-
 /**
  * A delivery recorded before `POST /goods-receipts` was wired up.
  *
@@ -44,7 +42,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
   if (!receipt) {
     return (
       <>
-        <Link href={inventoryHubHref('receive-stock')} className="back-link">
+        <Link href={'/stock-receipts'} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -53,7 +51,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
           title="This receipt is not on this device"
           description="Receipt paperwork is saved in the browser that recorded it. The stock it placed is on the server and is unaffected."
           action={
-            <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary">
+            <Link href={'/stock-receipts'} className="btn btn-secondary">
               Back to receipts
             </Link>
           }
@@ -72,7 +70,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
 
   return (
     <>
-      <Link href={inventoryHubHref('receive-stock')} className="back-link">
+      <Link href={'/stock-receipts'} className="back-link">
         <ArrowLeft size={16} aria-hidden="true" />
         Receive stock
       </Link>
@@ -223,7 +221,7 @@ export function LegacyReceiptDetail({ receiptId }: { receiptId: string }) {
           onResolve={(confirmed) => {
             setConfirming(false)
             if (confirmed)
-              remove.mutate(receipt.id, { onSuccess: () => router.push(inventoryHubHref('receive-stock')) })
+              remove.mutate(receipt.id, { onSuccess: () => router.push('/stock-receipts') })
           }}
         />
       )}

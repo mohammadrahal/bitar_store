@@ -1,8 +1,9 @@
 'use client'
 
 import { useId, useRef } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { MoneyInput } from '@/components/shared/money-input'
 import { usePriceHistory, useUpdateVariant } from '@/hooks/use-skus'
 import { useModalBehavior } from '@/hooks/use-modal-behavior'
 import { formatDocumentDate, formatPrice } from '@/lib/format'
@@ -42,6 +43,7 @@ export function SkuEditDialog({ variant, onClose }: { variant: Variant; onClose:
   useModalBehavior(ref, onClose)
   const {
     register,
+    control,
     handleSubmit,
     formState: { errors, isDirty },
   } = useForm<SkuEditFormValues>({
@@ -91,16 +93,21 @@ export function SkuEditDialog({ variant, onClose }: { variant: Variant; onClose:
           </div>
           <div className="field">
             <label htmlFor={priceId}>Sell price ({variant.currency})</label>
-            <input
-              id={priceId}
-              {...register('price', { valueAsNumber: true })}
-              type="number"
-              min="0"
-              step="0.01"
-              inputMode="decimal"
-              className="tabular"
-              aria-invalid={errors.price ? true : undefined}
-              aria-describedby={errors.price ? `${priceId}-error` : undefined}
+            <Controller
+              control={control}
+              name="price"
+              render={({ field }) => (
+                <MoneyInput
+                  id={priceId}
+                  ref={field.ref}
+                  name={field.name}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onChange={(next) => field.onChange(next ?? Number.NaN)}
+                  aria-invalid={errors.price ? true : undefined}
+                  aria-describedby={errors.price ? `${priceId}-error` : undefined}
+                />
+              )}
             />
             {errors.price && <span id={`${priceId}-error`} className="field-error">{errors.price.message}</span>}
           </div>

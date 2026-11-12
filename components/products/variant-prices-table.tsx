@@ -1,5 +1,6 @@
 'use client'
 
+import { MoneyInput } from '@/components/shared/money-input'
 import { Pagination } from '@/components/shared/pagination'
 import { usePagination } from '@/hooks/use-pagination'
 import { comboKey } from '@/schemas/product.schema'
@@ -30,20 +31,22 @@ export function VariantPricesTable({
 }) {
   const showCosts = Boolean(onCostChange && defaultCost !== undefined)
 
-  const setPrice = (key: string, text: string) => {
+  const setPrice = (key: string, value: number | undefined) => {
     const next = { ...prices }
-    if (text === '') delete next[key]
-    else next[key] = Number(text)
+    if (value === undefined) delete next[key]
+    else next[key] = value
     onPriceChange(next)
   }
 
-  const setCost = (key: string, text: string) => {
+  const setCost = (key: string, value: number | undefined) => {
     if (!onCostChange) return
     const next = { ...(costs ?? {}) }
-    if (text === '') delete next[key]
-    else next[key] = Number(text)
+    if (value === undefined) delete next[key]
+    else next[key] = value
     onCostChange(next)
   }
+
+  const fallback = (amount: number | undefined) => (amount !== undefined && Number.isFinite(amount) && amount > 0 ? String(amount) : '0')
 
   const pagination = usePagination(combos, 20)
 
@@ -73,29 +76,19 @@ export function VariantPricesTable({
                 </th>
                 {showCosts ? (
                   <td>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      inputMode="decimal"
-                      className="tabular"
-                      value={costs?.[key] ?? (Number.isFinite(defaultCost) && defaultCost! > 0 ? defaultCost : '')}
-                      placeholder="0"
-                      onChange={(event) => setCost(key, event.target.value)}
+                    <MoneyInput
+                      value={costs?.[key]}
+                      placeholder={fallback(defaultCost)}
+                      onChange={(next) => setCost(key, next)}
                       aria-label={`Unit cost of ${color} / ${size}`}
                     />
                   </td>
                 ) : null}
                 <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    inputMode="decimal"
-                    className="tabular"
-                    value={prices[key] ?? (Number.isFinite(defaultPrice) && defaultPrice > 0 ? defaultPrice : '')}
-                    placeholder="0"
-                    onChange={(event) => setPrice(key, event.target.value)}
+                  <MoneyInput
+                    value={prices[key]}
+                    placeholder={fallback(defaultPrice)}
+                    onChange={(next) => setPrice(key, next)}
                     aria-label={`Sell price of ${color} / ${size}`}
                   />
                 </td>

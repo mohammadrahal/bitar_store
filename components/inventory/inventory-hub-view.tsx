@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 import {
   ArrowLeftRight,
+  ChartNoAxesColumn,
   PackageCheck,
   PackagePlus,
   Plus,
@@ -14,8 +15,9 @@ import {
 } from 'lucide-react'
 import { parseInventoryFilter } from '@/lib/inventory-filters'
 import { InventoryVariantsView } from '@/components/inventory/inventory-variants-view'
+import { SellersPanels } from '@/components/dashboard/sellers-panels'
+import { DEFAULT_RANGE } from '@/lib/dashboard-range'
 import { ReplenishmentView } from '@/components/warehouse/replenishment-view'
-import { StockReceiptsView } from '@/components/stock-receipts/stock-receipts-view'
 import { TransfersView } from '@/components/transfers/transfers-view'
 import { PageHeader } from '@/components/shared/page-header'
 import { useBranchScope } from '@/hooks/use-branch-scope'
@@ -25,6 +27,7 @@ import { usePermission } from '@/hooks/use-permission'
 import { useTransfersList } from '@/hooks/use-transfers'
 import { formatNumber } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { ALL_BRANCHES } from '@/types'
 import {
   inventoryHubHref,
   inventoryWorkspaceHref,
@@ -44,7 +47,8 @@ const HUB_DESCRIPTION =
   'Real-time inventory synchronization across boutiques and warehouses. Balances update through verified transfers and are reconciled on a continuous cycle.'
 
 /**
- * Stock hub: variant ledger, transfers, receiving, supplier receipts and replenishment.
+ * Stock hub: variant ledger, transfers, receiving and replenishment. Supplier
+ * deliveries have their own sidebar section and `/stock-receipts` route.
  */
 export function InventoryHubView() {
   const router = useRouter()
@@ -57,6 +61,8 @@ export function InventoryHubView() {
     canReceiveTransfers,
     canManageMinimums,
     canRequestTransfer,
+    canViewBranchSalesTelemetry,
+    canViewNetworkSalesTelemetry,
   } = usePermission()
 
   const stock = can('stock.view')
@@ -64,19 +70,23 @@ export function InventoryHubView() {
   const showReceiving = canReceiveTransfers()
   const showReceiveStock = can('stock.adjust')
   const showReplenishment = canManageMinimums()
+  /* A warehouse in scope reads the network's sales, so either grant opens the tab;
+     each panel still checks its own scope and hides itself if not allowed. */
+  const showSellers =
+    stock && (canViewNetworkSalesTelemetry() || (scope !== ALL_BRANCHES && canViewBranchSalesTelemetry(scope)))
 
   const tabs: TabDef[] = useMemo(
     () =>
       (
         [
           { id: 'variants', label: 'Variants stock', icon: Warehouse, visible: stock },
+          { id: 'sellers', label: 'Best & slowest', icon: ChartNoAxesColumn, visible: showSellers },
           { id: 'transfers', label: 'Transfers', icon: ArrowLeftRight, visible: showTransfers },
           { id: 'receiving', label: 'Receiving log', icon: PackageCheck, visible: showReceiving },
-          { id: 'receive-stock', label: 'Receive stock', icon: PackagePlus, visible: showReceiveStock },
           { id: 'replenishment', label: 'Replenishment', icon: Truck, visible: showReplenishment },
         ] satisfies TabDef[]
       ).filter((t) => t.visible),
-    [stock, showTransfers, showReceiving, showReceiveStock, showReplenishment],
+    [stock, showSellers, showTransfers, showReceiving, showReceiveStock, showReplenishment],
   )
 
   const requested = parseInventoryHubSection(searchParams.get('section'))
@@ -90,6 +100,10 @@ export function InventoryHubView() {
   }, [requested, tabs, filterFromUrl])
 
   useEffect(() => {
+    if (requested === 'receive-stock') {
+      router.replace('/stock-receipts')
+      return
+    }
     if (requested && tabs.some((t) => t.id === requested)) return
     if (!requested && section === 'variants' && !filterFromUrl) return
     const next = new URLSearchParams(searchParams.toString())
@@ -159,9 +173,9 @@ export function InventoryHubView() {
 
       <div className="inventory-hub-panel" role="tabpanel" id={`inventory-section-${section}`}>
         {section === 'variants' && <InventoryVariantsView showPageHeader={false} />}
+        {section === 'sellers' && showSellers && <SellersPanels location={scope} days={DEFAULT_RANGE} />}
         {section === 'transfers' && showTransfers && <TransfersView embedded />}
         {section === 'receiving' && showReceiving && <TransfersView embedded initialStatus="dispatched" />}
-        {section === 'receive-stock' && showReceiveStock && <StockReceiptsView embedded />}
         {section === 'replenishment' && showReplenishment && <ReplenishmentView embedded />}
       </div>
     </>

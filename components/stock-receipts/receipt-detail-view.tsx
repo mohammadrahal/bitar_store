@@ -16,8 +16,6 @@ import { ApiError } from '@/lib/api/api-error'
 import { formatDateInput, formatNumber, formatPrice, formatRelativeDateTime } from '@/lib/format'
 import { priceOf } from '@/lib/api/map-catalog'
 import type { ApiGoodsReceipt } from '@/lib/api/types'
-import { inventoryHubHref } from '@/lib/inventory-hub'
-
 /**
  * One delivery.
  *
@@ -42,7 +40,7 @@ export function ReceiptDetailView({ receiptId }: { receiptId: string }) {
   if (notOnServer) {
     return (
       <>
-        <Link href={inventoryHubHref('receive-stock')} className="back-link">
+        <Link href={'/stock-receipts'} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -51,7 +49,7 @@ export function ReceiptDetailView({ receiptId }: { receiptId: string }) {
           title="No such receipt"
           description="It is not on the server, and this browser has no copy of it either."
           action={
-            <Link href={inventoryHubHref('receive-stock')} className="btn btn-secondary">
+            <Link href={'/stock-receipts'} className="btn btn-secondary">
               Back to receipts
             </Link>
           }
@@ -63,7 +61,7 @@ export function ReceiptDetailView({ receiptId }: { receiptId: string }) {
   if (server.isError || !server.data) {
     return (
       <>
-        <Link href={inventoryHubHref('receive-stock')} className="back-link">
+        <Link href={'/stock-receipts'} className="back-link">
           <ArrowLeft size={16} aria-hidden="true" />
           Receive stock
         </Link>
@@ -85,7 +83,7 @@ function GoodsReceiptDetail({ receipt }: { receipt: ApiGoodsReceipt }) {
 
   return (
     <>
-      <Link href={inventoryHubHref('receive-stock')} className="back-link">
+      <Link href={'/stock-receipts'} className="back-link">
         <ArrowLeft size={16} aria-hidden="true" />
         Receive stock
       </Link>

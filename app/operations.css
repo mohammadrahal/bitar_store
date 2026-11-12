@@ -134,7 +134,7 @@ ul.chip-row { list-style: none; margin: 0; padding: 0; }
   padding-bottom: 12px;
 }
 .ledger-available {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   font-weight: 600;
 }
 .dark .ledger-available {
@@ -1064,7 +1064,7 @@ details.optional[open] summary { margin-bottom: 16px; }
 }
 .btn-sale-catalog-add {
   border: 1px solid hsl(var(--gold-500) / 0.55) !important;
-  color: hsl(var(--gold-500)) !important;
+  color: hsl(var(--gold-ink)) !important;
   background: transparent !important;
   font-weight: 600;
 }
@@ -2159,7 +2159,10 @@ details.optional[open] summary { margin-bottom: 16px; }
   }
 }
 .invoices-ledger-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
-.invoices-ledger-toolbar-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.invoices-ledger-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.invoices-ledger-filters-divider { width: 1px; height: 24px; background: hsl(var(--border)); }
+.invoices-ledger-toolbar-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; flex-basis: 100%; }
+.invoices-ledger-toolbar-row > .search-field { flex: 1 1 280px; }
 .invoices-ledger-table-wrap { margin: 0 -4px; }
 .ledger-col-check { width: 40px; }
 .ledger-invoice-cell {
@@ -2282,8 +2285,11 @@ details.optional[open] summary { margin-bottom: 16px; }
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--layout-gap);
-  align-items: start;
+  align-items: stretch;
 }
+.create-invoice-gateway-grid > .panel { display: flex; flex-direction: column; }
+.create-invoice-gateway-grid > .panel > .panel-body { flex: 1; }
+.create-invoice-gateway-grid > .panel > .panel-body > .btn { margin-top: auto; }
 @media (max-width: 767px) {
   .create-invoice-gateway-grid { grid-template-columns: 1fr; }
 }
@@ -2564,7 +2570,7 @@ details.optional[open] summary { margin-bottom: 16px; }
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .dark .cash-z-receipt-brand {
   color: hsl(var(--gold-400));
@@ -2800,7 +2806,7 @@ details.optional[open] summary { margin-bottom: 16px; }
   background: hsl(var(--card));
 }
 .financial-reports-kpi--gold .financial-reports-kpi-value {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .financial-reports-kpi-label {
   margin: 0 0 8px;
@@ -2992,7 +2998,7 @@ details.optional[open] summary { margin-bottom: 16px; }
 }
 .identity-dossier-badge--gold {
   border-color: hsl(var(--gold-500) / 0.4);
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .identity-dossier-meta {
   display: grid;
@@ -3041,7 +3047,7 @@ details.optional[open] summary { margin-bottom: 16px; }
   background: hsl(var(--card));
 }
 .identity-dossier-kpi--gold .identity-dossier-kpi-value {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
 }
 .identity-dossier-kpi-label {
   margin: 0 0 8px;
@@ -3174,7 +3180,7 @@ details.optional[open] summary { margin-bottom: 16px; }
   color: inherit;
 }
 .table-primary-link:hover {
-  color: hsl(var(--gold-500));
+  color: hsl(var(--gold-ink));
   text-decoration: underline;
 }
 

@@ -37,6 +37,8 @@ export function useTransfer(id: string) {
 async function invalidateTransfers(queryClient: ReturnType<typeof useQueryClient>) {
   clearDraftReservedCache()
   invalidateStockQueries(queryClient)
+  /* Dispatching raises the supply / return invoice drafts on the server. */
+  void queryClient.invalidateQueries({ queryKey: queryKeys.apiInvoices.all })
   await queryClient.invalidateQueries({ queryKey: queryKeys.transfers.all })
   await queryClient.refetchQueries({ queryKey: queryKeys.transfers.all, type: 'active' })
 }

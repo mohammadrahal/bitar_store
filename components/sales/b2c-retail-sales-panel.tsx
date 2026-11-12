@@ -9,6 +9,7 @@ import { receiptFromSale } from '@/components/sales/sale-receipt-build'
 import { printSaleReceipt } from '@/components/sales/sale-receipt-print'
 import { SearchInput } from '@/components/shared/search-input'
 import { Can } from '@/components/shared/can'
+import { useConfirm } from '@/components/shared/confirm-dialog'
 import { ErrorState } from '@/components/shared/error-state'
 import { Field } from '@/components/shared/field'
 import { FilterChips, type ChipOption } from '@/components/shared/filter-chips'
@@ -92,6 +93,7 @@ export function B2cRetailSalesPanel({
   const listQuery = useSalesList(branchId, date || undefined, saleFilter !== 'pending')
   const pendingQuery = usePendingSales(branchId)
   const removePending = useDeletePendingSale()
+  const [confirm, confirmDialog] = useConfirm()
 
   const completedSales = useMemo(() => {
     if (saleFilter === 'pending') return []
@@ -315,7 +317,15 @@ export function B2cRetailSalesPanel({
                             <button
                               type="button"
                               className="btn btn-ghost btn-sm danger"
-                              onClick={() => removePending.mutate({ id: row.pending.id, branchId: row.pending.branchId })}
+                              onClick={async () => {
+                                const confirmed = await confirm({
+                                  title: 'Remove this pending sale?',
+                                  description: `${pendingUnits(row.pending)} item(s), ${formatPrice(pendingSaleTotal(row.pending))}. The basket is deleted and cannot be resumed.`,
+                                  confirmLabel: 'Remove',
+                                  tone: 'danger',
+                                })
+                                if (confirmed) removePending.mutate({ id: row.pending.id, branchId: row.pending.branchId })
+                              }}
                             >
                               Remove
                             </button>
@@ -331,6 +341,7 @@ export function B2cRetailSalesPanel({
           </>
         )}
       </MotionSwap>
+      {confirmDialog}
     </Panel>
   )
 }

@@ -1,12 +1,14 @@
 'use client'
 
-import { useId, useRef } from 'react'
+import { useCallback, useId, useRef, useState } from 'react'
 import { useModalBehavior } from '@/hooks/use-modal-behavior'
 
 export interface ConfirmOptions {
   title: string
   description: string
   confirmLabel?: string
+  /** The dismiss button. Rename it when the action itself is a cancel. */
+  cancelLabel?: string
   tone?: 'danger' | 'default'
 }
 
@@ -14,6 +16,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   tone = 'default',
   onResolve,
 }: ConfirmOptions & { onResolve: (confirmed: boolean) => void }) {
@@ -30,7 +33,7 @@ export function ConfirmDialog({
         <p id={descId}>{description}</p>
         <div className="dialog-actions">
           <button type="button" className="btn btn-secondary" onClick={() => onResolve(false)} data-autofocus>
-            Cancel
+            {cancelLabel}
           </button>
           <button type="button" className={`btn ${tone === 'danger' ? 'btn-danger' : 'btn-primary'}`} onClick={() => onResolve(true)}>
             {confirmLabel}
@@ -39,4 +42,28 @@ export function ConfirmDialog({
       </div>
     </div>
   )
+}
+
+/**
+ * `const [confirm, confirmDialog] = useConfirm()`, render `confirmDialog`, then
+ * `if (await confirm({...})) doIt()`. Saves each screen its own open state.
+ */
+export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, React.ReactNode] {
+  const [pending, setPending] = useState<{ options: ConfirmOptions; resolve: (confirmed: boolean) => void } | null>(
+    null,
+  )
+  const confirm = useCallback(
+    (options: ConfirmOptions) => new Promise<boolean>((resolve) => setPending({ options, resolve })),
+    [],
+  )
+  const dialog = pending ? (
+    <ConfirmDialog
+      {...pending.options}
+      onResolve={(confirmed) => {
+        pending.resolve(confirmed)
+        setPending(null)
+      }}
+    />
+  ) : null
+  return [confirm, dialog]
 }

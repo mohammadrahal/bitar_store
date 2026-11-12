@@ -10,6 +10,7 @@ import {
   History,
   LayoutDashboard,
   Package,
+  PackagePlus,
   ScanLine,
   ScrollText,
   Settings,
@@ -60,7 +61,7 @@ export function activeHref(current: string, hrefs: string[]) {
 }
 
 /**
- * Navigation as four flat sections rather than collapsing groups.
+ * Navigation as flat labelled sections rather than collapsing groups.
  *
  * A disclosure that has to be opened to find a link costs a click on every
  * visit and hides where you are; four labelled sections of plain links show the
@@ -125,7 +126,7 @@ export function useNavEntries(): NavSection[] {
 
   const stock: NavLinkItem[] = []
   if (can('stock.view')) {
-    /* Transfers, receiving, supplier receipts and replenishment live under
+    /* Transfers, receiving and replenishment live under
        Inventory as tabs; badges roll up onto this one link. */
     const hubBadges: ('transfer_drafts' | 'incoming')[] = []
     if (canDispatchTransfers() || (!canDispatchTransfers() && !canReceiveTransfers() && canSeeTransfers())) {
@@ -145,8 +146,14 @@ export function useNavEntries(): NavSection[] {
   if (canViewAdminWarehouseTools()) {
     stock.push({ href: '/stock-network', label: 'Stock everywhere', icon: Warehouse })
   }
+
+  /* Goods coming in from suppliers to the warehouse: the delivery notes and the
+     suppliers they come from. */
+  const supply: NavLinkItem[] = []
   if (can('stock.adjust')) {
-    stock.push({ href: '/suppliers', label: 'Suppliers', icon: Truck })
+    supply.push({ href: '/stock-receipts/new', label: 'Receive delivery', icon: PackagePlus })
+    supply.push({ href: '/stock-receipts', label: 'Deliveries', icon: ClipboardList })
+    supply.push({ href: '/suppliers', label: 'Suppliers', icon: Truck })
   }
 
   const catalog: NavLinkItem[] = []
@@ -182,6 +189,7 @@ export function useNavEntries(): NavSection[] {
     { label: '', links: overview },
     { label: 'Sell', links: sell },
     { label: 'Stock', links: stock },
+    { label: 'Supplier to warehouse', links: supply },
     { label: 'Catalog', links: catalog },
     { label: 'Admin', links: admin },
   ].filter((section) => section.links.length > 0)

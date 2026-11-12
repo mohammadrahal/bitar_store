@@ -8,7 +8,9 @@ import { SearchInput } from '@/components/shared/search-input'
 import { Pagination } from '@/components/shared/pagination'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useMirroredBranches } from '@/hooks/use-stock'
+import { useCanViewCosts } from '@/hooks/use-costs'
 import { formatPrice } from '@/lib/format'
+import { getSkuCost } from '@/services/catalog-costs.service'
 import {
   listSaleModels,
   listSaleModelsAtBranch,
@@ -41,6 +43,10 @@ function skuSearchReady(term: string): boolean {
  */
 export type Availability = 'enforce' | 'warn' | 'ignore'
 
+function costCell(cost: number | undefined): string {
+  return cost !== undefined && cost > 0 ? formatPrice(cost) : '—'
+}
+
 function leftToSell(option: VariantOption, inCart: Record<string, number>): number {
   return Math.max(0, (option.available ?? 0) - (inCart[option.variantId] ?? 0))
 }
@@ -70,6 +76,7 @@ function VariantRows({
   itemLabel,
   nested = false,
   pickerUi = 'default',
+  showCost = false,
 }: {
   rows: VariantOption[]
   inCart: Record<string, number>
@@ -82,10 +89,13 @@ function VariantRows({
   /** Inside an expanded model row: drop the outer border, the row has one. */
   nested?: boolean
   pickerUi?: 'default' | 'till'
+  /** Off the till, rows are priced at unit cost; sell price belongs to the till only. */
+  showCost?: boolean
 }) {
   const enforceStock = availability === 'enforce'
   const showsStock = availability !== 'ignore'
   const till = pickerUi === 'till'
+  const showPrice = till || showCost
   const listed = enforceStock ? rows.filter((option) => (option.available ?? 0) > 0) : rows
   if (listed.length === 0) {
     return (
@@ -105,9 +115,11 @@ function VariantRows({
             <th scope="col" className="num">
               {till && showsStock ? 'Stock' : showsStock ? 'Available' : 'On hand'}
             </th>
-            <th scope="col" className="num">
-              {till ? 'Price' : 'Unit'}
-            </th>
+            {showPrice && (
+              <th scope="col" className="num">
+                {till ? 'Price' : 'Unit cost'}
+              </th>
+            )}
             <th scope="col" className="num">
               Qty
             </th>
@@ -163,7 +175,11 @@ function VariantRows({
                     </>
                   )}
                 </td>
-                <td className="num tabular">{formatPrice(option.sellPrice)}</td>
+                {till ? (
+                  <td className="num tabular">{formatPrice(option.sellPrice)}</td>
+                ) : showCost ? (
+                  <td className="num tabular">{costCell(getSkuCost(option.variantId))}</td>
+                ) : null}
                 <td className="num catalog-qty-cell">
                   {till ? (
                     <QtyStepper
@@ -259,6 +275,7 @@ export function CatalogLinePicker({
   pickerUi?: 'default' | 'till'
 }) {
   const till = pickerUi === 'till'
+  const canViewCosts = useCanViewCosts()
   const [input, setInput] = useState('')
   const search = useDebouncedValue(input, 220)
   const [productPage, setProductPage] = useState(1)
@@ -380,6 +397,7 @@ export function CatalogLinePicker({
     addLabel,
     itemLabel,
     pickerUi,
+    showCost: !till && canViewCosts,
   }
 
   return (

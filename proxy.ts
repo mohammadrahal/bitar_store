@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 /**
  * Hub list views: `/inventory?section=…` and `/admin?section=…`.
- * Legacy top-level URLs (not `/transfers`) redirect so bookmarks keep working.
- * `/transfers` is a dedicated app route — do not fold it into the inventory hub.
+ * Legacy top-level URLs redirect so bookmarks keep working. `/transfers` and
+ * `/stock-receipts` are dedicated app routes — do not fold them into the inventory hub.
  *
  * Next 16 renamed the `middleware` file convention to `proxy` — same request
  * hook, same `config.matcher`, and the function must be named `proxy` (or be
@@ -12,17 +12,6 @@ import { NextResponse, type NextRequest } from 'next/server'
  */
 export function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl
-
-  if (pathname === '/stock-receipts') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/inventory'
-    url.searchParams.set('section', 'receive-stock')
-    searchParams.forEach((value, key) => {
-      if (key === 'section') return
-      url.searchParams.set(key, value)
-    })
-    return NextResponse.redirect(url)
-  }
 
   if (pathname === '/replenishment') {
     const url = request.nextUrl.clone()
@@ -58,7 +47,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/stock-receipts',
     '/replenishment',
     '/users',
     '/branches',

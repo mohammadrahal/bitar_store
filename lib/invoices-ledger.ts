@@ -1,19 +1,31 @@
 import type { ApiInvoiceSummary } from '@/lib/api/types'
-import { invoiceTotal } from '@/services/invoices-api.service'
+import { invoiceTotal, isTransferInvoice } from '@/services/invoices-api.service'
 
 export type LedgerTab = 'all' | 'paid' | 'pending' | 'drafts' | 'void'
 
 export type LedgerDisplayStatus = 'paid' | 'pending' | 'draft' | 'void'
 
+/** `b2b` covers supply and return invoices: both are between the warehouse and a branch. */
+export type LedgerKind = 'all' | 'b2c' | 'b2b'
+
+export function matchesLedgerKind(inv: ApiInvoiceSummary, kind: LedgerKind): boolean {
+  if (kind === 'all') return true
+  return kind === 'b2b' ? isTransferInvoice(inv) : inv.kind === 'b2c'
+}
+
+/** The server reads `from`/`to` as calendar days in the shop's time zone, so send local days, not UTC ones. */
+function localDay(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 export function ledgerRangeIso(days: number) {
-  const to = new Date()
-  const from = new Date(Date.now() - days * 86_400_000)
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
+  return { from: localDay(new Date(Date.now() - days * 86_400_000)), to: localDay(new Date()) }
 }
 
 export function ledgerDisplayStatus(inv: ApiInvoiceSummary): LedgerDisplayStatus {
   if (inv.voided) return 'void'
-  if (inv.status === 'draft') return inv.kind === 'b2b' ? 'pending' : 'draft'
+  if (inv.status === 'draft') return isTransferInvoice(inv) ? 'pending' : 'draft'
   return 'paid'
 }
 

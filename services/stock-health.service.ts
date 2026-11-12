@@ -41,6 +41,17 @@ export interface StockHealth {
   /** Variants the counts were taken over, so a reader can size them. */
   variantCount: number
   scopedToOneLocation: boolean
+  /** Variants with sellable units in scope, keyed by variant id. Feeds the slow sellers list. */
+  sellable: Record<string, StockedVariant>
+}
+
+export interface StockedVariant {
+  variantId: string
+  productName: string
+  color: string
+  size: string
+  sku: string
+  sellable: number
 }
 
 /** A location holds a variant once it has units there, or a minimum set for it. */
@@ -69,6 +80,7 @@ function emptyHealth(scopedToOneLocation: boolean): StockHealth {
     minimumsKnown: false,
     variantCount: 0,
     scopedToOneLocation,
+    sellable: {},
   }
 }
 
@@ -104,6 +116,16 @@ function healthFromOverview(overview: ApiStockOverview, scope: BranchScope): Sto
     health.variantCount += 1
 
     const sellable = (single ? carrying : rows).reduce((sum, row) => sum + row.sellable, 0)
+    if (sellable > 0 && item.sku.isActive) {
+      health.sellable[item.sku.id] = {
+        variantId: item.sku.id,
+        productName: item.sku.style.name,
+        color: item.sku.color,
+        size: item.sku.size,
+        sku: item.sku.skuCode,
+        sellable,
+      }
+    }
     if (sellable === 0) {
       health.outOfStock += 1
     } else if (!single && rows.some((row) => row.sellable === 0 && carries(row))) {
@@ -187,6 +209,16 @@ function healthFromBranches(db: MockDb, positions: BranchPosition[], single: boo
 
     health.variantCount += 1
 
+    if (sellable > 0) {
+      health.sellable[variant.id] = {
+        variantId: variant.id,
+        productName: db.products.find((product) => product.id === variant.productId)?.name ?? '',
+        color: variant.color,
+        size: variant.size,
+        sku: variant.sku,
+        sellable,
+      }
+    }
     if (sellable === 0) health.outOfStock += 1
     else if (!single && outAtCarrier) health.outElsewhere += 1
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useRef } from 'react'
+import { useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Wand2, X } from 'lucide-react'
@@ -18,6 +18,9 @@ export function SkuBarcodesDialog({ variant, barcodes, onClose }: { variant: Var
   const add = useAddBarcode()
   const remove = useRemoveBarcode()
   const generate = useGenerateBarcode()
+  /* Confirmed in the row: a second modal over this one would fight it for
+     Escape and the scroll lock. */
+  const [confirmingId, setConfirmingId] = useState<string | null>(null)
   useModalBehavior(ref, onClose)
   const {
     register,
@@ -56,16 +59,38 @@ export function SkuBarcodesDialog({ variant, barcodes, onClose }: { variant: Var
             {barcodes.map((barcode) => (
               <li key={barcode.id}>
                 <span className="tabular">{formatBarcode(barcode.code)}</span>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate({ barcodeId: barcode.id, code: barcode.code })}
-                  aria-label={`Remove barcode ${barcode.code}`}
-                  title="Remove"
-                >
-                  <X size={16} />
-                </button>
+                {confirmingId === barcode.id ? (
+                  <span className="row-actions">
+                    <span className="muted text-sm">Remove this barcode?</span>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      disabled={remove.isPending}
+                      onClick={() =>
+                        remove.mutate(
+                          { barcodeId: barcode.id, code: barcode.code },
+                          { onSettled: () => setConfirmingId(null) },
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                    <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmingId(null)}>
+                      Keep
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    disabled={remove.isPending}
+                    onClick={() => setConfirmingId(barcode.id)}
+                    aria-label={`Remove barcode ${barcode.code}`}
+                    title="Remove"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
               </li>
             ))}
           </ul>

@@ -140,6 +140,17 @@ export async function createB2cInvoiceForSale(
   })
 }
 
+/** Supply and return invoices come off a transfer, start as drafts and are priced at cost. */
+export function isTransferInvoice(invoice: Pick<ApiInvoiceSummary, 'kind'>): boolean {
+  return invoice.kind === 'b2b' || invoice.kind === 'b2b_return'
+}
+
+export function invoiceKindLabel(invoice: Pick<ApiInvoiceSummary, 'kind'>): string {
+  if (invoice.kind === 'b2b_return') return 'Return invoice'
+  if (invoice.kind === 'b2b') return 'Supply invoice'
+  return 'Retail invoice'
+}
+
 export function invoiceTotal(invoice: ApiInvoiceSummary): number {
   return priceOf(invoice.total)
 }
