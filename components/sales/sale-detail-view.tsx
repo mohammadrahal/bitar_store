@@ -24,7 +24,7 @@ import { useBranches } from '@/hooks/use-branches'
 import { useSale } from '@/hooks/use-sales'
 import { getApiClient } from '@/lib/api'
 import type { ApiSale, ApiSaleLine } from '@/lib/api/types'
-import { formatPrice, formatNumber } from '@/lib/format'
+import { formatPrice, formatNumber, toValidDate } from '@/lib/format'
 import { queryKeys } from '@/lib/query-keys'
 import { InvoiceLineBarcode } from '@/components/sales/invoice-line-barcode'
 import { primaryBarcodeFor, useSkuBarcodes } from '@/hooks/use-sku-barcodes'
@@ -34,8 +34,9 @@ import { findB2cInvoiceForSale, invoiceLabel } from '@/services/invoices-api.ser
 import { usdToLbp } from '@/services/settings.service'
 import { useExchangeRate } from '@/hooks/use-settings'
 
-function formatSaleWhen(iso: string) {
-  const date = new Date(iso)
+function formatSaleWhen(iso: string | null | undefined) {
+  const date = toValidDate(iso)
+  if (!date) return ''
   const day = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     month: 'long',

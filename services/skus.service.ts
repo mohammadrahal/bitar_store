@@ -1,6 +1,6 @@
 import { getApiClient } from '@/lib/api'
 import { mapApiBarcode, mapApiPriceChange, mapApiSku, mapApiStyle, priceText } from '@/lib/api/map-catalog'
-import { mirrorCatalog } from '@/mocks/mirror'
+import { mirrorCatalog } from '@/lib/catalog-cache/mirror'
 import { toCatalog } from '@/services/catalog-sync.service'
 import type { Barcode, PriceChange, ProductDetail } from '@/types'
 

@@ -1,6 +1,6 @@
 import { canViewAdminWarehouseTools } from '@/lib/api-access'
 import type { ApiStockOverview } from '@/lib/api/types'
-import { readDb, type MockDb } from '@/mocks/store'
+import { readDb, type MockDb } from '@/lib/catalog-cache/store'
 import { visibleBranchIds, visibleScope } from '@/services/mock-ledger'
 import { branchStockItems, styleStockItems } from '@/services/stock-api.service'
 import { fetchAllStockOverviewCached, fetchStockOverview } from '@/services/warehouse.service'

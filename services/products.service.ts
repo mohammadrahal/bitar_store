@@ -4,7 +4,7 @@ import { isApiFeatureMissing, noteMissingApiFeature } from '@/lib/api/capabiliti
 import { DEFAULT_CURRENCY, priceText } from '@/lib/api/map-catalog'
 import type { ProductFilters } from '@/lib/query-keys'
 import { buildSku, buildVariantCode, formatModelCode } from '@/lib/sku'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import { mintBarcode } from '@/services/barcodes.service'
 import { applyModelCosts, getSkuCost, getStyleCost, setSkuCost, setStyleCost } from '@/services/catalog-costs.service'
 import { refreshStyle, syncCatalog } from '@/services/catalog-sync.service'

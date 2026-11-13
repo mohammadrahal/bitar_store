@@ -1,8 +1,8 @@
 import { getApiClient } from '@/lib/api'
 import { mapApiSku, mapApiStyle } from '@/lib/api/map-catalog'
 import type { ApiSku, ApiStyle } from '@/lib/api/types'
-import { mirrorCatalog } from '@/mocks/mirror'
-import { readDb } from '@/mocks/store'
+import { mirrorCatalog } from '@/lib/catalog-cache/mirror'
+import { readDb } from '@/lib/catalog-cache/store'
 import type { Product, Variant } from '@/types'
 
 /** The API's largest page. */

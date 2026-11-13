@@ -5,7 +5,7 @@ import type { ApiAdjustmentReason } from '@/lib/api/types'
 import { deleteBlob, getBlob, putBlob } from '@/lib/blob-store'
 import { variantLabel } from '@/lib/variant-label'
 import { getSkuCost, getStyleCost } from '@/services/catalog-costs.service'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import { visibleBranchIds, visibleScope } from '@/services/mock-ledger'
 import { ALL_BRANCHES, type BranchScope } from '@/types'
 

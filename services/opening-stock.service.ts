@@ -1,5 +1,5 @@
 import { getApiClient } from '@/lib/api'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import { movedSkusAt } from '@/services/stock-api.service'
 
 export interface OpeningStock {

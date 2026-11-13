@@ -1,6 +1,6 @@
 import { clearAllBlobs } from '@/lib/blob-store'
 import { clearPersistedQueryCache } from '@/lib/query-persist'
-import { resetDb } from '@/mocks/store'
+import { resetDb } from '@/lib/catalog-cache/store'
 import { clearTodayBranchSalesCache } from '@/services/today-branch-sales.service'
 
 /** Bump when a new purge pass should run for every browser. */

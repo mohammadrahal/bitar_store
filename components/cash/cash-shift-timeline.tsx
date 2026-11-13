@@ -59,8 +59,8 @@ export function CashShiftTimeline({
                 </span>
                 <span className="cash-shift-timeline-meta tabular">
                   {row.closedAt
-                    ? formatShortDate(new Date(row.closedAt))
-                    : formatShortDate(new Date(row.openedAt))}{' '}
+                    ? formatShortDate(row.closedAt)
+                    : formatShortDate(row.openedAt)}{' '}
                   · {formatPrice(net)}
                 </span>
               </Link>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { MailPlus } from 'lucide-react'
-import { formatShortDate } from '@/lib/format'
+import { formatShortDate, formatTime } from '@/lib/format'
 import { inviteStatusLabel, inviteStatusPillClass } from '@/lib/invite-rows'
 
 export type InviteEntryStatus = 'pending' | 'accepted' | 'expired'
@@ -16,7 +16,8 @@ export interface InviteEntry {
 }
 
 function formatSentAt(date: Date) {
-  return `${formatShortDate(date)}, ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`
+  const day = formatShortDate(date)
+  return day ? `${day}, ${formatTime(date)}` : ''
 }
 
 export function InviteMembers({

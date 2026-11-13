@@ -1,7 +1,7 @@
 import { priceOf } from '@/lib/api/map-catalog'
 import type { ApiSalesSummary } from '@/lib/api/types'
 import type { DateRange } from '@/lib/dashboard-range'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import { fetchSalesSummary, fetchTopSkus } from '@/services/reports-api.service'
 import { fetchTodayBranchSales } from '@/services/today-branch-sales.service'
 import { ALL_BRANCHES, type BranchScope, type SalesAnalytics, type SalesSeries, type TopSellerRow } from '@/types'

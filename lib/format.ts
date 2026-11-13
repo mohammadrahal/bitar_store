@@ -36,26 +36,47 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day
 const shortDateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: '2-digit' })
 const longDateFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
 
+export type DateLike = string | number | Date | null | undefined
+
+/**
+ * `Intl.DateTimeFormat#format` throws `RangeError: Invalid time value` on an
+ * invalid Date, which takes down the whole page. API rows can carry a null or
+ * unparseable timestamp, so every formatter goes through this first.
+ */
+export function toValidDate(value: DateLike): Date | null {
+  if (value === null || value === undefined || value === '') return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 function startOfDay(date: Date) {
   const d = new Date(date)
   d.setHours(0, 0, 0, 0)
   return d.getTime()
 }
 
-export function formatRelativeDateTime(iso: string, now = new Date()) {
-  const date = new Date(iso)
+export function formatRelativeDateTime(iso: DateLike, now = new Date()) {
+  const date = toValidDate(iso)
+  if (!date) return EMPTY_DISPLAY
   const diffDays = Math.round((startOfDay(now) - startOfDay(date)) / 86_400_000)
   if (diffDays === 0) return `Today, ${timeFormatter.format(date)}`
   if (diffDays === 1) return `Yesterday, ${timeFormatter.format(date)}`
   return dateTimeFormatter.format(date)
 }
 
-export function formatShortDate(date: Date) {
-  return shortDateFormatter.format(date)
+export function formatTime(value: DateLike) {
+  const date = toValidDate(value)
+  return date ? timeFormatter.format(date) : EMPTY_DISPLAY
 }
 
-export function formatLongDate(date: Date) {
-  return longDateFormatter.format(date)
+export function formatShortDate(value: DateLike) {
+  const date = toValidDate(value)
+  return date ? shortDateFormatter.format(date) : EMPTY_DISPLAY
+}
+
+export function formatLongDate(value: DateLike) {
+  const date = toValidDate(value)
+  return date ? longDateFormatter.format(date) : EMPTY_DISPLAY
 }
 
 export const CURRENCY = 'USD'
@@ -96,8 +117,9 @@ export function initials(name: string) {
 const documentDateFormatter = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: '2-digit' })
 
 /** Dated documents always carry their year, unlike the dashboard's short dates. */
-export function formatDocumentDate(iso: string) {
-  return documentDateFormatter.format(new Date(iso))
+export function formatDocumentDate(iso: DateLike) {
+  const date = toValidDate(iso)
+  return date ? documentDateFormatter.format(date) : EMPTY_DISPLAY
 }
 
 /**
@@ -108,10 +130,12 @@ export function formatDocumentDate(iso: string) {
  * the one that is printed on it. Reading the parts and building a local date
  * keeps the day the person entered.
  */
-export function formatDateInput(value: string) {
+export function formatDateInput(value: string | null | undefined) {
+  if (!value) return EMPTY_DISPLAY
   const [year, month, day] = value.split('-').map(Number)
   if (!year || !month || !day) return value
-  return documentDateFormatter.format(new Date(year, month - 1, day))
+  const date = toValidDate(new Date(year, month - 1, day))
+  return date ? documentDateFormatter.format(date) : value
 }
 
 const settingsDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
@@ -123,8 +147,9 @@ const settingsDateTimeFormatter = new Intl.DateTimeFormat('en-GB', {
 })
 
 /** Settings footnotes, e.g. "3 Nov 2026, 10:42". */
-export function formatSettingsDateTime(iso: string) {
-  return settingsDateTimeFormatter.format(new Date(iso))
+export function formatSettingsDateTime(iso: DateLike) {
+  const date = toValidDate(iso)
+  return date ? settingsDateTimeFormatter.format(date) : EMPTY_DISPLAY
 }
 
 /** Large currency display: `1 USD = 89,500 LBP`. */

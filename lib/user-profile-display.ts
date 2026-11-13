@@ -8,6 +8,7 @@ export function userBadgeId(id: string) {
 export function tenureLabel(createdAt: string | undefined) {
   if (!createdAt) return '—'
   const created = new Date(createdAt)
+  if (Number.isNaN(created.getTime())) return '—'
   const years = Math.max(0, new Date().getFullYear() - created.getFullYear())
   if (years < 1) {
     const months = Math.max(

@@ -1,5 +1,5 @@
 import { isLocationScoped } from '@/lib/permissions'
-import type { MockDb } from '@/mocks/store'
+import type { MockDb } from '@/lib/catalog-cache/store'
 import { useUserStore } from '@/store/user-store'
 import { ALL_BRANCHES, type BranchScope } from '@/types'
 

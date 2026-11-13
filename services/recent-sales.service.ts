@@ -1,6 +1,6 @@
 import { isApiFeatureMissing, noteMissingApiFeature } from '@/lib/api/capabilities'
 import { priceOf } from '@/lib/api/map-catalog'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import { getSalesHistory } from '@/services/sales.service'
 import { fetchTodayBranchSales } from '@/services/today-branch-sales.service'
 import { visibleScope } from '@/services/mock-ledger'

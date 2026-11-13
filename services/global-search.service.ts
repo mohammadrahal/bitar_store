@@ -1,4 +1,4 @@
-import { isRetired, readDb } from '@/mocks/store'
+import { isRetired, readDb } from '@/lib/catalog-cache/store'
 import { resolveSkuReferenceToId, searchVariants } from '@/services/variant-search.service'
 
 export interface SearchHit {

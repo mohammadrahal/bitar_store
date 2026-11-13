@@ -1,7 +1,7 @@
 import { ApiError, getApiClient } from '@/lib/api'
 import { mapApiSku } from '@/lib/api/map-catalog'
-import { mirrorCatalog } from '@/mocks/mirror'
-import { isRetired, readDb, type MockDb } from '@/mocks/store'
+import { mirrorCatalog } from '@/lib/catalog-cache/mirror'
+import { isRetired, readDb, type MockDb } from '@/lib/catalog-cache/store'
 import type { VariantOption } from '@/types'
 
 /** Something a scanner could have produced: one token, no spaces. */

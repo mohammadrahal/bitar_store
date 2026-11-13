@@ -23,7 +23,7 @@ export function OfflineBanner() {
     <div className="offline-banner" role="status">
       <WifiOff size={16} aria-hidden="true" />
       <span>
-        You are offline{asOf === null ? '' : `, showing figures from ${formatRelativeDateTime(new Date(asOf).toISOString())}`}.
+        You are offline{asOf === null ? '' : `, showing figures from ${formatRelativeDateTime(asOf)}`}.
         Sales and receipts cannot be posted until the connection is back.
       </span>
     </div>

@@ -1,4 +1,4 @@
-import { readDb, type MockDb } from '@/mocks/store'
+import { readDb, type MockDb } from '@/lib/catalog-cache/store'
 import {
   canLoadInventoryFromOverview,
   loadStockOverviewForInventory,

@@ -1,5 +1,5 @@
 import type { ApiSale } from '@/lib/api/types'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import { visibleBranchIds, visibleScope } from '@/services/mock-ledger'
 import { listSales } from '@/services/sales.service'
 import { ALL_BRANCHES, type BranchScope } from '@/types'

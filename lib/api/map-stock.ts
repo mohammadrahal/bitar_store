@@ -1,6 +1,6 @@
 import { mapApiSku } from '@/lib/api/map-catalog'
 import type { ApiSkuWithStyle, ApiStockItem } from '@/lib/api/types'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import type { BranchStockRow, StockStatus } from '@/types'
 
 function statusOf(available: number): StockStatus {

@@ -1,4 +1,4 @@
-import { writeDb, type MockDb } from '@/mocks/store'
+import { writeDb, type MockDb } from '@/lib/catalog-cache/store'
 import type { Branch, Product, Variant } from '@/types'
 
 /** Runs after either mirror. Only `kind: "warehouse"` counts. names are not a guess. */
@@ -8,12 +8,12 @@ function settle(db: MockDb) {
 }
 
 /**
- * Branches live on the API while stock lives here, so the store keeps a
- * mirror of them. Called whenever the branch list is fetched.
+ * Keeps a copy of the API's branches so stock queries know which locations to
+ * ask for and screens can name them. Called whenever the branch list is fetched.
  *
  * Branches are upserted, never removed: a manager's API list contains only
- * their own branch, and dropping the rest would throw away other branches'
- * stock. Only a viewer of the whole network may `prune`.
+ * their own branch, and dropping the rest would forget branches the mirror
+ * already knew. Only a viewer of the whole network may `prune`.
  */
 export function mirrorBranches(branches: Branch[], { prune = false } = {}): void {
   writeDb((db) => {

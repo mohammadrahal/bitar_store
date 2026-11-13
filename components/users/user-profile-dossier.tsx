@@ -491,7 +491,7 @@ export function UserProfileDossier({
               </Field>
               {subject.createdAt ? (
                 <Field label="Commissioned">
-                  <input className="input" value={formatShortDate(new Date(subject.createdAt))} readOnly />
+                  <input className="input" value={formatShortDate(subject.createdAt)} readOnly />
                 </Field>
               ) : null}
             </div>

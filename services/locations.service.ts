@@ -1,6 +1,6 @@
 import { getApiClient } from '@/lib/api'
 import { mapApiBranch } from '@/lib/api/map-branch'
-import { mirrorBranches } from '@/mocks/mirror'
+import { mirrorBranches } from '@/lib/catalog-cache/mirror'
 import { seesWholeNetwork } from '@/services/branches.service'
 import {
   clearWarehouseCache,

@@ -1,7 +1,7 @@
 import type { ApiStockOverview } from '@/lib/api/types'
 import { mapApiSku, mapApiStyle } from '@/lib/api/map-catalog'
 import { canViewAdminWarehouseTools } from '@/lib/api-access'
-import { mirrorCatalog } from '@/mocks/mirror'
+import { mirrorCatalog } from '@/lib/catalog-cache/mirror'
 import { useUserStore } from '@/store/user-store'
 import { fetchAllStockOverviewCached } from '@/services/warehouse.service'
 import { ALL_BRANCHES, type BranchScope } from '@/types'

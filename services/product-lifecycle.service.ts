@@ -1,5 +1,5 @@
 import { getApiClient } from '@/lib/api'
-import { readDb } from '@/mocks/store'
+import { readDb } from '@/lib/catalog-cache/store'
 import { getProduct } from '@/services/products.service'
 import { branchStockItems } from '@/services/stock-api.service'
 import type { ProductWithVariants } from '@/types'

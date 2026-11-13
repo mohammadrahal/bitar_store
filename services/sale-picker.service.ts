@@ -1,7 +1,7 @@
 import { syncCatalog } from '@/services/catalog-sync.service'
 import { branchSellableMapForStyle, listBranchStockFromApi } from '@/services/stock-api.service'
 import { draftReservedQuantities, reservedAtBranch } from '@/services/transfer-reservations.service'
-import { isRetired, readDb } from '@/mocks/store'
+import { isRetired, readDb } from '@/lib/catalog-cache/store'
 import type { SaleModelOption, VariantOption } from '@/types'
 
 /**
